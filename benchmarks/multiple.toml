@@ -1,0 +1,39 @@
+[hekad]
+maxprocs = 4
+base_dir = "."
+share_dir = "."
+
+[FxaAuthWebserver]
+type = "LogstreamerInput"
+log_directory = "/work/git/misc-heka/benchmark"
+file_match = 'access_msec\.log'
+decoder = "FxaAuthDecoder"
+
+[FxaAuthWebserver1]
+type = "LogstreamerInput"
+log_directory = "/work/git/misc-heka/benchmark"
+file_match = 'access_msec1\.log'
+decoder = "FxaAuthDecoder"
+
+[FxaAuthWebserver2]
+type = "LogstreamerInput"
+log_directory = "/work/git/misc-heka/benchmark"
+file_match = 'access_msec2\.log'
+decoder = "FxaAuthDecoder"
+
+[FxaAuthDecoder]
+type = "SandboxDecoder"
+script_type = "lua"
+filename = "lua_decoders/nginx_access.lua"
+
+[FxaAuthDecoder.config]
+log_format = '$remote_addr $msec "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent" "$http_x_forwarded_for"'
+
+[FileOutput]
+message_matcher = "TRUE"
+path = "hekaout.log"
+perm = "666"
+flush_count = 100
+flush_operator = "OR"
+encoder = "ProtobufEncoder"
+
