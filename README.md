@@ -16,12 +16,12 @@ test consists of parsing the Nginx logs, converting them to a Heka protobuf stre
 and writing them back to disk.  The configurations were setup to be as equivalent as
 posssible (single output, similar flush intervals, and individual readers for each
 file in the concurrent test). The configs can be found here: 
-https://github.com/trink/hindsight/tree/dev/benchmarks.  
+https://github.com/trink/hindsight/tree/master/benchmarks.  
 
 ### Test Hardware
 * Lenovo x230 Thinkpad
 * Memory 8GB
-* Processor Intel Core i7-3520M CPU @ 2.90GHz × 4
+* Processor Intel Core i7-3520M CPU @ 2.90GHz Ã— 4
 * Disk SSD
 
 ### Test 1 - Processing a single log file
