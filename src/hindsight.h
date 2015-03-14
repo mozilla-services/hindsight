@@ -28,11 +28,14 @@ struct hs_plugin
   long long cp_offset;  // numeric checkpoint
   char* cp_string;      // string checkpoint
   size_t cp_capacity;   // string checkpoint capacity
+  int ticker_interval;
 };
 
 struct hs_plugins
 {
   pthread_mutex_t lock;
+  pthread_mutex_t* shutdown;
+
   hs_plugin** list;
   pthread_t* threads;
   struct hindsight_config* hs_cfg;
@@ -46,6 +49,16 @@ struct hs_plugins
 
   int cnt;
 };
+
+
+/**
+ * Hindsight logging facility
+ *
+ * @param plugin
+ * @param level
+ * @param fmt
+ */
+void hs_log(const char* plugin, int level, const char* fmt, ...);
 
 /**
  * Frees all resources allocated by the plugin

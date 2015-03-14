@@ -12,6 +12,8 @@
 #include <lua.h>
 #include <stdbool.h>
 
+#include "hindsight.h"
+
 typedef enum {
   HS_MODE_UNKNOWN,
   HS_MODE_INPUT,
@@ -29,6 +31,7 @@ typedef struct sandbox_config
   bool preserve_data;
   char* module_path;
   char* filename;
+  int ticker_interval;
 } sandbox_config;
 
 typedef struct hindsight_config

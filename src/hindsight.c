@@ -11,33 +11,34 @@
 #include <errno.h>
 #include <lauxlib.h>
 #include <signal.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <sys/times.h>
 #include <unistd.h>
 
 #include "hindsight_config.h"
+#include "hindsight_logger.h"
 #include "hindsight_sandbox_loader.h"
 
-static bool g_stop = false;
+static pthread_mutex_t g_shutdown;
 
 static void stop_signal(int sig)
 {
   fprintf(stderr, "stop signal received %d\n", sig);
   signal(SIGINT, SIG_DFL);
-  g_stop = true;
+  pthread_mutex_unlock(&g_shutdown);
 }
 
 
-//static void issue_stop(hs_plugins* plugins)
-//{
-//  for (int i = 0; i < plugins->cnt; ++i) {
-//    hs_stop_sandbox(plugins->list[i]->lsb);
-//  }
-//}
-//
+static void issue_stop(hs_plugins* plugins)
+{
+  for (int i = 0; i < plugins->cnt; ++i) {
+    hs_stop_sandbox(plugins->list[i]->lsb);
+  }
+}
+
 
 static int file_exists(const char* fn)
 {
@@ -56,9 +57,18 @@ static void init_plugins(hs_plugins* plugins, hindsight_config* cfg)
 
   plugins->cnt = 0;
   plugins->hs_cfg = cfg;
+  plugins->output_fh = NULL;
+  plugins->shutdown = &g_shutdown;
+
+  if (pthread_mutex_init(plugins->shutdown, NULL)) {
+    perror("shutdown pthread_mutex_init failed");
+    exit(EXIT_FAILURE);
+  }
+  pthread_mutex_lock(plugins->shutdown);
+
 
   if (pthread_mutex_init(&plugins->lock, NULL)) {
-    perror("pthread_mutex_init failed");
+    perror("lock pthread_mutex_init failed");
     exit(EXIT_FAILURE);
   }
 
@@ -67,7 +77,7 @@ static void init_plugins(hs_plugins* plugins, hindsight_config* cfg)
   }
   plugins->cp_values = luaL_newstate();
   if (!plugins->cp_values) {
-    fprintf(stderr, "checkpoint luaL_newstate failed\n");
+    hs_log(HS_APP_NAME, 0, "checkpoint luaL_newstate failed");
     exit(EXIT_FAILURE);
   } else {
     lua_pushvalue(plugins->cp_values, LUA_GLOBALSINDEX);
@@ -76,16 +86,15 @@ static void init_plugins(hs_plugins* plugins, hindsight_config* cfg)
 
   if (file_exists(fqfn)) {
     if (luaL_dofile(plugins->cp_values, fqfn)) {
-      fprintf(stderr, "Loading %s failed: %s\n", fqfn,
-              lua_tostring(plugins->cp_values, -1));
+      hs_log(HS_APP_NAME, 0, "Loading %s failed: %s", fqfn,
+             lua_tostring(plugins->cp_values, -1));
       exit(EXIT_FAILURE);
     }
   }
 
   plugins->cp_fh = fopen(fqfn, "wb");
   if (!plugins->cp_fh) {
-    fprintf(stderr, "%s: ", fqfn);
-    perror(NULL);
+    hs_log(HS_APP_NAME, 0, "%s: %s", fqfn, strerror(errno));
     exit(EXIT_FAILURE);
   }
 
@@ -103,9 +112,8 @@ static void init_plugins(hs_plugins* plugins, hindsight_config* cfg)
 }
 
 
-static clock_t free_plugins(hs_plugins* plugins)
+static void free_plugins(hs_plugins* plugins)
 {
-  struct tms tms1;
   void* thread_result;
   for (int i = 0; i < plugins->cnt; ++i) {
     int ret = pthread_join(plugins->threads[i], &thread_result);
@@ -113,7 +121,6 @@ static clock_t free_plugins(hs_plugins* plugins)
       perror("pthread_join failed");
     }
   }
-  clock_t t = times(&tms1);
   free(plugins->threads);
   plugins->threads = NULL;
 
@@ -142,9 +149,9 @@ static clock_t free_plugins(hs_plugins* plugins)
   }
 
   pthread_mutex_destroy(&plugins->lock);
+  pthread_mutex_destroy(plugins->shutdown);
   plugins->hs_cfg = NULL;
   plugins->cnt = 0;
-  return t;
 }
 
 
@@ -179,7 +186,7 @@ void hs_free_plugin(hs_plugin* p)
 
   char* e = lsb_destroy(p->lsb, NULL);
   if (e) {
-    fprintf(stderr, "lsb_destroy() received: %s\n", e);
+    hs_log(p->filename, 3, "lsb_destroy() received: %s", e);
     free(e);
   }
   p->lsb = NULL;
@@ -203,8 +210,8 @@ bool hs_get_fqfn(const char* path,
 {
   int ret = snprintf(fqfn, fqfn_len, "%s/%s", path, name);
   if (ret < 0 || ret > (int)fqfn_len - 1) {
-    fprintf(stderr, "%s: fully qualiifed path is greater than %zu\n",
-            name, fqfn_len);
+    hs_log(HS_APP_NAME, 3, "%s: fully qualiifed path is greater than %zu",
+           name, fqfn_len);
     return false;
   }
 
@@ -215,7 +222,8 @@ bool hs_get_fqfn(const char* path,
 void hs_write_checkpoint(hs_plugins* plugins)
 {
   if (fseek(plugins->cp_fh, 0, SEEK_SET)) {
-    fprintf(stderr, "checkpoint fseek() error: %d\n", ferror(plugins->cp_fh));
+    hs_log(HS_APP_NAME, 3, "checkpoint fseek() error: %d",
+           ferror(plugins->cp_fh));
     return;
   }
 
@@ -245,13 +253,12 @@ void hs_open_output_file(hs_plugins* plugins)
                      plugins->hs_cfg->output_path,
                      plugins->output_id);
   if (ret < 0 || ret > (int)sizeof(fqfn) - 1) {
-    fprintf(stderr, "output filename exceeds %zu\n", sizeof(fqfn));
+    hs_log(HS_APP_NAME, 0, "output filename exceeds %zu", sizeof(fqfn));
     exit(EXIT_FAILURE);
   }
   plugins->output_fh = fopen(fqfn, "ab+");
   if (!plugins->output_fh) {
-    fprintf(stderr, "%s: ", fqfn);
-    perror(NULL);
+    hs_log(HS_APP_NAME, 0, "%s: %s", fqfn, strerror(errno));
     exit(EXIT_FAILURE);
   } else {
     fseek(plugins->output_fh, 0, SEEK_END);
@@ -266,41 +273,39 @@ int main(int argc, char* argv[])
     fprintf(stderr, "usage: %s <cfg>\n", argv[0]);
     return EXIT_FAILURE;
   }
+  hs_init_log();
 
   hindsight_config cfg;
   if (hs_load_config(argv[1], &cfg)) {
     return EXIT_FAILURE;
   }
+
   if (cfg.mode != HS_MODE_INPUT) {
     hs_free_config(&cfg);
     fprintf(stderr, "only 'input' mode has been implemented\n");
     return EXIT_FAILURE;
   }
-
   signal(SIGINT, stop_signal);
 
   hs_plugins plugins;
   init_plugins(&plugins, &cfg);
   hs_load_sandboxes(cfg.run_path, &cfg, &plugins);
 
-  struct tms tms1;
-
-  clock_t t = times(&tms1);
-  // todo uncomment after benchmarking and remove the clock_t return from free_plugins
-//  int cnt = 0;
-//  while (!g_stop) {
-//    if (cnt % 60 == 0) {
-//      fprintf(stderr, "todo scan the load directory\n");
-//      cnt = 1;
-//    } else {
-//      ++cnt;
-//    }
-//    sleep(1);
-//  }
-//  issue_stop(&plugins);
-  clock_t t1 = free_plugins(&plugins);
-  t = t1 - t;
-  fprintf(stderr, "execution time %g seconds\n", ((float)t) / sysconf(_SC_CLK_TCK));
+  struct timespec ts;
+  while (true) {
+    if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
+      hs_log(HS_APP_NAME, 3, "clock_gettime failed");
+    }
+    ts.tv_sec += 60;
+    if (!pthread_mutex_timedlock(plugins.shutdown, &ts)) {
+      pthread_mutex_unlock(plugins.shutdown);
+      break; // shutting down
+    }
+    fprintf(stderr, "todo scan the load directory\n");
+  }
+  issue_stop(&plugins);
+  free_plugins(&plugins);
   hs_free_config(&cfg);
+  hs_free_log();
   return 0;
 }

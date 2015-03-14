@@ -4,6 +4,7 @@
 
 set(HINDSIGHT_SRC
 hindsight_config.c
+hindsight_logger.c
 hindsight_sandbox_loader.c
 hindsight.c
 )

@@ -10,12 +10,16 @@
 
 #include <ctype.h>
 #include <dirent.h>
+#include <errno.h>
 #include <lauxlib.h>
 #include <lua.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
+#include "hindsight_logger.h"
 #include "lsb.h"
 #include "lsb_output.h"
 
@@ -277,10 +281,12 @@ static hs_plugin* create_plugin(const char* file,
   hs_plugin* p = calloc(1, sizeof(hs_plugin));
   if (!p) return NULL;
 
+  p->ticker_interval = cfg->ticker_interval;
+
   p->lsb = lsb_create_custom(p, file, config);
   if (!p->lsb) {
     free(p);
-    fprintf(stderr, "lsb_create_custom failed\n%s\n", config);
+    hs_log(file, 3, "lsb_create_custom failed");
     return NULL;
   }
 
@@ -292,7 +298,8 @@ static int init_plugin(hs_plugin* p)
 {
   int ret = lsb_init(p->lsb, p->state);
   if (ret) {
-    fprintf(stderr, "lsb_init() received: %d %s\n", ret, lsb_get_error(p->lsb));
+    hs_log(p->filename, 3, "lsb_init() received: %d %s", ret,
+           lsb_get_error(p->lsb));
     return ret;
   }
   lsb_add_function(p->lsb, &inject_message, "inject_message");
@@ -304,10 +311,41 @@ static int init_plugin(hs_plugin* p)
 static void* input_thread_function(void* arg)
 {
   hs_plugin* p = (hs_plugin*)arg;
-  fprintf(stderr, "starting %s\n", p->filename);
-  int ret = process_message(p->lsb, p);
-  fprintf(stderr, "exiting %s received: %d %s\n", p->filename, ret,
-          lsb_get_error(p->lsb));
+  struct timespec ts;
+  int ret = 0;
+
+  hs_log(p->filename, 6, "starting");
+  while (true) {
+    ret = process_message(p->lsb, p);
+    if (ret <= 0) {
+      if (ret < 0) {
+        const char* err = lsb_get_error(p->lsb);
+        if (strlen(err) > 0) {
+          hs_log(p->filename, 4, "received: %d %s", ret, lsb_get_error(p->lsb));
+        }
+      }
+      if (p->ticker_interval == 0) break; // run once
+
+      if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
+        hs_log(p->filename, 3, "clock_gettime failed");
+        break;
+      }
+      ts.tv_sec += p->ticker_interval;
+      if (!pthread_mutex_timedlock(p->plugins->shutdown, &ts)) {
+        pthread_mutex_unlock(p->plugins->shutdown);
+        break; // shutting down
+      }
+      // poll
+    } else {
+      const char* err = lsb_get_error(p->lsb);
+      if (!strcmp(err, "shutting down")) {
+        hs_log(p->filename, 2, "received: %d %s", ret, err);
+      }
+      break;
+    }
+  }
+  hs_log(p->filename, 6, "exiting received: %d msg: %s", ret,
+         lsb_get_error(p->lsb));
   pthread_exit(NULL);
 }
 
@@ -346,14 +384,14 @@ static void populate_environment(lua_State* cfg,
         lua_setfield(sb, -2, lua_tostring(cfg, -2));
         break;
       default:
-        fprintf(stderr, "skipping config value type: %s\n",
-                lua_typename(cfg, vt));
+        hs_log(sbc->filename, 4, "skipping config value type: %s",
+               lua_typename(cfg, vt));
         break;
       }
       break;
     default:
-      fprintf(stderr, "skipping config key type: %s\n",
-              lua_typename(cfg, kt));
+      hs_log(sbc->filename, 4, "skipping config key type: %s",
+             lua_typename(cfg, kt));
       break;
     }
     lua_pop(cfg, 1);
@@ -372,6 +410,8 @@ static void populate_environment(lua_State* cfg,
   lua_setfield(sb, -2, "module_path");
   lua_pushstring(sb, sbc->filename);
   lua_setfield(sb, -2, "filename");
+  lua_pushinteger(sb, sbc->ticker_interval);
+  lua_setfield(sb, -2, "ticker_interval");
 
   // add the table as the environment for the read_config function
   lua_setfenv(sb, -2);
@@ -392,8 +432,7 @@ static bool get_config_fqfn(const char* path,
 
   int ret = snprintf(fqfn, fqfn_len, "%s/%s", path, name);
   if (ret < 0 || ret > (int)fqfn_len - 1) {
-    fprintf(stderr, "%s: fully qualiifed path is greater than %zu\n", name,
-            fqfn_len);
+    hs_log(name, 3, "fully qualiifed path is greater than %zu", fqfn_len);
     return false;
   }
 
@@ -433,7 +472,7 @@ static void lookup_checkpoint(lua_State* L, hs_plugin* p)
       p->cp_capacity = len + 8;
       p->cp_string = malloc(p->cp_capacity);
       if (!p->cp_string) {
-        fprintf(stderr, "checkpoint malloc failed\n");
+        hs_log(HS_APP_NAME, 0, "checkpoint malloc failed");
         exit(EXIT_FAILURE);
       }
       memcpy(p->cp_string, cp, len + 1);
@@ -454,7 +493,7 @@ static void add_to_plugins(hs_plugins* plugins, hs_plugin* p)
     plugins->list = htmp;
     plugins->list[plugins->cnt - 1] = p;
   } else {
-    fprintf(stderr, "plugins realloc failed\n");
+    hs_log(HS_APP_NAME, 0, "plugins realloc failed");
     exit(EXIT_FAILURE);
   }
 
@@ -463,7 +502,7 @@ static void add_to_plugins(hs_plugins* plugins, hs_plugin* p)
   if (ptmp) {
     plugins->threads = ptmp;
   } else {
-    fprintf(stderr, "thread realloc failed\n");
+    hs_log(HS_APP_NAME, 0, "thread realloc failed");
     exit(EXIT_FAILURE);
   }
 
@@ -494,12 +533,9 @@ void hs_load_sandboxes(const char* path, const hindsight_config* cfg,
                        hs_plugins* plugins)
 {
   struct dirent* entry;
-  DIR* dp;
-
-  dp = opendir(path);
+  DIR* dp = opendir(path);
   if (dp == NULL) {
-    fprintf(stderr, "%s: ", path);
-    perror(NULL);
+    hs_log(HS_APP_NAME, 0, "%s: %s", path, strerror(errno));
     exit(EXIT_FAILURE);
   }
 

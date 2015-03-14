@@ -21,8 +21,8 @@
  * @param cfg
  * @param plugins
  */
-void hs_load_sandboxes(const char* path, const hindsight_config *cfg,
-                       hs_plugins *plugins);
+void hs_load_sandboxes(const char* path, const hindsight_config* cfg,
+                       hs_plugins* plugins);
 
 /**
  * Sends a stop signal to long running (input) sandboxes

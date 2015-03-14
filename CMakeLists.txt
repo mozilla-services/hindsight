@@ -23,6 +23,7 @@ if(CMAKE_HOST_UNIX)
   ${PTHREAD_LIBRARY}
   ${LIBDL_LIBRARY}
   ${LIBM_LIBRARY})
+  add_definitions(-D_POSIX_C_SOURCE=199309L -D_XOPEN_SOURCE=600)
 endif()
 
 include_directories(${PROJECT_PATH}/include)

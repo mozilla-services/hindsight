@@ -14,6 +14,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "hindsight_logger.h"
+
 static const char* cfg_mode = "mode";
 static const char* cfg_output_path = "output_path";
 static const char* cfg_output_size = "output_size";
@@ -27,6 +29,7 @@ static const char* cfg_sb_instruction = "instruction_limit";
 static const char* cfg_sb_preserve = "preserve_data";
 static const char* cfg_sb_module = "module_path";
 static const char* cfg_sb_filename = "filename";
+static const char* cfg_sb_ticker_interval = "ticker_interval";
 
 static void init_sandbox_config(sandbox_config* cfg)
 {
@@ -36,6 +39,7 @@ static void init_sandbox_config(sandbox_config* cfg)
   cfg->preserve_data = false;
   cfg->module_path = NULL;
   cfg->filename = NULL;
+  cfg->ticker_interval = 0;
 }
 
 
@@ -58,10 +62,10 @@ static int check_for_unknown_options(lua_State* L, int idx, const char* parent)
   while (lua_next(L, idx) != 0) {
     switch (lua_type(L, -2)) {
     case LUA_TSTRING:
-      fprintf(stderr, "invalid option '%s%s'\n", parent, lua_tostring(L, -2));
+      lua_pushfstring(L, "invalid option '%s%s'", parent, lua_tostring(L, -2));
       break;
     default:
-      fprintf(stderr, "non string key\n");
+      lua_pushstring(L, "non string key");
       break;
     }
     ++cnt;
@@ -87,7 +91,7 @@ static int get_string_item(lua_State* L, int idx, const char* name, char** val,
   const char* tmp = lua_tolstring(L, -1, &len);
   if (!tmp) {
     if (!dflt) {
-      fprintf(stderr, "%s must be set to a string\n", name);
+      lua_pushfstring(L, "%s must be set to a string", name);
       return 1;
     }
     len = strlen(dflt);
@@ -109,14 +113,14 @@ static int get_numeric_item(lua_State* L, int idx, const char* name, int* val)
   case LUA_TNUMBER:
     *val = lua_tonumber(L, -1);
     if (*val < 0) {
-      fprintf(stderr, "%s must be set to a positive number\n", name);
+      lua_pushfstring(L, "%s must be set to a positive number", name);
       return 1;
     }
     break;
   case LUA_TNIL:
     break; // use the default
   default:
-    fprintf(stderr, "%s must be set to a number\n", name);
+    lua_pushfstring(L, "%s must be set to a number", name);
     return 1;
     break;
   }
@@ -137,7 +141,7 @@ static int get_bool_item(lua_State* L, int idx, const char* name, bool* val)
   case LUA_TNIL:
     break; // use the default
   default:
-    fprintf(stderr, "%s must be set to a bool\n", cfg_sb_preserve);
+    lua_pushfstring(L, "%s must be set to a bool", cfg_sb_preserve);
     return 1;
   }
   remove_item(L, idx, name);
@@ -150,7 +154,7 @@ static int load_sandbox_defaults(lua_State* L, sandbox_config* cfg)
 {
   lua_getglobal(L, cfg_sb);
   if (!lua_istable(L, -1)) {
-    fprintf(stderr, "%s must be a table\n", cfg_sb);
+    lua_pushfstring(L, "%s must be a table", cfg_sb);
     return 1;
   }
   if (get_numeric_item(L, 1, cfg_sb_output, &cfg->output_limit)) return 1;
@@ -193,6 +197,7 @@ void hs_free_config(hindsight_config* cfg)
   hs_free_sandbox_config(&cfg->sbc);
 }
 
+
 lua_State* hs_load_sandbox_config(const char* fn,
                                   sandbox_config* cfg,
                                   const sandbox_config* dflt)
@@ -201,11 +206,10 @@ lua_State* hs_load_sandbox_config(const char* fn,
 
   lua_State* L = luaL_newstate();
   if (!L) {
-    fprintf(stderr, "luaL_newstate failed\n");
+    hs_log(HS_APP_NAME, 3, "luaL_newstate failed: %s", fn);
     return NULL;
   }
 
-  int ret = 0;
   init_sandbox_config(cfg);
   char* module_path = NULL;
   if (dflt) {
@@ -216,11 +220,8 @@ lua_State* hs_load_sandbox_config(const char* fn,
     module_path = dflt->module_path;
   }
 
-  if (luaL_dofile(L, fn)) {
-    fprintf(stderr, "Loading %s failed: %s\n", fn, lua_tostring(L, -1));
-    ret = 1;
-    goto cleanup;
-  }
+  int ret = luaL_dofile(L, fn);
+  if (ret) goto cleanup;
 
   ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_sb_output,
                          &cfg->output_limit);
@@ -232,6 +233,10 @@ lua_State* hs_load_sandbox_config(const char* fn,
 
   ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_sb_instruction,
                          &cfg->instruction_limit);
+  if (ret) goto cleanup;
+
+  ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_sb_ticker_interval,
+                         &cfg->ticker_interval);
   if (ret) goto cleanup;
 
   ret = get_string_item(L, LUA_GLOBALSINDEX, cfg_sb_filename, &cfg->filename,
@@ -247,6 +252,7 @@ lua_State* hs_load_sandbox_config(const char* fn,
 
 cleanup:
   if (ret) {
+    hs_log(HS_APP_NAME, 3, "Loading %s failed: %s", fn, lua_tostring(L, -1));
     lua_close(L);
     return NULL;
   }
@@ -261,17 +267,14 @@ int hs_load_config(const char* fn, hindsight_config* cfg)
 
   lua_State* L = luaL_newstate();
   if (!L) {
-    fprintf(stderr, "luaL_newstate failed\n");
+    hs_log(HS_APP_NAME, 3, "luaL_newstate failed: %s", fn);
     return 1;
   }
 
-  int ret = 0;
   init_config(cfg);
-  if (luaL_dofile(L, fn)) {
-    fprintf(stderr, "Loading %s failed: %s\n", fn, lua_tostring(L, -1));
-    ret = 1;
-    goto cleanup;
-  }
+
+  int ret = luaL_dofile(L, fn);
+  if (ret) goto cleanup;
 
   // set mode
   lua_getglobal(L, cfg_mode);
@@ -283,7 +286,7 @@ int hs_load_config(const char* fn, hindsight_config* cfg)
   } else if (tmp && strcmp(tmp, "output") == 0) {
     cfg->mode = HS_MODE_OUTPUT;
   } else {
-    fprintf(stderr, "%s must be set to input|analysis|output\n", cfg_mode);
+    lua_pushfstring(L, "%s must be set to input|analysis|output", cfg_mode);
     ret = 1;
     goto cleanup;
   }
@@ -311,6 +314,9 @@ int hs_load_config(const char* fn, hindsight_config* cfg)
   ret = check_for_unknown_options(L, LUA_GLOBALSINDEX, "");
 
 cleanup:
+  if (ret) {
+    hs_log(HS_APP_NAME, 3, "Loading %s failed: %s", fn, lua_tostring(L, -1));
+  }
   lua_close(L);
 
   return ret;

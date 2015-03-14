@@ -12,6 +12,7 @@
 #include <string.h>
 
 #include "../hindsight_config.h"
+#include "../hindsight_logger.h"
 
 #ifdef _WIN32
 #define snprintf _snprintf
@@ -121,6 +122,7 @@ static char* all_tests()
 
 int main()
 {
+  hs_init_log();
   char* result = all_tests();
   if (result) {
     printf("%s\n", result);
@@ -129,6 +131,7 @@ int main()
   }
   printf("Tests run: %d\n", mu_tests_run);
   free(e);
+  hs_free_log();
 
   return result != 0;
 }
