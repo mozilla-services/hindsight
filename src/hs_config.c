@@ -6,7 +6,7 @@
 
 /** @brief Hindsight configuration implementation @file */
 
-#include "hindsight_config.h"
+#include "hs_config.h"
 
 #include <lauxlib.h>
 #include <lua.h>
@@ -14,13 +14,15 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "hindsight_logger.h"
+#include "hs_logger.h"
 
 static const char* cfg_mode = "mode";
+static const char* cfg_input_path = "input_path";
 static const char* cfg_output_path = "output_path";
 static const char* cfg_output_size = "output_size";
 static const char* cfg_load_path = "sandbox_load_path";
 static const char* cfg_run_path = "sandbox_run_path";
+static const char* cfg_threads = "threads";
 
 static const char* cfg_sb = "sandbox_defaults";
 static const char* cfg_sb_output = "output_limit";
@@ -30,8 +32,9 @@ static const char* cfg_sb_preserve = "preserve_data";
 static const char* cfg_sb_module = "module_path";
 static const char* cfg_sb_filename = "filename";
 static const char* cfg_sb_ticker_interval = "ticker_interval";
+static const char* cfg_sb_thread = "thread";
 
-static void init_sandbox_config(sandbox_config* cfg)
+static void init_sandbox_config(hs_sandbox_config* cfg)
 {
   cfg->output_limit = 1024 * 64;
   cfg->memory_limit = 1024 * 1024 * 8;
@@ -40,38 +43,37 @@ static void init_sandbox_config(sandbox_config* cfg)
   cfg->module_path = NULL;
   cfg->filename = NULL;
   cfg->ticker_interval = 0;
+  cfg->thread = 0;
 }
 
 
-static void init_config(hindsight_config* cfg)
+static void init_config(hs_config* cfg)
 {
   cfg->mode = HS_MODE_UNKNOWN;
   cfg->run_path = NULL;
   cfg->load_path = NULL;
   cfg->output_path = NULL;
+  cfg->input_path = NULL;
   cfg->output_size = 1024 * 1024 * 64;
+  cfg->threads = 1;
   init_sandbox_config(&cfg->sbc);
 }
 
 
 static int check_for_unknown_options(lua_State* L, int idx, const char* parent)
 {
-  int cnt = 0;
-
   lua_pushnil(L);
   while (lua_next(L, idx) != 0) {
     switch (lua_type(L, -2)) {
     case LUA_TSTRING:
-      lua_pushfstring(L, "invalid option '%s%s'", parent, lua_tostring(L, -2));
-      break;
+      lua_pushfstring(L, "invalid option: '%s%s'", parent, lua_tostring(L, -2));
+      return 1;
     default:
       lua_pushstring(L, "non string key");
-      break;
+      return 1;;
     }
-    ++cnt;
-    lua_pop(L, 1);
   }
-  return cnt;
+  return 0;
 }
 
 
@@ -150,7 +152,7 @@ static int get_bool_item(lua_State* L, int idx, const char* name, bool* val)
 }
 
 
-static int load_sandbox_defaults(lua_State* L, sandbox_config* cfg)
+static int load_sandbox_defaults(lua_State* L, hs_sandbox_config* cfg)
 {
   lua_getglobal(L, cfg_sb);
   if (!lua_istable(L, -1)) {
@@ -173,7 +175,7 @@ static int load_sandbox_defaults(lua_State* L, sandbox_config* cfg)
 }
 
 
-void hs_free_sandbox_config(sandbox_config* cfg)
+void hs_free_sandbox_config(hs_sandbox_config* cfg)
 {
   free(cfg->module_path);
   cfg->module_path = NULL;
@@ -183,7 +185,7 @@ void hs_free_sandbox_config(sandbox_config* cfg)
 }
 
 
-void hs_free_config(hindsight_config* cfg)
+void hs_free_config(hs_config* cfg)
 {
   free(cfg->run_path);
   cfg->run_path = NULL;
@@ -194,13 +196,16 @@ void hs_free_config(hindsight_config* cfg)
   free(cfg->output_path);
   cfg->output_path = NULL;
 
+  free(cfg->input_path);
+  cfg->input_path = NULL;
+
   hs_free_sandbox_config(&cfg->sbc);
 }
 
 
 lua_State* hs_load_sandbox_config(const char* fn,
-                                  sandbox_config* cfg,
-                                  const sandbox_config* dflt)
+                                  hs_sandbox_config* cfg,
+                                  const hs_sandbox_config* dflt)
 {
   if (!cfg) return NULL;
 
@@ -239,6 +244,11 @@ lua_State* hs_load_sandbox_config(const char* fn,
                          &cfg->ticker_interval);
   if (ret) goto cleanup;
 
+  // todo only used for analysis, make error for other modes
+  ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_sb_thread,
+                         &cfg->thread);
+  if (ret) goto cleanup;
+
   ret = get_string_item(L, LUA_GLOBALSINDEX, cfg_sb_filename, &cfg->filename,
                         NULL);
   if (ret) goto cleanup;
@@ -261,7 +271,7 @@ cleanup:
 }
 
 
-int hs_load_config(const char* fn, hindsight_config* cfg)
+int hs_load_config(const char* fn, hs_config* cfg)
 {
   if (!cfg) return 1;
 
@@ -296,6 +306,23 @@ int hs_load_config(const char* fn, hindsight_config* cfg)
                         &cfg->output_path, NULL);
   if (ret) goto cleanup;
 
+  switch (cfg->mode) {
+  case HS_MODE_OUTPUT:
+    // fall thru
+  case HS_MODE_ANALYSIS:
+    ret = get_string_item(L, LUA_GLOBALSINDEX, cfg_input_path,
+                          &cfg->input_path, NULL);
+    if (ret) goto cleanup;
+
+    ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_threads,
+                           &cfg->threads);
+    if (ret) goto cleanup;
+    break;
+  default:
+    // do nothing, it will fail with an extra option
+    break;
+  }
+
   ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_output_size,
                          &cfg->output_size);
   if (ret) goto cleanup;
@@ -320,4 +347,23 @@ cleanup:
   lua_close(L);
 
   return ret;
+}
+
+
+bool hs_get_config_fqfn(const char* path,
+                        const char* name,
+                        char* fqfn,
+                        size_t fqfn_len)
+{
+  static const size_t ext_size = 4;
+  size_t len = strlen(name);
+  if (len <= ext_size) return false;
+
+  if (strcmp(".cfg", name + len - ext_size)) return false;
+
+  int ret = snprintf(fqfn, fqfn_len, "%s/%s", path, name);
+  if (ret < 0 || ret > (int)fqfn_len - 1) {
+    return false;
+  }
+  return true;
 }

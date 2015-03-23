@@ -6,8 +6,8 @@
 
 /** Hindsight logging facility @file */
 
-#ifndef hindsight_logger_h_
-#define hindsight_logger_h_
+#ifndef hs_logger_h_
+#define hs_logger_h_
 
 extern const char* HS_APP_NAME;
 

@@ -11,8 +11,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../hindsight_config.h"
-#include "../hindsight_logger.h"
+#include "../hs_config.h"
+#include "../hs_logger.h"
 
 #ifdef _WIN32
 #define snprintf _snprintf
@@ -48,7 +48,7 @@ char* e = NULL;
 
 static char* test_load_default_config()
 {
-  hindsight_config cfg;
+  hs_config cfg;
   int ret = hs_load_config("cfg/default.cfg", &cfg);
   mu_assert(ret == 0, "hindsight_load_config: %d", ret);
   mu_assert(cfg.mode == HS_MODE_INPUT, "received %d", cfg.mode);
@@ -76,7 +76,7 @@ static char* test_load_default_config()
 
 static char* test_load_config()
 {
-  hindsight_config cfg;
+  hs_config cfg;
   int ret = hs_load_config("cfg/valid.cfg", &cfg);
   mu_assert(ret == 0, "hindsight_load_config: %d", ret);
   mu_assert(cfg.mode == HS_MODE_INPUT, "received %d", cfg.mode);
@@ -104,7 +104,7 @@ static char* test_load_config()
 
 static char* test_load_invalid_config()
 {
-  hindsight_config cfg;
+  hs_config cfg;
   int ret = hs_load_config("cfg/extra.cfg", &cfg);
   mu_assert(ret == 1, "hindsight_load_config: %d", ret);
   hs_free_config(&cfg);

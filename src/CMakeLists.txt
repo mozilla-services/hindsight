@@ -3,10 +3,15 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 set(HINDSIGHT_SRC
-hindsight_config.c
-hindsight_logger.c
-hindsight_sandbox_loader.c
 hindsight.c
+hs_config.c
+hs_input_plugins.c
+hs_analysis_plugins.c
+hs_input.c
+hs_logger.c
+hs_output.c
+hs_sandbox.c
+hs_util.c
 )
 
 set ( CMAKE_SKIP_BUILD_RPATH FALSE CACHE STRING "" FORCE )

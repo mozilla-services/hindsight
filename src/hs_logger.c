@@ -6,7 +6,7 @@
 
 /** @brief Hindsight logging implementation @file */
 
-#include "hindsight_logger.h"
+#include "hs_logger.h"
 
 #include <pthread.h>
 #include <stdarg.h>

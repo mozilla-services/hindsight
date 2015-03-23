@@ -6,13 +6,11 @@
 
 /** Hindsight main configuration module @file */
 
-#ifndef hindsight_config_h_
-#define hindsight_config_h_
+#ifndef hs_config_h_
+#define hs_config_h_
 
 #include <lua.h>
 #include <stdbool.h>
-
-#include "hindsight.h"
 
 typedef enum {
   HS_MODE_UNKNOWN,
@@ -23,7 +21,7 @@ typedef enum {
   HS_MODE_MAX
 } hs_mode;
 
-typedef struct sandbox_config
+typedef struct hs_sandbox_config
 {
   int output_limit;
   int memory_limit;
@@ -32,17 +30,20 @@ typedef struct sandbox_config
   char* module_path;
   char* filename;
   int ticker_interval;
-} sandbox_config;
+  int thread;
+} hs_sandbox_config;
 
-typedef struct hindsight_config
+typedef struct hs_config
 {
   hs_mode mode;
   char* run_path;
   char* load_path;
   char* output_path;
+  char* input_path; // used by analysis/output
   int output_size;
-  sandbox_config sbc;
-} hindsight_config;
+  int threads;
+  hs_sandbox_config sbc;
+} hs_config;
 
 
 /**
@@ -51,7 +52,7 @@ typedef struct hindsight_config
  * @param cfg Configuration structure to free
  *
  */
-void hs_free_sandbox_config(sandbox_config* cfg);
+void hs_free_sandbox_config(hs_sandbox_config* cfg);
 
 /**
  * Free any memory allocated by the configuration
@@ -59,7 +60,7 @@ void hs_free_sandbox_config(sandbox_config* cfg);
  * @param cfg Configuration structure to free
  *
  */
-void hs_free_config(hindsight_config* cfg);
+void hs_free_config(hs_config* cfg);
 
 /**
  * Loads the sandbox configuration from a file
@@ -71,8 +72,8 @@ void hs_free_config(hindsight_config* cfg);
  * @return int NULL on failure
  */
 lua_State* hs_load_sandbox_config(const char* fn,
-                                  sandbox_config* cfg,
-                                  const sandbox_config* dflt);
+                                  hs_sandbox_config* cfg,
+                                  const hs_sandbox_config* dflt);
 
 /**
  * Loads the Hinsight configuration from a file
@@ -82,7 +83,12 @@ lua_State* hs_load_sandbox_config(const char* fn,
  *
  * @return int 0 on success
  */
-int hs_load_config(const char* fn, hindsight_config* cfg);
+int hs_load_config(const char* fn, hs_config* cfg);
+
+bool hs_get_config_fqfn(const char* path,
+                        const char* name,
+                        char* fqfn,
+                        size_t fqfn_len);
 
 
 #endif
