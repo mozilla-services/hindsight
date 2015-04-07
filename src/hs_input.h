@@ -14,12 +14,21 @@
 #include <pthread.h>
 #include <stdio.h>
 
+#define HS_MIN_MSG_LEN 26
+#define HS_MAX_MSG_LEN 1024 * 64
+#define HS_MAX_HDR_LEN 255 + 3
+
 typedef struct hs_input
 {
   char path[230];
   char file[260];
+  unsigned char* buf;
+  size_t bufsize;
   size_t id;
   size_t offset;
+  size_t readpos;
+  size_t scanpos;
+  size_t msglen;
   FILE* fh;
 } hs_input;
 

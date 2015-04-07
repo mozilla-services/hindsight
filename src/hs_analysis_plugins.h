@@ -15,7 +15,9 @@
 #include <stddef.h>
 
 #include "hs_config.h"
+#include "hs_heka_message.h"
 #include "hs_input.h"
+#include "hs_message_matcher.h"
 #include "hs_output.h"
 #include "hs_sandbox.h"
 
@@ -26,14 +28,16 @@ struct hs_analysis_plugins
 {
   pthread_mutex_t lock;
   pthread_mutex_t* shutdown;
+  sem_t finished;
 
   hs_analysis_thread* list;
   pthread_t* threads;
   hs_config* cfg;
   hs_output output;
   hs_input input;
+  hs_message_match_builder mmb;
 
-  void* msg;
+  hs_heka_message* msg;
 
   int thread_cnt;
   bool stop;
@@ -43,7 +47,6 @@ struct hs_analysis_thread
 {
   hs_analysis_plugins* plugins;
   sem_t start;
-  sem_t finished;
 
   hs_sandbox** list;
   int plugin_cnt;

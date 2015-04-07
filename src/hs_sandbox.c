@@ -162,6 +162,7 @@ hs_sandbox* hs_create_sandbox(void* parent,
     return NULL;
   }
   populate_environment(lsb_get_lua(p->lsb), env, cfg);
+  p->matcher = NULL;
   return p;
 }
 
@@ -182,4 +183,10 @@ void hs_free_sandbox(hs_sandbox* p)
 
   free(p->state);
   p->state = NULL;
+
+  if (p->matcher) {
+    hs_free_message_matcher(p->matcher);
+    free(p->matcher);
+    p->matcher = NULL;
+  }
 }

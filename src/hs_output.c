@@ -36,7 +36,7 @@ static void init_checkpoint(hs_checkpoint* cp, const char* path)
 
   if (hs_file_exists(fqfn)) {
     if (luaL_dofile(cp->values, fqfn)) {
-      hs_log(HS_APP_NAME, 0, "Loading %s failed: %s", fqfn,
+      hs_log(HS_APP_NAME, 0, "loading %s failed: %s", fqfn,
              lua_tostring(cp->values, -1));
       exit(EXIT_FAILURE);
     }

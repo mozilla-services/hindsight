@@ -17,9 +17,11 @@
 const char* HS_APP_NAME = "hindsight";
 
 static pthread_mutex_t g_logger;
+static int g_loglevel;
 
-void hs_init_log()
+void hs_init_log(int loglevel)
 {
+  g_loglevel = loglevel;
   if (pthread_mutex_init(&g_logger, NULL)) {
     perror("loger pthread_mutex_init failed");
     exit(EXIT_FAILURE);
@@ -35,6 +37,8 @@ void hs_free_log()
 
 void hs_log(const char* plugin, int severity, const char* fmt, ...)
 {
+  if (severity > g_loglevel) return;
+
   struct timespec ts;
   if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
     fprintf(stderr, "hs_log - clock_gettime failed\n");

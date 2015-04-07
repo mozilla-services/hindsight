@@ -17,7 +17,7 @@ extern const char* HS_APP_NAME;
  * Initialize the log mutex
  *
  */
-void hs_init_log();
+void hs_init_log(int loglevel);
 
 /**
  * Destroy the log mutex

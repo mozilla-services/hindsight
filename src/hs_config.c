@@ -33,6 +33,7 @@ static const char* cfg_sb_module = "module_path";
 static const char* cfg_sb_filename = "filename";
 static const char* cfg_sb_ticker_interval = "ticker_interval";
 static const char* cfg_sb_thread = "thread";
+static const char* cfg_sb_matcher = "message_matcher";
 
 static void init_sandbox_config(hs_sandbox_config* cfg)
 {
@@ -205,7 +206,8 @@ void hs_free_config(hs_config* cfg)
 
 lua_State* hs_load_sandbox_config(const char* fn,
                                   hs_sandbox_config* cfg,
-                                  const hs_sandbox_config* dflt)
+                                  const hs_sandbox_config* dflt,
+                                  hs_mode mode)
 {
   if (!cfg) return NULL;
 
@@ -244,11 +246,6 @@ lua_State* hs_load_sandbox_config(const char* fn,
                          &cfg->ticker_interval);
   if (ret) goto cleanup;
 
-  // todo only used for analysis, make error for other modes
-  ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_sb_thread,
-                         &cfg->thread);
-  if (ret) goto cleanup;
-
   ret = get_string_item(L, LUA_GLOBALSINDEX, cfg_sb_filename, &cfg->filename,
                         NULL);
   if (ret) goto cleanup;
@@ -259,10 +256,21 @@ lua_State* hs_load_sandbox_config(const char* fn,
 
   ret = get_bool_item(L, LUA_GLOBALSINDEX, cfg_sb_preserve,
                       &cfg->preserve_data);
+  if (ret) goto cleanup;
+
+  if (mode == HS_MODE_ANALYSIS) {
+    ret = get_string_item(L, LUA_GLOBALSINDEX, cfg_sb_matcher,
+                          &cfg->message_matcher, "FALSE");
+    if (ret) goto cleanup;
+
+    ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_sb_thread,
+                           &cfg->thread);
+    if (ret) goto cleanup;
+  }
 
 cleanup:
   if (ret) {
-    hs_log(HS_APP_NAME, 3, "Loading %s failed: %s", fn, lua_tostring(L, -1));
+    hs_log(HS_APP_NAME, 3, "loading %s failed: %s", fn, lua_tostring(L, -1));
     lua_close(L);
     return NULL;
   }
@@ -342,7 +350,7 @@ int hs_load_config(const char* fn, hs_config* cfg)
 
 cleanup:
   if (ret) {
-    hs_log(HS_APP_NAME, 3, "Loading %s failed: %s", fn, lua_tostring(L, -1));
+    hs_log(HS_APP_NAME, 3, "loading %s failed: %s", fn, lua_tostring(L, -1));
   }
   lua_close(L);
 

@@ -4,11 +4,13 @@
 
 set(HINDSIGHT_SRC
 hindsight.c
-hs_config.c
-hs_input_plugins.c
 hs_analysis_plugins.c
+hs_config.c
+hs_heka_message.c
 hs_input.c
+hs_input_plugins.c
 hs_logger.c
+hs_message_matcher.c
 hs_output.c
 hs_sandbox.c
 hs_util.c

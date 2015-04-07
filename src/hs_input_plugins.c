@@ -259,6 +259,8 @@ static hs_input_plugin* create_input_plugin(const char* file,
 static void free_input_plugin(hs_input_plugin* p)
 {
   hs_free_sandbox(p->sb);
+  free(p->sb);
+  p->sb = NULL;
 
   p->plugins = NULL;
   free(p->cp_string);
@@ -455,7 +457,7 @@ void hs_load_input_plugins(hs_input_plugins* plugins, const hs_config* cfg,
   while ((entry = readdir(dp))) {
     if (!hs_get_config_fqfn(path, entry->d_name, fqfn, sizeof(fqfn))) continue;
     hs_sandbox_config sbc;
-    lua_State* L = hs_load_sandbox_config(fqfn, &sbc, &cfg->sbc);
+    lua_State* L = hs_load_sandbox_config(fqfn, &sbc, &cfg->sbc, HS_MODE_INPUT);
     if (L) {
       if (!hs_get_fqfn(path, sbc.filename, fqfn, sizeof(fqfn))) {
         lua_close(L);

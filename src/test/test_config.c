@@ -6,6 +6,8 @@
 
 /** @brief Hindsight unit tests @file */
 
+#include "test.h"
+
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,36 +16,6 @@
 #include "../hs_config.h"
 #include "../hs_logger.h"
 
-#ifdef _WIN32
-#define snprintf _snprintf
-#endif
-
-#define mu_assert(cond, ...)                                                   \
-do {                                                                           \
-  if (!(cond)) {                                                               \
-    int cnt = snprintf(mu_err, MU_ERR_LEN, "line: %d (%s) ", __LINE__, #cond); \
-    if (cnt > 0 && cnt < MU_ERR_LEN) {                                         \
-      cnt = snprintf(mu_err+cnt, MU_ERR_LEN-cnt, __VA_ARGS__);                 \
-      if (cnt > 0 && cnt < MU_ERR_LEN) {                                       \
-        return mu_err;                                                         \
-      }                                                                        \
-    }                                                                          \
-    mu_err[MU_ERR_LEN - 1] = 0;                                                \
-    return mu_err;                                                             \
-  }                                                                            \
-} while (0)
-
-#define mu_run_test(test)                                                      \
-do {                                                                           \
-  char *message = test();                                                      \
-  mu_tests_run++;                                                              \
-  if (message)                                                                 \
-    return message;                                                            \
-} while (0)
-
-#define MU_ERR_LEN 1024
-int mu_tests_run = 0;
-char mu_err[MU_ERR_LEN] = { 0 };
 char* e = NULL;
 
 static char* test_load_default_config()
@@ -122,7 +94,7 @@ static char* all_tests()
 
 int main()
 {
-  hs_init_log();
+  hs_init_log(7);
   char* result = all_tests();
   if (result) {
     printf("%s\n", result);

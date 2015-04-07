@@ -91,11 +91,18 @@ static void analysis_main(hs_config* cfg)
 
 int main(int argc, char* argv[])
 {
-  if (argc != 2) {
-    fprintf(stderr, "usage: %s <cfg>\n", argv[0]);
+  if (argc < 2 || argc > 3) {
+    fprintf(stderr, "usage: %s <cfg> [loglevel]\n", argv[0]);
     return EXIT_FAILURE;
   }
-  hs_init_log();
+  int loglevel = 6;
+  if (argc == 3) {
+    loglevel = atoi(argv[2]);
+    if (loglevel < 0 || loglevel > 7) {
+      loglevel = 6;
+    }
+  }
+  hs_init_log(loglevel);
 
   hs_config cfg;
   if (hs_load_config(argv[1], &cfg)) {

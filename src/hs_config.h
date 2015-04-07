@@ -23,14 +23,19 @@ typedef enum {
 
 typedef struct hs_sandbox_config
 {
+  char* module_path;
+  char* filename;
+
+  // analysis sandbox only
+  char* message_matcher;
+  int thread;
+  // end analysis sandbox only
+
   int output_limit;
   int memory_limit;
   int instruction_limit;
   bool preserve_data;
-  char* module_path;
-  char* filename;
   int ticker_interval;
-  int thread;
 } hs_sandbox_config;
 
 typedef struct hs_config
@@ -73,7 +78,8 @@ void hs_free_config(hs_config* cfg);
  */
 lua_State* hs_load_sandbox_config(const char* fn,
                                   hs_sandbox_config* cfg,
-                                  const hs_sandbox_config* dflt);
+                                  const hs_sandbox_config* dflt,
+                                  hs_mode mode);
 
 /**
  * Loads the Hinsight configuration from a file

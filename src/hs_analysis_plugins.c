@@ -109,7 +109,6 @@ static void* analysis_thread_function(void* arg)
   hs_analysis_thread* at = (hs_analysis_thread*)arg;
 
   hs_log("analysis_thread", 6, "starting thread [%d]", at->tid);
-  sem_wait(&at->finished);
   bool stop = false;
   while (!stop) {
     if (sem_wait(&at->start)) {
@@ -120,13 +119,13 @@ static void* analysis_thread_function(void* arg)
     if (!at->plugins->msg) {
       stop = true;
     } else {
-      hs_log("analysis_thread", 6, "thread [%d] ... process message", at->tid); // todo remove
+      //hs_log("analysis_thread", 6, "thread [%d] ... process message", at->tid); // todo remove
       // loop through plugins
       // run matcher
       // if match process message
       // end loop
     }
-    if (sem_post(&at->finished)) {
+    if (sem_post(&at->plugins->finished)) {
       hs_log("analysis_thread", 3, "thread [%d] sem_post error: %s", at->tid,
              strerror(errno));
     }
@@ -171,17 +170,11 @@ static void init_analysis_thread(hs_analysis_plugins* plugins, int tid)
     exit(EXIT_FAILURE);
   }
   sem_wait(&at->start);
-
-  if (sem_init(&at->finished, 0, 1)) {
-    perror("finished sem_init failed");
-    exit(EXIT_FAILURE);
-  }
 }
 
 
 static void free_analysis_thread(hs_analysis_thread* at)
 {
-  sem_destroy(&at->finished);
   sem_destroy(&at->start);
   at->plugins = NULL;
   for (int i = 0; i < at->plugin_cnt; ++i) {
@@ -214,6 +207,7 @@ void hs_init_analysis_plugins(hs_analysis_plugins* plugins, hs_config* cfg,
 {
   hs_init_output(&plugins->output, cfg->output_path);
   hs_init_input(&plugins->input);
+  hs_init_message_match_builder(&plugins->mmb, cfg->sbc.module_path);
 
   plugins->thread_cnt = cfg->threads;
   plugins->cfg = cfg;
@@ -232,8 +226,14 @@ void hs_init_analysis_plugins(hs_analysis_plugins* plugins, hs_config* cfg,
     exit(EXIT_FAILURE);
   }
 
+  if (sem_init(&plugins->finished, 0, cfg->threads)) {
+    perror("finished sem_init failed");
+    exit(EXIT_FAILURE);
+  }
+
   plugins->list = malloc(sizeof(hs_analysis_thread) * cfg->threads);
   for (int i = 0; i < cfg->threads; ++i) {
+    sem_wait(&plugins->finished);
     init_analysis_thread(plugins, i);
   }
 
@@ -263,13 +263,16 @@ void hs_free_analysis_plugins(hs_analysis_plugins* plugins)
   free(plugins->list);
   plugins->list = NULL;
 
+  hs_free_message_match_builder(&plugins->mmb);
   hs_free_input(&plugins->input);
   hs_free_output(&plugins->output);
 
   pthread_mutex_destroy(&plugins->lock);
   pthread_mutex_destroy(plugins->shutdown);
+  sem_destroy(&plugins->finished);
   plugins->cfg = NULL;
   plugins->thread_cnt = 0;
+  plugins->msg = NULL;
 }
 
 
@@ -288,7 +291,8 @@ void hs_load_analysis_plugins(hs_analysis_plugins* plugins,
   while ((entry = readdir(dp))) {
     if (!hs_get_config_fqfn(path, entry->d_name, fqfn, sizeof(fqfn))) continue;
     hs_sandbox_config sbc;
-    lua_State* L = hs_load_sandbox_config(fqfn, &sbc, &cfg->sbc);
+    lua_State* L = hs_load_sandbox_config(fqfn, &sbc, &cfg->sbc,
+                                          HS_MODE_ANALYSIS);
     if (L) {
       if (!hs_get_fqfn(path, sbc.filename, fqfn, sizeof(fqfn))) {
         lua_close(L);

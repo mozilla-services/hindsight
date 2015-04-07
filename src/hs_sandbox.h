@@ -11,12 +11,14 @@
 
 #include "lsb.h"
 #include "hs_config.h"
+#include "hs_message_matcher.h"
 
 typedef struct hs_sandbox
 {
   lua_sandbox* lsb;
   char* filename;
   char* state;
+  hs_message_matcher* matcher;
   int ticker_interval;
 } hs_sandbox;
 

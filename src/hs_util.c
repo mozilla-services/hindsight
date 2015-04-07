@@ -11,6 +11,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#define MAX_VARINT_BYTES 10
+
 bool hs_file_exists(const char* fn)
 {
   FILE* fh = fopen(fn, "r");
@@ -74,4 +76,21 @@ int hs_write_varint(char* buf, unsigned long long i)
   }
   buf[pos - 1] &= 0x7F; // end the varint
   return pos;
+}
+
+
+unsigned const char*
+hs_read_varint(unsigned const char* p, unsigned const char* e, long long* vi)
+{
+  *vi = 0;
+  unsigned i, shift = 0;
+  for (i = 0; p != e && i < MAX_VARINT_BYTES; i++) {
+    *vi |= (p[i] & 0x7f) << shift;
+    shift += 7;
+    if ((p[i] & 0x80) == 0) break;
+  }
+  if (i == MAX_VARINT_BYTES) {
+    return NULL;
+  }
+  return p + i + 1;
 }
