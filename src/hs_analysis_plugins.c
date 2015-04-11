@@ -313,7 +313,12 @@ void hs_load_analysis_plugins(hs_analysis_plugins* plugins,
           memcpy(sb->state + len - 3, "dat", 3);
         }
 
-        if (init_sandbox(sb)) {
+        sb->mm = hs_create_message_matcher(&plugins->mmb, sbc.message_matcher);
+        if (!sb->mm || init_sandbox(sb)) {
+          if (!sb->mm) {
+            hs_log(entry->d_name, 3, "invalid message_matcher: %s",
+                   sbc.message_matcher);
+          }
           hs_free_sandbox(sb);
           free(sb);
           sb = NULL;

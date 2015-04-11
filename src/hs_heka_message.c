@@ -30,7 +30,7 @@ read_length(unsigned const char* p, unsigned const char* e, size_t* vi)
   *vi = 0;
   unsigned i, shift = 0;
   for (i = 0; p != e && i < MAX_VARINT_BYTES; i++) {
-    *vi |= (p[i] & 0x7f) << shift;
+    *vi |= ((unsigned long long)p[i] & 0x7f) << shift;
     shift += 7;
     if ((p[i] & 0x80) == 0) break;
   }
@@ -47,7 +47,7 @@ read_varint(unsigned const char* p, unsigned const char* e, long long* vi)
   *vi = 0;
   unsigned i, shift = 0;
   for (i = 0; p != e && i < MAX_VARINT_BYTES; i++) {
-    *vi |= (p[i] & 0x7f) << shift;
+    *vi |= ((unsigned long long)p[i] & 0x7f) << shift;
     shift += 7;
     if ((p[i] & 0x80) == 0) break;
   }
@@ -150,13 +150,26 @@ process_fields(hs_heka_field* f,
       // - there won't be repeated tags for packed values
     case 4: // value_string
     case 5: // value_bytes
+      if (wiretype != 2) {
+        p = NULL;
+        break;
+      }
       f->value = p - 1;
       f->value_len = (int)(e - f->value);
       p = e;
       break;
     case 6: // value_integer
-    case 7: // value_double
     case 8: // value_bool
+      if (wiretype != 0 && wiretype != 2) {
+        p = NULL;
+        break;
+      }
+      // fall thru
+    case 7: // value_double
+      if (tag == 7 && wiretype != 1 && wiretype != 2) {
+        p = NULL;
+        break;
+      }
       if (wiretype == 2) {
         p = read_length(p, e, &len);
         if (!p || p + len > e) {
@@ -176,6 +189,61 @@ process_fields(hs_heka_field* f,
   while (p && p < e);
 
   return f->name ? p : NULL;
+}
+
+static bool
+read_string_value(const unsigned char* p, const unsigned char* e, int ai,
+                  hs_read_value* val)
+{
+  int acnt = 0;
+  int tag = 0;
+  int wiretype = 0;
+  while (p && p < e) {
+    val->type = HS_READ_NIL;
+    p = read_key(p, &tag, &wiretype);
+    p = read_string(wiretype, p, e, &val->u.s, &val->len);
+    if (p) {
+      if (ai == acnt++) {
+        val->type = HS_READ_STRING;
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+
+static bool
+read_integer_value(const unsigned char* p, const unsigned char* e, int ai,
+                   hs_read_value* val)
+{
+  int acnt = 0;
+  long long ll = 0;
+  while (p && p < e) {
+    p = read_varint(p, e, &ll);
+    if (p) {
+      if (ai == acnt++) {
+        val->type = HS_READ_NUMERIC;
+        val->u.d = (double)ll;
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+
+static bool
+read_double_value(const unsigned char* p, const unsigned char* e, int ai,
+                  hs_read_value* val)
+{
+  if (p + (sizeof(double) * (ai + 1)) > e) {
+    return false;
+  }
+  val->type = HS_READ_NUMERIC;
+  p += sizeof(double) * ai;
+  memcpy(&val->u.d, p, sizeof(double));
+  return true;
 }
 
 
@@ -360,90 +428,32 @@ void hs_free_heka_message(hs_heka_message* m)
 }
 
 
-
-bool hs_read_numeric_field(hs_heka_message* m, const char* name, size_t nlen,
-                           int fi, int ai, double* val)
+bool hs_read_message_field(hs_heka_message* m, const char* name, size_t nlen,
+                           int fi, int ai, hs_read_value* val)
 {
   int fcnt = 0;
-  int acnt = 0;
-  long long ll;
   const unsigned char* p, *e;
+  val->type = HS_READ_NIL;
 
   for (int i = 0; i < m->fields_len; ++i) {
     if (nlen == (size_t)m->fields[i].name_len
         && strncmp(name, m->fields[i].name, m->fields[i].name_len) == 0) {
-      if (fi == fcnt) {
+      if (fi == fcnt++) {
         p = m->fields[i].value;
         e = p + m->fields[i].value_len;
-        do {
-          switch (m->fields[i].value_type) {
-          case HS_FIELD_INTEGER:
-          case HS_FIELD_BOOL:
-            p = read_varint(p, e, &ll);
-            if (p) *val = (double)ll;
-            break;
-          case HS_FIELD_DOUBLE:
-            if (p + sizeof(double) > e) {
-              p = NULL;
-              break;
-            }
-            memcpy(val, p, sizeof(double));
-            p += sizeof(double);
-            break;
-          default:
-            p = NULL;
-            break;
-          }
-          if (p && ai == acnt) {
-            return true;
-          }
-          ++acnt;
+        switch (m->fields[i].value_type) {
+        case HS_FIELD_STRING:
+        case HS_FIELD_BYTES:
+          return read_string_value(p, e, ai, val);
+        case HS_FIELD_INTEGER:
+        case HS_FIELD_BOOL:
+          return read_integer_value(p, e, ai, val);
+        case HS_FIELD_DOUBLE:
+          return read_double_value(p, e, ai, val);
+        default:
+          return false;
         }
-        while (p && p < e);
-        return false;
       }
-      ++fcnt;
-    }
-  }
-  return false;
-}
-
-
-bool hs_read_string_field(hs_heka_message* m, const char* name, size_t nlen,
-                          int fi, int ai, const char** val, size_t* vlen)
-{
-  int fcnt = 0;
-  int acnt = 0;
-  int tag = 0;
-  int wiretype = 0;
-  const unsigned char* p, *e;
-
-  for (int i = 0; i < m->fields_len; ++i) {
-    if (nlen == (size_t)m->fields[i].name_len
-        && strncmp(name, m->fields[i].name, m->fields[i].name_len) == 0) {
-      if (fi == fcnt) {
-        p = m->fields[i].value;
-        e = p + m->fields[i].value_len;
-        do {
-          switch (m->fields[i].value_type) {
-          case HS_FIELD_STRING:
-          case HS_FIELD_BYTES:
-            p = read_key(p, &tag, &wiretype);
-            p = read_string(wiretype, p, e, val, vlen);
-            break;
-          default:
-            p = NULL;
-            break;
-          }
-          if (p && ai == acnt) {
-            return true;
-          }
-          ++acnt;
-        }
-        while (p && p < e);
-        return false;
-      }
-      ++fcnt;
     }
   }
   return false;

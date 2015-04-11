@@ -45,7 +45,6 @@ typedef struct hs_heka_field
   int name_len;
   int representation_len;
   int value_len;
-  int value_items;
   hs_field_value_type value_type;
 } hs_heka_field;
 
@@ -75,24 +74,35 @@ typedef struct hs_heka_message
 } hs_heka_message;
 
 
+typedef enum {
+  HS_READ_NIL,
+  HS_READ_NUMERIC,
+  HS_READ_STRING
+} hs_read_type;
+
+
+typedef struct {
+  union
+  {
+    const char* s;
+    double d;
+  } u;
+  size_t len;
+  hs_read_type type;
+} hs_read_value;
+
+
 void hs_init_heka_message(hs_heka_message* m, size_t size);
+void hs_free_heka_message(hs_heka_message* m);
+
 void hs_clear_heka_message(hs_heka_message* m);
 bool hs_decode_heka_message(hs_heka_message* m,
                             const unsigned char* buf,
                             size_t len);
-bool hs_read_numeric_field(hs_heka_message* m,
-                           const char* name,
-                           size_t nlen,
-                           int fi,
-                           int ai,
-                           double* val);
-bool hs_read_string_field(hs_heka_message* m,
+bool hs_read_message_field(hs_heka_message* m,
                           const char* name,
                           size_t nlen,
                           int fi,
                           int ai,
-                          const char** val,
-                          size_t* vlen);
-void hs_free_heka_message(hs_heka_message* m);
-
+                          hs_read_value *val);
 #endif

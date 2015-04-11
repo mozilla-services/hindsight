@@ -15,8 +15,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "hs_logger.h"
-
 
 static const char* grammar =
   "local l = require 'lpeg'\n"
@@ -29,8 +27,8 @@ static const char* grammar =
   "local op_and        = l.C(l.P'&&')\n"
   "local op_or         = l.C(l.P'||')\n"
   "\n"
-  "local string_vars   = l.Cg(l.P'Type' + 'Logger' + 'Hostname' + 'EnvVersion' + 'Payload' + 'Uuid', 'variable')\n"
-  "local numeric_vars  = l.Cg(l.P'Severity' + 'Pid', 'variable')\n"
+  "local string_vars   = l.Cg(l.P'Type' + 'Logger' + 'Hostname' + 'EnvVersion' + 'Payload', 'variable')\n"
+  "local numeric_vars  = l.Cg(l.P'Timestamp' + l.P'Severity' + 'Pid', 'variable')\n"
   "local boolean       = l.Cg(l.P'TRUE' / function() return true end + l.P'FALSE' / function() return false end, 'value')\n"
   "local null          = l.P'NIL'\n"
   "local index         = l.P'[' * (l.digit^1 / tonumber) * l.P']' + l.Cc'0' / tonumber\n"
@@ -38,13 +36,14 @@ static const char* grammar =
   "\n"
   "local string_value  = l.Cg(l.P'\"' * l.Cs(((l.P(1) - l.S'\\\\\"') + l.P'\\\\\"' / '\"')^0) * '\"'\n"
   "                    + l.P'\\'' * l.Cs(((l.P(1) - l.S'\\\\\\'') + l.P'\\\\\\'' / '\\'')^0) * '\\'', 'value')\n"
-  "local regexp_value  = l.Cg(l.P'/' * l.Cs(((l.P(1) - l.S'\\/') + l.P'\\/' / '/')^0) * '/', 'value')\n"
+  "local regexp_value  = l.Cg(l.P'/' * l.Cs(((l.P(1) - l.S'\\\\/') + l.P'\\\\/' / '/')^0) * '/', 'value')\n"
   "local string_test   = l.Ct(string_vars * sp * (relational * sp * string_value + regexp * sp * regexp_value))\n"
   "\n"
-  "local sign          = l.S'+-'\n"
-  "local exponent      = l.S'eE' * sign^-1 * l.digit^1\n"
-  "local float         = l.digit^0 * '.' * l.digit^1 * exponent^-1\n"
-  "local numeric_value = l.Cg(sign^-1 * (float + l.digit^1) / tonumber, 'value')\n"
+  "local sign          = l.S'+-'^-1\n"
+  "local number        = (l.P'0' + l.R'19' * l.digit^0)\n"
+  "local decimal       = (l.P'.'^-1 * l.digit^1)^-1\n"
+  "local exponent      = (l.S'eE' * sign * l.digit^1)^-1\n"
+  "local numeric_value = l.Cg((sign * number * decimal * exponent) / tonumber, 'value')\n"
   "local numeric_test  = l.Ct(numeric_vars * sp * relational * sp * numeric_value)\n"
   "\n"
   "local field_test    = l.Ct(fields * sp * (relational * sp * (string_value + numeric_value)\n"
@@ -113,29 +112,20 @@ typedef enum {
 
 
 typedef enum {
+  TYPE_NIL,
   TYPE_STRING,
   TYPE_NUMERIC,
   TYPE_BOOLEAN,
-  TYPE_REGEX,
-  TYPE_NIL
+  TYPE_REGEX
 } match_type;
-
-
-typedef struct {
-  match_type type;
-  union
-  {
-    char* s;
-    double d;
-    // regex* r;
-  } u;
-} match_value;
 
 
 typedef struct match_node {
   char* variable;
   struct match_node* left;
   struct match_node* right;
+  size_t variable_len;
+  size_t value_len;
   match_operation op;
   hs_heka_pb_id pbid;
   unsigned fi;
@@ -145,7 +135,7 @@ typedef struct match_node {
   {
     char* s;
     double d;
-    // regex* r;
+    // todo add regex
   } value;
 } match_node;
 
@@ -157,26 +147,41 @@ struct hs_message_matcher
 };
 
 
-bool string_test(match_node* n, const char* val, size_t len)
+bool string_test(match_node* mn, const char* val, size_t len)
 {
-  if (!val && n->value_type == TYPE_NIL) return true;
-  if (!val || (n->value_type != TYPE_STRING && n->value_type != TYPE_REGEX)) {
-    return false;
-  }
-
-  switch (n->op) {
+  switch (mn->op) {
   case OP_EQ:
-    return strncmp(val, n->value.s, len) == 0;
+    if (len != mn->value_len) return false;
+    return strncmp(val, mn->value.s, len) == 0;
   case OP_NE:
-    return strncmp(val, n->value.s, len) != 0;
+    if (len != mn->value_len) return true;
+    return strncmp(val, mn->value.s, len) != 0;
   case OP_LT:
-    return strncmp(val, n->value.s, len) < 0;
+    {
+      int cmp = strncmp(val, mn->value.s, len);
+      if (cmp == 0) {
+        return len < mn->value_len;
+      }
+      return cmp < 0;
+    }
   case OP_LTE:
-    return strncmp(val, n->value.s, len) <= 0;
+    return strncmp(val, mn->value.s, len) <= 0;
   case OP_GT:
-    return strncmp(val, n->value.s, len) > 0;
+    {
+      int cmp = strncmp(val, mn->value.s, len);
+      if (cmp == 0) {
+        return len > mn->value_len;
+      }
+      return cmp > 0;
+    }
   case OP_GTE:
-    return strncmp(val, n->value.s, len) >= 0;
+    {
+      int cmp = strncmp(val, mn->value.s, len);
+      if (cmp == 0) {
+        return len == mn->value_len;
+      }
+      return cmp > 0;
+    }
   case OP_RE:
     return false; // todo implement
   case OP_NRE:
@@ -188,24 +193,21 @@ bool string_test(match_node* n, const char* val, size_t len)
 }
 
 
-bool numeric_test(match_node* n, double val)
+bool numeric_test(match_node* mn, double val)
 {
-  if (!val && n->value_type == TYPE_NIL) return true;
-  if (!val || n->value_type != TYPE_NUMERIC) return false;
-
-  switch (n->op) {
+  switch (mn->op) {
   case OP_EQ:
-    return val == n->value.d;
+    return val == mn->value.d;
   case OP_NE:
-    return val != n->value.d;
+    return val != mn->value.d;
   case OP_LT:
-    return val < n->value.d;
+    return val < mn->value.d;
   case OP_LTE:
-    return val <= n->value.d;
+    return val <= mn->value.d;
   case OP_GT:
-    return val > n->value.d;
+    return val > mn->value.d;
   case OP_GTE:
-    return val > n->value.d;
+    return val >= mn->value.d;
   default:
     break;
   }
@@ -213,44 +215,59 @@ bool numeric_test(match_node* n, double val)
 }
 
 
-bool eval_node(match_node* n, hs_heka_message* m)
+bool eval_node(match_node* mn, hs_heka_message* m)
 {
-  switch (n->op) {
+  switch (mn->op) {
   case OP_TRUE:
     return true;
   case OP_FALSE:
     return false;
   default:
-    switch (n->pbid) {
-    case HS_HEKA_UUID:
-      string_test(n, m->uuid, 16);
-      break;
+    switch (mn->pbid) {
     case HS_HEKA_TIMESTAMP:
-      numeric_test(n, m->timestamp);
-      break;
+      return numeric_test(mn, m->timestamp);
     case HS_HEKA_TYPE:
-      string_test(n, m->type, m->type_len);
-      break;
+      return string_test(mn, m->type, m->type_len);
     case HS_HEKA_LOGGER:
-      string_test(n, m->logger, m->logger_len);
-      break;
+      return string_test(mn, m->logger, m->logger_len);
     case HS_HEKA_SEVERITY:
-      numeric_test(n, m->severity);
-      break;
+      return numeric_test(mn, m->severity);
     case HS_HEKA_PAYLOAD:
-      string_test(n, m->payload, m->payload_len);
-      break;
+      return string_test(mn, m->payload, m->payload_len);
     case HS_HEKA_ENV_VERSION:
-      string_test(n, m->env_version, m->env_version_len);
-      break;
+      return string_test(mn, m->env_version, m->env_version_len);
     case HS_HEKA_PID:
-      numeric_test(n, m->pid);
-      break;
+      return numeric_test(mn, m->pid);
     case HS_HEKA_HOSTNAME:
-      string_test(n, m->hostname, m->hostname_len);
-      break;
+      return string_test(mn, m->hostname, m->hostname_len);
     default:
-      // todo implement field support
+      {
+        hs_read_value val;
+        switch (mn->value_type) {
+        case TYPE_STRING:
+        case TYPE_REGEX:
+          if (hs_read_message_field(m, mn->variable,
+                                    mn->variable_len, mn->fi, mn->ai, &val)
+              && val.type == HS_READ_STRING) {
+            return string_test(mn, val.u.s, val.len);
+          }
+          break;
+        case TYPE_NUMERIC:
+        case TYPE_BOOLEAN:
+          if (hs_read_message_field(m, mn->variable,
+                                    mn->variable_len, mn->fi, mn->ai, &val)
+              && val.type == HS_READ_NUMERIC) {
+            return numeric_test(mn, val.u.d);
+          }
+          break;
+        case TYPE_NIL:
+          if (hs_read_message_field(m, mn->variable, mn->variable_len,
+                                    mn->fi, mn->ai, &val)) {
+            return mn->op == OP_NE;
+          }
+          return mn->op == OP_EQ;
+        }
+      }
       break;
     }
     break;
@@ -259,25 +276,25 @@ bool eval_node(match_node* n, hs_heka_message* m)
 }
 
 
-bool eval_tree(match_node* n, hs_heka_message* m)
+bool eval_tree(match_node* mn, hs_heka_message* m)
 {
-  bool match = false;
-  if (n->left) {
-    match = eval_tree(n->left, m);
+  bool match;
+  if (mn->left) {
+    match = eval_tree(mn->left, m);
   } else {
-    match = eval_node(n, m);
+    match = eval_node(mn, m);
   }
 
-  if (match && n->op == OP_OR) {
+  if (match && mn->op == OP_OR) {
     return match; // short circuit
   }
 
-  if (!match && n->op == OP_AND) {
+  if (!match && mn->op == OP_AND) {
     return match; // short circuit
   }
 
-  if (n->right) {
-    match = eval_tree(n->right, m);
+  if (mn->right) {
+    match = eval_tree(mn->right, m);
   }
   return match;
 }
@@ -290,12 +307,8 @@ void load_op_node(lua_State* L, match_node* mn)
     mn->op = OP_OR;
   } else if (strcmp(op, "&&") == 0) {
     mn->op = OP_AND;
-  } else if (strcmp(op, "TRUE") == 0) {
-    mn->op = OP_TRUE;
-  } else if (strcmp(op, "FALSE") == 0) {
-    mn->op = OP_FALSE;
   } else {
-    hs_log(HS_APP_NAME, 0, "message_matcher unknown op: %s", op);
+    fprintf(stderr, "message_matcher unknown op: %s", op);
     exit(EXIT_FAILURE);
   }
 }
@@ -305,58 +318,6 @@ void load_expression_node(lua_State* L, match_node* mn)
 {
   size_t len;
   const char* tmp;
-  lua_getfield(L, -1, "variable");
-  tmp = lua_tolstring(L, -1, &len);
-  if (strcmp(tmp, "Uuid") == 0) {
-    mn->pbid = HS_HEKA_UUID;
-  } else if (strcmp(tmp, "Timestamp") == 0) {
-    mn->pbid = HS_HEKA_TIMESTAMP;
-  } else if (strcmp(tmp, "Type") == 0) {
-    mn->pbid = HS_HEKA_TYPE;
-  } else if (strcmp(tmp, "Logger") == 0) {
-    mn->pbid = HS_HEKA_LOGGER;
-  } else if (strcmp(tmp, "Severity") == 0) {
-    mn->pbid = HS_HEKA_SEVERITY;
-  } else if (strcmp(tmp, "Payload") == 0) {
-    mn->pbid = HS_HEKA_PAYLOAD;
-  } else if (strcmp(tmp, "EnvVersion") == 0) {
-    mn->pbid = HS_HEKA_ENV_VERSION;
-  } else if (strcmp(tmp, "Pid") == 0) {
-    mn->pbid = HS_HEKA_PID;
-  } else if (strcmp(tmp, "Hostname") == 0) {
-    mn->pbid = HS_HEKA_HOSTNAME;
-  } else {
-    mn->pbid = HS_HEKA_FIELD;
-    mn->variable = malloc(len + 1);
-    memcpy(mn->variable, tmp, len + 1);
-  }
-  lua_pop(L, 1);
-
-  lua_getfield(L, -1, "value");
-  switch (lua_type(L, -1)) {
-  case LUA_TSTRING:
-    tmp = lua_tolstring(L, -1, &len);
-    mn->value_type = TYPE_STRING;
-    mn->value.s = malloc(len + 1);
-    memcpy(mn->value.s, tmp, len + 1);
-    break;
-  case LUA_TNUMBER:
-    mn->value_type = TYPE_NUMERIC;
-    mn->value.d = lua_tonumber(L, -1);
-    break;
-  case LUA_TBOOLEAN:
-    mn->value_type = TYPE_BOOLEAN;
-    mn->value.d = lua_tonumber(L, -1);
-    break;
-  case LUA_TNIL:
-    mn->value_type = TYPE_NIL;
-    break;
-  default:
-    hs_log(HS_APP_NAME, 0, "message_matcher invalid value");
-    exit(EXIT_FAILURE);
-  }
-  lua_pop(L, 1);
-
   lua_getfield(L, -1, "op");
   tmp = lua_tolstring(L, -1, &len);
   if (strcmp(tmp, "==") == 0) {
@@ -377,8 +338,68 @@ void load_expression_node(lua_State* L, match_node* mn)
   } else if (strcmp(tmp, "!~") == 0) {
     mn->value_type = TYPE_REGEX;
     mn->op = OP_NRE;
+  } else if (strcmp(tmp, "TRUE") == 0) {
+    mn->op = OP_TRUE;
+    lua_pop(L, 1);
+    return; // no other args
+  } else if (strcmp(tmp, "FALSE") == 0) {
+    mn->op = OP_FALSE; // no other args
+    lua_pop(L, 1);
+    return;
   } else {
-    hs_log(HS_APP_NAME, 0, "message_matcher invalid op: %s", tmp);
+    fprintf(stderr, "message_matcher invalid op: %s", tmp);
+    exit(EXIT_FAILURE);
+  }
+  lua_pop(L, 1);
+
+  lua_getfield(L, -1, "variable");
+  tmp = lua_tolstring(L, -1, &len);
+  if (strcmp(tmp, "Timestamp") == 0) {
+    mn->pbid = HS_HEKA_TIMESTAMP;
+  } else if (strcmp(tmp, "Type") == 0) {
+    mn->pbid = HS_HEKA_TYPE;
+  } else if (strcmp(tmp, "Logger") == 0) {
+    mn->pbid = HS_HEKA_LOGGER;
+  } else if (strcmp(tmp, "Severity") == 0) {
+    mn->pbid = HS_HEKA_SEVERITY;
+  } else if (strcmp(tmp, "Payload") == 0) {
+    mn->pbid = HS_HEKA_PAYLOAD;
+  } else if (strcmp(tmp, "EnvVersion") == 0) {
+    mn->pbid = HS_HEKA_ENV_VERSION;
+  } else if (strcmp(tmp, "Pid") == 0) {
+    mn->pbid = HS_HEKA_PID;
+  } else if (strcmp(tmp, "Hostname") == 0) {
+    mn->pbid = HS_HEKA_HOSTNAME;
+  } else {
+    mn->pbid = HS_HEKA_FIELD;
+    mn->variable = malloc(len + 1);
+    mn->variable_len = len;
+    memcpy(mn->variable, tmp, len + 1);
+  }
+  lua_pop(L, 1);
+
+  lua_getfield(L, -1, "value");
+  switch (lua_type(L, -1)) {
+  case LUA_TSTRING:
+    tmp = lua_tolstring(L, -1, &len);
+    mn->value_type = TYPE_STRING;
+    mn->value_len = len;
+    mn->value.s = malloc(len + 1);
+    memcpy(mn->value.s, tmp, len + 1);
+    break;
+  case LUA_TNUMBER:
+    mn->value_type = TYPE_NUMERIC;
+    mn->value.d = lua_tonumber(L, -1);
+    break;
+  case LUA_TBOOLEAN:
+    mn->value_type = TYPE_BOOLEAN;
+    mn->value.d = lua_toboolean(L, -1);
+    break;
+  case LUA_TNIL:
+    mn->value_type = TYPE_NIL;
+    break;
+  default:
+    fprintf(stderr, "message_matcher invalid value");
     exit(EXIT_FAILURE);
   }
   lua_pop(L, 1);
@@ -398,7 +419,7 @@ void hs_init_message_match_builder(hs_message_match_builder* mmb,
 {
   mmb->parser = luaL_newstate();
   if (!mmb->parser) {
-    hs_log(HS_APP_NAME, 0, "message_matcher_builder luaL_newstate failed");
+    fprintf(stderr, "message_matcher_builder luaL_newstate failed");
     exit(EXIT_FAILURE);
   }
 
@@ -431,8 +452,8 @@ void hs_init_message_match_builder(hs_message_match_builder* mmb,
   lua_pop(mmb->parser, 1);
 
   if (luaL_dostring(mmb->parser, grammar)) {
-    hs_log(HS_APP_NAME, 0, "message_matcher_grammar error: %s",
-           lua_tostring(mmb->parser, -1));
+    fprintf(stderr, "message_matcher_grammar error: %s",
+            lua_tostring(mmb->parser, -1));
     exit(EXIT_FAILURE);
   }
 }
@@ -447,24 +468,22 @@ void hs_free_message_match_builder(hs_message_match_builder* mmb)
 }
 
 
-hs_message_matcher* hs_create_message_matcher(hs_message_match_builder* mmb, const char* exp)
+hs_message_matcher* hs_create_message_matcher(hs_message_match_builder* mmb,
+                                              const char* exp)
 {
   lua_getglobal(mmb->parser, "parse");
   if (!lua_isfunction(mmb->parser, -1)) {
-    hs_log(HS_APP_NAME, 0, "message_matcher error: %s",
-           lua_tostring(mmb->parser, -1));
+    fprintf(stderr, "message_matcher error: %s", lua_tostring(mmb->parser, -1));
     exit(EXIT_FAILURE);
   }
   lua_pushstring(mmb->parser, exp);
   if (lua_pcall(mmb->parser, 1, 2, 0)) {
-    hs_log(HS_APP_NAME, 0, "message_matcher error: %s",
-           lua_tostring(mmb->parser, -1));
+    fprintf(stderr, "message_matcher error: %s", lua_tostring(mmb->parser, -1));
     exit(EXIT_FAILURE);
   }
 
   if (lua_type(mmb->parser, 1) != LUA_TTABLE) {
-    hs_log(HS_APP_NAME, 4, "message_matcher parse failed: %s", exp);
-    return NULL;
+    return NULL; // parse failed
   }
   int size = lua_tointeger(mmb->parser, 2);
 
@@ -482,17 +501,17 @@ hs_message_matcher* hs_create_message_matcher(hs_message_match_builder* mmb, con
       load_expression_node(mmb->parser, &mm->nodes[j]);
       break;
     default:
-      hs_log(HS_APP_NAME, 0, "message_matcher error: invalid table returned");
+      fprintf(stderr, "message_matcher error: invalid table returned");
       exit(EXIT_FAILURE);
     }
     lua_pop(mmb->parser, 1);
   }
   lua_pop(mmb->parser, 2);
 
-  // turn the postfix stack into a executable tree
-  match_node** stack = malloc(sizeof(match_node*) * size);
+  // turn the postfix stack into an executable tree
+  match_node** stack = calloc(sizeof(match_node*) * size, 1);
   if (!stack) {
-    hs_log(HS_APP_NAME, 0, "message_matcher stack allocation failed");
+    fprintf(stderr, "message_matcher stack allocation failed");
     exit(EXIT_FAILURE);
   }
 
@@ -501,13 +520,12 @@ hs_message_matcher* hs_create_message_matcher(hs_message_match_builder* mmb, con
     if (mm->nodes[i].op != OP_AND && mm->nodes[i].op != OP_OR) {
       stack[top++] = &mm->nodes[i];
     } else {
-      mm->nodes[i].right = stack[top--];
-      mm->nodes[i].left = stack[top];
-      stack[top] = &mm->nodes[i];
+      mm->nodes[i].right = stack[--top];
+      mm->nodes[i].left = stack[--top];
+      stack[top++] = &mm->nodes[i];
     }
   }
   free(stack);
-
   return mm;
 }
 

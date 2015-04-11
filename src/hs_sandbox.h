@@ -18,7 +18,7 @@ typedef struct hs_sandbox
   lua_sandbox* lsb;
   char* filename;
   char* state;
-  hs_message_matcher* matcher;
+  hs_message_matcher* mm;
   int ticker_interval;
 } hs_sandbox;
 

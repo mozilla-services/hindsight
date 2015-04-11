@@ -260,7 +260,7 @@ lua_State* hs_load_sandbox_config(const char* fn,
 
   if (mode == HS_MODE_ANALYSIS) {
     ret = get_string_item(L, LUA_GLOBALSINDEX, cfg_sb_matcher,
-                          &cfg->message_matcher, "FALSE");
+                          &cfg->message_matcher, NULL);
     if (ret) goto cleanup;
 
     ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_sb_thread,

@@ -46,39 +46,54 @@ static char* test_read()
   hs_init_heka_message(&m, 8);
   mu_assert(hs_decode_heka_message(&m, pb, pblen-1), "decode failed");
 
-  const char* val;
-  double d;
-  size_t len;
-  mu_assert(hs_read_string_field(&m, "string", 6, 0, 0, &val, &len), "standalone");
-  mu_assert(strncmp(val, "string", len) == 0, "invalid value: %.*s", (int)len, val);
+  hs_read_value v;
+  mu_assert(hs_read_message_field(&m, "string", 6, 0, 0, &v), "standalone");
+  mu_assert(v.type == HS_READ_STRING, "%d", v.type);
+  mu_assert(strncmp(v.u.s, "string", v.len) == 0, "invalid value: %.*s",
+            (int)v.len, v.u.s);
 
-  mu_assert(hs_read_string_field(&m, "strings", 7, 0, 0, &val, &len), "item 0");
-  mu_assert(strncmp(val, "s1", len) == 0, "invalid value: %.*s", (int)len, val);
+  mu_assert(hs_read_message_field(&m, "strings", 7, 0, 0, &v), "item 0");
+  mu_assert(v.type == HS_READ_STRING, "%d", v.type);
+  mu_assert(strncmp(v.u.s, "s1", v.len) == 0, "invalid value: %.*s",
+            (int)v.len, v.u.s);
 
-  mu_assert(hs_read_string_field(&m, "strings", 7, 0, 1, &val, &len), "item 1");
-  mu_assert(strncmp(val, "s2", len) == 0, "invalid value: %.*s", (int)len, val);
+  mu_assert(hs_read_message_field(&m, "strings", 7, 0, 1, &v), "item 1");
+  mu_assert(v.type == HS_READ_STRING, "%d", v.type);
+  mu_assert(strncmp(v.u.s, "s2", v.len) == 0, "invalid value: %.*s",
+            (int)v.len, v.u.s);
 
-  mu_assert(hs_read_string_field(&m, "strings", 7, 0, 2, &val, &len), "item 2");
-  mu_assert(strncmp(val, "s3", len) == 0, "invalid value: %.*s", (int)len, val);
+  mu_assert(hs_read_message_field(&m, "strings", 7, 0, 2, &v), "item 2");
+  mu_assert(v.type == HS_READ_STRING, "%d", v.type);
+  mu_assert(strncmp(v.u.s, "s3", v.len) == 0, "invalid value: %.*s",
+            (int)v.len, v.u.s);
 
-  mu_assert(hs_read_string_field(&m, "strings", 7, 0, 3, &val, &len) == false, "no item 3");
+  mu_assert(hs_read_message_field(&m, "strings", 7, 0, 3, &v) == false,
+            "no item 3");
+  mu_assert(v.type == HS_READ_NIL, "%d", v.type);
 
-  mu_assert(hs_read_numeric_field(&m, "number", 6, 0, 0, &d), "standalone");
-  mu_assert(d == 1, "invalid value: %g", d);
+  mu_assert(hs_read_message_field(&m, "number", 6, 0, 0, &v), "standalone");
+  mu_assert(v.type == HS_READ_NUMERIC, "%d", v.type);
+  mu_assert(v.u.d == 1, "invalid value: %g", v.u.d);
 
-  mu_assert(hs_read_numeric_field(&m, "numbers", 7, 0, 0, &d), "item 0");
-  mu_assert(d == 1, "invalid value: %g", d);
+  mu_assert(hs_read_message_field(&m, "numbers", 7, 0, 0, &v), "item 0");
+  mu_assert(v.type == HS_READ_NUMERIC, "%d", v.type);
+  mu_assert(v.u.d == 1, "invalid value: %g", v.u.d);
 
-  mu_assert(hs_read_numeric_field(&m, "numbers", 7, 0, 1, &d), "item 1");
-  mu_assert(d == 2, "invalid value: %g", d);
+  mu_assert(hs_read_message_field(&m, "numbers", 7, 0, 1, &v), "item 1");
+  mu_assert(v.type == HS_READ_NUMERIC, "%d", v.type);
+  mu_assert(v.u.d == 2, "invalid value: %g", v.u.d);
 
-  mu_assert(hs_read_numeric_field(&m, "numbers", 7, 0, 2, &d), "item 2");
-  mu_assert(d == 3, "invalid value: %g", d);
+  mu_assert(hs_read_message_field(&m, "numbers", 7, 0, 2, &v), "item 2");
+  mu_assert(v.type == HS_READ_NUMERIC, "%d", v.type);
+  mu_assert(v.u.d == 3, "invalid value: %g", v.u.d);
 
-  mu_assert(hs_read_numeric_field(&m, "numbers", 7, 0, 3, &d) == false, "no item 3");
+  mu_assert(hs_read_message_field(&m, "numbers", 7, 0, 3, &v) == false,
+            "no item 3");
+  mu_assert(v.type == HS_READ_NIL, "%d", v.type);
 
-  mu_assert(hs_read_numeric_field(&m, "bool", 4, 0, 0, &d), "standalone");
-  mu_assert(d == 1, "invalid value: %g", d);
+  mu_assert(hs_read_message_field(&m, "bool", 4, 0, 0, &v), "standalone");
+  mu_assert(v.type == HS_READ_NUMERIC, "%d", v.type);
+  mu_assert(v.u.d == 1, "invalid value: %g", v.u.d);
 
   hs_free_heka_message(&m);
   return NULL;
