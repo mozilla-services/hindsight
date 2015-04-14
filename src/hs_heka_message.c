@@ -408,7 +408,7 @@ void hs_clear_heka_message(hs_heka_message* m)
     memset(m->fields, 0, m->fields_size * sizeof(hs_heka_field));
   }
   m->timestamp = 0;
-  m->severity = 0;
+  m->severity = 7;
   m->pid = 0;
   m->type_len = 0;
   m->logger_len = 0;

@@ -10,6 +10,7 @@
 #define hs_input_plugins_h_
 
 #include <pthread.h>
+#include <semaphore.h>
 #include <stddef.h>
 
 #include "hs_config.h"
@@ -21,29 +22,27 @@ typedef struct hs_input_plugins hs_input_plugins;
 
 struct hs_input_plugin
 {
-  hs_input_plugins* plugins;
-
-  long long cp_offset;  // numeric checkpoint
-  char* cp_string;      // string checkpoint
-  size_t cp_capacity;   // string checkpoint capacity
   hs_sandbox* sb;
+  hs_input_plugins* plugins;
+  char* cp_string;      // string checkpoint
+  long long cp_offset;  // numeric checkpoint
+  size_t cp_capacity;   // string checkpoint capacity
 };
 
 struct hs_input_plugins
 {
-  pthread_mutex_t lock;
-  pthread_mutex_t* shutdown;
+  sem_t* shutdown;
   pthread_t* threads;
-
   hs_input_plugin** list;
   hs_config* cfg;
 
+  pthread_mutex_t lock;
   hs_output output;
   int plugin_cnt;
 };
 
 void hs_init_input_plugins(hs_input_plugins* plugins, hs_config* cfg,
-                           pthread_mutex_t* shutdown);
+                           sem_t* shutdown);
 void hs_free_input_plugins(hs_input_plugins* plugins);
 
 void hs_load_input_plugins(hs_input_plugins* plugins, const hs_config* cfg,

@@ -13,6 +13,7 @@
 #include <semaphore.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <time.h>
 
 #include "hs_config.h"
 #include "hs_heka_message.h"
@@ -26,21 +27,21 @@ typedef struct hs_analysis_thread hs_analysis_thread;
 
 struct hs_analysis_plugins
 {
-  pthread_mutex_t lock;
-  pthread_mutex_t* shutdown;
-  sem_t finished;
-
   hs_analysis_thread* list;
   pthread_t* threads;
   hs_config* cfg;
+  hs_heka_message *msg;
+
+  pthread_mutex_t lock;
+  sem_t finished;
   hs_output output;
   hs_input input;
   hs_message_match_builder mmb;
 
-  hs_heka_message* msg;
-
   int thread_cnt;
+  time_t current_t;
   bool stop;
+  bool matched;
 };
 
 struct hs_analysis_thread
@@ -49,12 +50,12 @@ struct hs_analysis_thread
   sem_t start;
 
   hs_sandbox** list;
+  int list_size;
   int plugin_cnt;
   int tid;
 };
 
-void hs_init_analysis_plugins(hs_analysis_plugins* plugins, hs_config* cfg,
-                              pthread_mutex_t* shutdown);
+void hs_init_analysis_plugins(hs_analysis_plugins* plugins, hs_config* cfg);
 void hs_free_analysis_plugins(hs_analysis_plugins* plugins);
 
 void hs_start_analysis_threads(hs_analysis_plugins* plugins);
@@ -64,4 +65,6 @@ void hs_load_analysis_plugins(hs_analysis_plugins* plugins,
                               const char* path);
 
 void hs_start_analysis_input(hs_analysis_plugins* plugins, pthread_t* t);
+
+bool hs_analyze_message(hs_analysis_thread* at);
 #endif

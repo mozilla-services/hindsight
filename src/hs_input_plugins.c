@@ -180,9 +180,8 @@ static int inject_message(lua_State* L)
                lsb_get_error(lsb));
   }
 
-  const char* written_data;
-  size_t written_data_len = 0;
-  written_data = lsb_get_output(lsb, &written_data_len);
+  size_t output_len = 0;
+  const char* output = lsb_get_output(lsb, &output_len);
 
   switch (lua_type(L, 2)) {
   case LUA_TNUMBER:
@@ -215,14 +214,14 @@ static int inject_message(lua_State* L)
   }
 
   pthread_mutex_lock(&p->plugins->lock);
-  int len = write_varint(header + 3, written_data_len);
+  int len = write_varint(header + 3, output_len);
   header[0] = 0x1e;
   header[1] = (char)(len + 1);
   header[2] = 0x08;
   header[3 + len] = 0x1f;
   fwrite(header, 4 + len, 1, p->plugins->output.fh);
-  fwrite(written_data, written_data_len, 1, p->plugins->output.fh);
-  bytes_written += 4 + len + written_data_len;
+  fwrite(output, output_len, 1, p->plugins->output.fh);
+  bytes_written += 4 + len + output_len;
   if (bytes_written > BUFSIZ) {
     fflush(p->plugins->output.fh);
     write_input_checkpoints(p->plugins);
@@ -270,13 +269,14 @@ static void free_input_plugin(hs_input_plugin* p)
 
 static int init_input_plugin(hs_input_plugin* p)
 {
+  lsb_add_function(p->sb->lsb, &inject_message, "inject_message");
+
   int ret = lsb_init(p->sb->lsb, p->sb->state);
   if (ret) {
     hs_log(p->sb->filename, 3, "lsb_init() received: %d %s", ret,
            lsb_get_error(p->sb->lsb));
     return ret;
   }
-  lsb_add_function(p->sb->lsb, &inject_message, "inject_message");
 
   return 0;
 }
@@ -306,8 +306,8 @@ static void* input_thread_function(void* arg)
         break;
       }
       ts.tv_sec += p->sb->ticker_interval;
-      if (!pthread_mutex_timedlock(p->plugins->shutdown, &ts)) {
-        pthread_mutex_unlock(p->plugins->shutdown);
+      if (!sem_timedwait(p->plugins->shutdown, &ts)) {
+        sem_post(p->plugins->shutdown);
         break; // shutting down
       }
       // poll
@@ -388,17 +388,11 @@ static void add_to_input_plugins(hs_input_plugins* plugins, hs_input_plugin* p)
 
 
 void hs_init_input_plugins(hs_input_plugins* plugins, hs_config* cfg,
-                           pthread_mutex_t* shutdown)
+                           sem_t* shutdown)
 {
   plugins->plugin_cnt = 0;
   plugins->cfg = cfg;
   plugins->shutdown = shutdown;
-
-  if (pthread_mutex_init(plugins->shutdown, NULL)) {
-    perror("shutdown pthread_mutex_init failed");
-    exit(EXIT_FAILURE);
-  }
-  pthread_mutex_lock(plugins->shutdown);
 
   if (pthread_mutex_init(&plugins->lock, NULL)) {
     perror("lock pthread_mutex_init failed");
@@ -437,7 +431,6 @@ void hs_free_input_plugins(hs_input_plugins* plugins)
   hs_free_output(&plugins->output);
 
   pthread_mutex_destroy(&plugins->lock);
-  pthread_mutex_destroy(plugins->shutdown);
   plugins->cfg = NULL;
   plugins->plugin_cnt = 0;
 }

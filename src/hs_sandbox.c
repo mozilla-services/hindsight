@@ -154,6 +154,8 @@ hs_sandbox* hs_create_sandbox(void* parent,
   if (!p) return NULL;
 
   p->ticker_interval = cfg->ticker_interval;
+  // distribute when the timer_events will fire
+  p->next_timer_event = time(NULL) + rand() % 60;
 
   p->lsb = lsb_create_custom(parent, file, config);
   if (!p->lsb) {

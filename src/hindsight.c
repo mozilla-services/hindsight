@@ -10,6 +10,7 @@
 #include <lauxlib.h>
 #include <pthread.h>
 #include <sched.h>
+#include <semaphore.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -25,13 +26,13 @@
 #include "hs_logger.h"
 #include "hs_sandbox.h"
 
-static pthread_mutex_t g_shutdown;
+static sem_t g_shutdown;
 
 static void stop_signal(int sig)
 {
   fprintf(stderr, "stop signal received %d\n", sig);
   signal(SIGINT, SIG_DFL);
-  pthread_mutex_unlock(&g_shutdown);
+  sem_post(&g_shutdown);
 }
 
 
@@ -47,8 +48,8 @@ static void input_main(hs_config* cfg)
       hs_log(HS_APP_NAME, 3, "clock_gettime failed");
     }
     ts.tv_sec += 60;
-    if (!pthread_mutex_timedlock(plugins.shutdown, &ts)) {
-      pthread_mutex_unlock(plugins.shutdown);
+    if (!sem_timedwait(&g_shutdown, &ts)) {
+      sem_post(&g_shutdown);
       break; // shutting down
     }
     fprintf(stderr, "todo scan the load directory\n");
@@ -63,10 +64,14 @@ static void input_main(hs_config* cfg)
 static void analysis_main(hs_config* cfg)
 {
   hs_analysis_plugins plugins;
-  hs_init_analysis_plugins(&plugins, cfg, &g_shutdown);
-  hs_start_analysis_threads(&plugins);
+  hs_init_analysis_plugins(&plugins, cfg);
+  if (cfg->threads) {
+    hs_start_analysis_threads(&plugins);
+  }
   hs_load_analysis_plugins(&plugins, cfg, cfg->run_path);
+
   sched_yield();
+
   // the input uses the extra thread slot allocated at the end
   hs_start_analysis_input(&plugins, &plugins.threads[cfg->threads]);
 
@@ -76,8 +81,8 @@ static void analysis_main(hs_config* cfg)
       hs_log(HS_APP_NAME, 3, "clock_gettime failed");
     }
     ts.tv_sec += 60;
-    if (!pthread_mutex_timedlock(plugins.shutdown, &ts)) {
-      pthread_mutex_unlock(plugins.shutdown);
+    if (!sem_timedwait(&g_shutdown, &ts)) {
+      sem_post(&g_shutdown);
       break; // shutting down
     }
     fprintf(stderr, "todo scan the load directory\n");
@@ -95,6 +100,17 @@ int main(int argc, char* argv[])
     fprintf(stderr, "usage: %s <cfg> [loglevel]\n", argv[0]);
     return EXIT_FAILURE;
   }
+
+  if (sem_init(&g_shutdown, 0, 1)) {
+    perror("g_shutdown sem_init failed");
+    exit(EXIT_FAILURE);
+  }
+
+  if (sem_wait(&g_shutdown)) {
+    perror("g_shutdown sem_wait failed");
+    exit(EXIT_FAILURE);
+  }
+
   int loglevel = 6;
   if (argc == 3) {
     loglevel = atoi(argv[2]);
@@ -125,5 +141,6 @@ int main(int argc, char* argv[])
     break;
   }
   hs_log(HS_APP_NAME, 6, "exiting", cfg.mode);
+  sem_destroy(&g_shutdown);
   return 0;
 }

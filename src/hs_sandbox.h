@@ -9,6 +9,8 @@
 #ifndef hs_sandbox_h_
 #define hs_sandbox_h_
 
+#include <time.h>
+
 #include "lsb.h"
 #include "hs_config.h"
 #include "hs_message_matcher.h"
@@ -20,6 +22,7 @@ typedef struct hs_sandbox
   char* state;
   hs_message_matcher* mm;
   int ticker_interval;
+  time_t next_timer_event;
 } hs_sandbox;
 
 hs_sandbox* hs_create_sandbox(void* parent,

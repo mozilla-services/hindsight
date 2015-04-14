@@ -22,7 +22,6 @@
 #include "hs_logger.h"
 #include "hs_util.h"
 
-
 static bool extract_id(const char* fn, size_t* id)
 {
   size_t l = strlen(fn);
@@ -81,6 +80,26 @@ static int read_checkpoint(hs_config* cfg, hs_analysis_plugins* plugins)
     hsi->id = find_first_id(cfg->input_path);
   }
   return 0;
+}
+
+
+static void write_input_checkpoint(hs_analysis_plugins* plugins)
+{
+
+  hs_output* output = &plugins->output;
+  if (fseek(output->cp.fh, 0, SEEK_SET)) {
+    hs_log(HS_APP_NAME, 3, "checkpoint fseek() error: %d",
+           ferror(output->cp.fh));
+    return;
+  }
+
+  long pos = 0;
+  hs_input* hsi = &plugins->input;
+  if (hsi->fh) pos = ftell(hsi->fh) - (hsi->readpos - hsi->scanpos);
+  fprintf(output->cp.fh, "last_output_id = %zu\n", output->cp.id);
+  fprintf(output->cp.fh, "input_id = %zu\n", hsi->id);
+  fprintf(output->cp.fh, "input_offset = %zu\n", pos);
+  fflush(output->cp.fh);
 }
 
 
@@ -286,48 +305,87 @@ void* hs_read_input_thread(void* arg)
     exit(EXIT_FAILURE);
   }
   strcpy(plugins->input.path, cfg->input_path);
+  plugins->msg = &msg;
 
   read_checkpoint(cfg, plugins);
   size_t bytes_read = 0;
-  plugins->msg = &msg;
+  size_t output_offset = 0;
   size_t cnt = 0;
+  bool flush_cp = true;
+
   while (!plugins->stop) {
     if (plugins->input.fh) {
       if (find_message(&msg, &plugins->input)) {
-        ++cnt;
-//        for (int i = 0; i < plugins->thread_cnt; ++i) {
-//          sem_post(&plugins->list[i].start);
-//        }
-//        // this creates a bottleneck of ~110-120K messages per second (tp x230)
-//        for (int i = 0; i < plugins->thread_cnt; ++i) {
-//          sem_wait(&plugins->finished);
-//        }
+        ++cnt; // todo remove
+        plugins->current_t = time(NULL);
+        output_offset = plugins->output.cp.offset;
+
+        if (plugins->thread_cnt) {
+          for (int i = 0; i < plugins->thread_cnt; ++i) {
+            sem_post(&plugins->list[i].start);
+          }
+          sched_yield();
+          // the synchronization creates s a bottleneck of ~110-120K messages
+          // per second on my Thinkpad x230.  Threads should be used only
+          // when the amount of work done by each thread (>20us) outweighs the
+          // synchronization overhead.
+          for (int i = 0; i < plugins->thread_cnt; ++i) {
+            sem_wait(&plugins->finished);
+          }
+        } else {
+          hs_analyze_message(&plugins->list[0]);
+        }
+
+        if (output_offset != plugins->output.cp.offset) {
+          fflush(plugins->output.fh);
+          write_input_checkpoint(plugins);
+          if (plugins->output.cp.offset >= (size_t)plugins->cfg->output_size) {
+            ++plugins->output.cp.id;
+            hs_open_output_file(&plugins->output, plugins->cfg->output_path);
+          }
+        } else {
+          flush_cp = true;
+        }
       } else {
         bytes_read = read_file(&plugins->input);
       }
 
       if (!bytes_read) {
+        if (flush_cp) {
+          write_input_checkpoint(plugins);
+          flush_cp = false;
+        }
         // see if the next file is there yet
         hs_log(HS_APP_NAME, 7, "count %zu", cnt); // todo remove
         hs_log(HS_APP_NAME, 7, "looking for the next log"); // todo remove
         open_file(&plugins->input, plugins->input.id + 1);
       }
-//      sleep(1); // todo remove
+      //sleep(1); // todo remove
     } else { // still waiting on the first file
       hs_log(HS_APP_NAME, 7, "waiting for the input file"); // todo remove
       open_file(&plugins->input, plugins->input.id);
     }
-
   }
+
   // signal shutdown
   plugins->msg = NULL;
+  plugins->current_t = time(NULL);
+
+  if (plugins->thread_cnt) {
+    for (int i = 0; i < plugins->thread_cnt; ++i) {
+      sem_post(&plugins->list[i].start);
+    }
+    for (int i = 0; i < plugins->thread_cnt; ++i) {
+      sem_wait(&plugins->finished);
+    }
+  } else {
+    hs_analyze_message(&plugins->list[0]);
+  }
+
+  if (plugins->output.fh) fflush(plugins->output.fh);
+  write_input_checkpoint(plugins);
   hs_free_heka_message(&msg);
-  for (int i = 0; i < plugins->thread_cnt; ++i) {
-    sem_post(&plugins->list[i].start);
-  }
-  for (int i = 0; i < plugins->thread_cnt; ++i) {
-    sem_wait(&plugins->finished);
-  }
+
   hs_log(HS_APP_NAME, 6, "exiting hs_read_input");
   pthread_exit(NULL);
 }

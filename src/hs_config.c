@@ -56,7 +56,7 @@ static void init_config(hs_config* cfg)
   cfg->output_path = NULL;
   cfg->input_path = NULL;
   cfg->output_size = 1024 * 1024 * 64;
-  cfg->threads = 1;
+  cfg->threads = 0;
   init_sandbox_config(&cfg->sbc);
 }
 
@@ -163,6 +163,9 @@ static int load_sandbox_defaults(lua_State* L, hs_sandbox_config* cfg)
   if (get_numeric_item(L, 1, cfg_sb_output, &cfg->output_limit)) return 1;
   if (get_numeric_item(L, 1, cfg_sb_memory, &cfg->memory_limit)) return 1;
   if (get_numeric_item(L, 1, cfg_sb_instruction, &cfg->instruction_limit)) {
+    return 1;
+  }
+  if (get_numeric_item(L, 1, cfg_sb_ticker_interval, &cfg->ticker_interval)) {
     return 1;
   }
   if (get_string_item(L, 1, cfg_sb_module, &cfg->module_path, NULL)) return 1;
