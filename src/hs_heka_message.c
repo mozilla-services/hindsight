@@ -12,6 +12,7 @@
 #include <string.h>
 
 #include "hs_logger.h"
+#include "hs_util.h"
 
 #define MAX_VARINT_BYTES 10
 
@@ -246,6 +247,89 @@ read_double_value(const unsigned char* p, const unsigned char* e, int ai,
   return true;
 }
 
+static size_t decode_header(unsigned char* buf, size_t len)
+{
+  if (*buf != 0x08) return 0;
+
+  unsigned char* p = buf;
+  if (p && p < buf + len - 1) {
+    long long vi;
+    if (hs_read_varint(p + 1, buf + len, &vi)) {
+      if (vi > HS_MIN_MSG_LEN && vi <= HS_MAX_MSG_LEN) {
+        return vi;
+      }
+    }
+  }
+  return 0;
+}
+
+
+bool hs_find_message(hs_heka_message* m, hs_input* hsi)
+{
+  if (hsi->readpos == hsi->scanpos) return false;
+
+  unsigned char* p = memchr(&hsi->buf[hsi->scanpos], 0x1e,
+                            hsi->readpos - hsi->scanpos);
+  if (p) {
+    if (p != hsi->buf + hsi->scanpos) {
+      hs_log(HS_APP_NAME, 4, "discarded bytes: %zu offset %zu",
+             p - hsi->buf + hsi->scanpos,
+             ftell(hsi->fh) - (hsi->readpos - (hsi->scanpos + 2)));
+    }
+    pthread_mutex_lock(&hsi->lock);
+    hsi->scanpos = p - hsi->buf;
+    pthread_mutex_unlock(&hsi->lock);
+
+    if (hsi->readpos - hsi->scanpos < 2) {
+      return false; // header length is not buf
+    }
+
+    size_t hlen = hsi->buf[hsi->scanpos + 1];
+    size_t hend = hsi->scanpos + hlen + 3;
+    if (hend > hsi->readpos) return false; // header is not in buf
+    if (hsi->buf[hend - 1] != 0x1f) return false; // invalid header termination
+
+    if (!hsi->msglen) {
+      hsi->msglen = decode_header(&hsi->buf[hsi->scanpos + 2], hlen);
+    }
+
+    if (hsi->msglen) {
+      size_t mend = hend + hsi->msglen;
+      if (mend > hsi->readpos) return false; // message is not in buf
+
+      if (hs_decode_heka_message(m, &hsi->buf[hend], hsi->msglen)) {
+        pthread_mutex_lock(&hsi->lock);
+        hsi->scanpos = mend;
+        pthread_mutex_unlock(&hsi->lock);
+        hsi->msglen = 0;
+      } else {
+        hs_log(HS_APP_NAME, 4, "message decode failure file: %s offset %zu",
+               hsi->file,
+               ftell(hsi->fh) - (hsi->readpos - hend));
+        pthread_mutex_lock(&hsi->lock);
+        ++hsi->scanpos;
+        pthread_mutex_unlock(&hsi->lock);
+      }
+    } else {
+      hs_log(HS_APP_NAME, 4,
+             "message header decode failure file: %s offset %lld",
+             hsi->file,
+             ftell(hsi->fh) - (hsi->readpos - (hsi->scanpos + 2)));
+      pthread_mutex_lock(&hsi->lock);
+      ++hsi->scanpos;
+      pthread_mutex_unlock(&hsi->lock);
+    }
+  } else {
+    hs_log(HS_APP_NAME, 4, "discarded bytes: %zu offset %zu",
+           hsi->readpos - hsi->scanpos,
+           ftell(hsi->fh) - (hsi->readpos - (hsi->scanpos + 2)));
+    pthread_mutex_lock(&hsi->lock);
+    hsi->scanpos = hsi->readpos = 0;
+    pthread_mutex_unlock(&hsi->lock);
+  }
+  return true;
+}
+
 
 bool hs_decode_heka_message(hs_heka_message* m,
                             const unsigned char* buf,
@@ -262,6 +346,8 @@ bool hs_decode_heka_message(hs_heka_message* m,
   int wiretype = 0;
   int tag = 0;
   hs_clear_heka_message(m);
+  m->msg = buf;
+  m->msg_len = (int)len;
 
   do {
     cp = read_key(cp, &tag, &wiretype);
@@ -398,6 +484,7 @@ void hs_init_heka_message(hs_heka_message* m, size_t size)
 
 void hs_clear_heka_message(hs_heka_message* m)
 {
+  m->msg = NULL;
   m->uuid = NULL;
   m->type = NULL;
   m->logger = NULL;
@@ -410,6 +497,7 @@ void hs_clear_heka_message(hs_heka_message* m)
   m->timestamp = 0;
   m->severity = 7;
   m->pid = 0;
+  m->msg_len = 0;
   m->type_len = 0;
   m->logger_len = 0;
   m->payload_len = 0;
@@ -457,4 +545,83 @@ bool hs_read_message_field(hs_heka_message* m, const char* name, size_t nlen,
     }
   }
   return false;
+}
+
+
+int hs_read_message(lua_State* lua, hs_heka_message* m)
+{
+  int n = lua_gettop(lua);
+  if (n < 1 || n > 3) {
+    luaL_error(lua, "read_message() incorrect number of arguments");
+  }
+  size_t field_len;
+  const char* field = luaL_checklstring(lua, 1, &field_len);
+  int fi = luaL_optinteger(lua, 2, 0);
+  luaL_argcheck(lua, fi >= 0, 2, "field index must be >= 0");
+  int ai = luaL_optinteger(lua, 3, 0);
+  luaL_argcheck(lua, ai >= 0, 3, "array index must be >= 0");
+
+  if (strcmp(field, "Uuid") == 0) {
+    lua_pushlstring(lua, m->uuid, 16);
+  } else if (strcmp(field, "Timestamp") == 0) {
+    lua_pushnumber(lua, m->timestamp);
+  } else if (strcmp(field, "Type") == 0) {
+    if (m->type) {
+      lua_pushlstring(lua, m->type, m->type_len);
+    } else {
+      lua_pushnil(lua);
+    }
+  } else if (strcmp(field, "Logger") == 0) {
+    if (m->logger) {
+      lua_pushlstring(lua, m->logger, m->logger_len);
+    } else {
+      lua_pushnil(lua);
+    }
+  } else if (strcmp(field, "Severity") == 0) {
+    lua_pushinteger(lua, m->severity);
+  } else if (strcmp(field, "Payload") == 0) {
+    if (m->payload) {
+      lua_pushlstring(lua, m->payload, m->payload_len);
+    } else {
+      lua_pushnil(lua);
+    }
+    lua_pushlstring(lua, m->payload, m->payload_len);
+  } else if (strcmp(field, "EnvVersion") == 0) {
+    if (m->env_version) {
+      lua_pushlstring(lua, m->env_version, m->env_version_len);
+    } else {
+      lua_pushnil(lua);
+    }
+  } else if (strcmp(field, "Pid") == 0) {
+    lua_pushinteger(lua, m->pid);
+  } else if (strcmp(field, "Hostname") == 0) {
+    if (m->hostname) {
+      lua_pushlstring(lua, m->hostname, m->hostname_len);
+    } else {
+      lua_pushnil(lua);
+    }
+  } else if (strcmp(field, "raw") == 0) {
+    lua_pushlstring(lua, (const char*)m->msg, m->msg_len);
+  } else {
+    if (field_len >= 8
+        && memcmp(field, "Fields[", 7) == 0
+        && field[field_len - 1] == ']') {
+      hs_read_value v;
+      hs_read_message_field(m, field + 7, field_len - 8, 0, 0, &v);
+      switch (v.type) {
+      case HS_READ_STRING:
+        lua_pushlstring(lua, v.u.s, v.len);
+        break;
+      case HS_READ_NUMERIC:
+        lua_pushnumber(lua, v.u.d);
+        break;
+      default:
+        lua_pushnil(lua);
+        break;
+      }
+    } else {
+      lua_pushnil(lua);
+    }
+  }
+  return 1;
 }

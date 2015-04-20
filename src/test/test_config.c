@@ -23,7 +23,6 @@ static char* test_load_default_config()
   hs_config cfg;
   int ret = hs_load_config("cfg/default.cfg", &cfg);
   mu_assert(ret == 0, "hindsight_load_config: %d", ret);
-  mu_assert(cfg.mode == HS_MODE_INPUT, "received %d", cfg.mode);
   mu_assert(strcmp(cfg.output_path, "output_path") == 0, "received %s",
             cfg.output_path);
   mu_assert(cfg.output_size == 1024 * 1024 * 64, "received %d",
@@ -32,16 +31,16 @@ static char* test_load_default_config()
             cfg.run_path);
   mu_assert(strcmp(cfg.load_path, "load") == 0, "received %s",
             cfg.load_path);
-  mu_assert(cfg.sbc.output_limit == 1024 * 64, "received %d",
-            cfg.sbc.output_limit);
-  mu_assert(cfg.sbc.memory_limit == 1024 * 1024 * 8, "received %d",
-            cfg.sbc.memory_limit);
-  mu_assert(cfg.sbc.instruction_limit == 1000000, "received %d",
-            cfg.sbc.instruction_limit);
-  mu_assert(cfg.sbc.preserve_data == false, "received %d",
-            cfg.sbc.preserve_data);
-  mu_assert(strcmp(cfg.sbc.module_path, "module") == 0, "received %s",
-            cfg.sbc.module_path);
+  mu_assert(cfg.ipd.output_limit == 1024 * 64, "received %d",
+            cfg.ipd.output_limit);
+  mu_assert(cfg.ipd.memory_limit == 1024 * 1024 * 8, "received %d",
+            cfg.ipd.memory_limit);
+  mu_assert(cfg.ipd.instruction_limit == 1000000, "received %d",
+            cfg.ipd.instruction_limit);
+  mu_assert(cfg.ipd.preserve_data == false, "received %d",
+            cfg.ipd.preserve_data);
+  mu_assert(strcmp(cfg.ipd.module_path, "module") == 0, "received %s",
+            cfg.ipd.module_path);
   hs_free_config(&cfg);
   return NULL;
 }
@@ -51,7 +50,6 @@ static char* test_load_config()
   hs_config cfg;
   int ret = hs_load_config("cfg/valid.cfg", &cfg);
   mu_assert(ret == 0, "hindsight_load_config: %d", ret);
-  mu_assert(cfg.mode == HS_MODE_INPUT, "received %d", cfg.mode);
   mu_assert(strcmp(cfg.output_path, "output_path") == 0, "received %s",
             cfg.output_path);
   mu_assert(cfg.output_size == 1024, "received %d",
@@ -60,16 +58,16 @@ static char* test_load_config()
             cfg.run_path);
   mu_assert(strcmp(cfg.load_path, "load") == 0, "received %s",
             cfg.load_path);
-  mu_assert(cfg.sbc.output_limit == 1023, "received %d",
-            cfg.sbc.output_limit);
-  mu_assert(cfg.sbc.memory_limit == 32767, "received %d",
-            cfg.sbc.memory_limit);
-  mu_assert(cfg.sbc.instruction_limit == 1000, "received %d",
-            cfg.sbc.instruction_limit);
-  mu_assert(cfg.sbc.preserve_data == true, "received %d",
-            cfg.sbc.preserve_data);
-  mu_assert(strcmp(cfg.sbc.module_path, "module") == 0, "received %s",
-            cfg.sbc.module_path);
+  mu_assert(cfg.ipd.output_limit == 1023, "received %d",
+            cfg.ipd.output_limit);
+  mu_assert(cfg.ipd.memory_limit == 32767, "received %d",
+            cfg.ipd.memory_limit);
+  mu_assert(cfg.ipd.instruction_limit == 1000, "received %d",
+            cfg.ipd.instruction_limit);
+  mu_assert(cfg.ipd.preserve_data == true, "received %d",
+            cfg.ipd.preserve_data);
+  mu_assert(strcmp(cfg.ipd.module_path, "module") == 0, "received %s",
+            cfg.ipd.module_path);
   hs_free_config(&cfg);
   return NULL;
 }

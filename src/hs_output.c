@@ -12,68 +12,44 @@
 #include <lauxlib.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include "hs_logger.h"
 #include "hs_util.h"
 
-static void init_checkpoint(hs_checkpoint* cp, const char* path)
-{
-  char fqfn[260];
-  if (!hs_get_fqfn(path, "hindsight.cp", fqfn, sizeof(fqfn))) {
-    exit(EXIT_FAILURE);
-  }
-  cp->offset = 0;
-  cp->id = 0;
-
-  cp->values = luaL_newstate();
-  if (!cp->values) {
-    hs_log(HS_APP_NAME, 0, "checkpoint luaL_newstate failed");
-    exit(EXIT_FAILURE);
-  } else {
-    lua_pushvalue(cp->values, LUA_GLOBALSINDEX);
-    lua_setglobal(cp->values, "_G");
-  }
-
-  if (hs_file_exists(fqfn)) {
-    if (luaL_dofile(cp->values, fqfn)) {
-      hs_log(HS_APP_NAME, 0, "loading %s failed: %s", fqfn,
-             lua_tostring(cp->values, -1));
-      exit(EXIT_FAILURE);
-    }
-  }
-
-  lua_getglobal(cp->values, "last_output_id");
-  if (lua_type(cp->values, -1) == LUA_TNUMBER) {
-    cp->id = (size_t)lua_tonumber(cp->values, 1);
-  }
-  lua_pop(cp->values, 1);
-
-  cp->fh = fopen(fqfn, "wb");
-  if (!cp->fh) {
-    hs_log(HS_APP_NAME, 0, "%s: %s", fqfn, strerror(errno));
-    exit(EXIT_FAILURE);
-  }
-}
+static const char g_module[] = "hs_output";
 
 
-static void free_checkpoint(hs_checkpoint* cp)
-{
-  if (cp->fh) fclose(cp->fh);
-  cp->fh = NULL;
-
-  if (cp->values) lua_close(cp->values);
-  cp->values = NULL;
-
-  cp->offset = 0;
-  cp->id = 0;
-}
-
-
-void hs_init_output(hs_output* output, const char* path)
+void hs_init_output(hs_output* output, const char* path, const char* subdir)
 {
   output->fh = NULL;
-  init_checkpoint(&output->cp, path);
-  hs_open_output_file(output, path);
+  output->id = 0;
+  output->offset = 0;
+  size_t len = strlen(path) + strlen(subdir) + 2;
+  output->path = malloc(len);
+  if (!output->path) {
+    hs_log(g_module, 0, "output path malloc failed");
+    exit(EXIT_FAILURE);
+  }
+  snprintf(output->path, len, "%s/%s", path, subdir);
+
+  int ret = mkdir(path, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP);
+  if (ret && errno != EEXIST) {
+    hs_log(g_module, 0, "output path could not be created: %s", path);
+    exit(EXIT_FAILURE);
+  }
+
+  ret = mkdir(output->path, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP);
+  if (ret && errno != EEXIST) {
+    hs_log(g_module, 0, "output path could not be created: %s", output->path);
+    exit(EXIT_FAILURE);
+  }
+
+  if (pthread_mutex_init(&output->lock, NULL)) {
+    perror("output lock pthread_mutex_init failed");
+    exit(EXIT_FAILURE);
+  }
+  hs_open_output_file(output);
 }
 
 
@@ -82,28 +58,31 @@ void hs_free_output(hs_output* output)
   if (output->fh) fclose(output->fh);
   output->fh = NULL;
 
-  free_checkpoint(&output->cp);
+  free(output->path);
+  output->path = NULL;
+
+  pthread_mutex_destroy(&output->lock);
 }
 
 
-void hs_open_output_file(hs_output* output, const char* path)
+void hs_open_output_file(hs_output* output)
 {
   static char fqfn[260];
   if (output->fh) {
     fclose(output->fh);
     output->fh = NULL;
   }
-  int ret = snprintf(fqfn, sizeof(fqfn), "%s/%zu.log", path, output->cp.id);
+  int ret = snprintf(fqfn, sizeof(fqfn), "%s/%zu.log", output->path,
+                     output->id);
   if (ret < 0 || ret > (int)sizeof(fqfn) - 1) {
-    hs_log(HS_APP_NAME, 0, "output filename exceeds %zu", sizeof(fqfn));
+    hs_log(g_module, 0, "output filename exceeds %zu", sizeof(fqfn));
     exit(EXIT_FAILURE);
   }
   output->fh = fopen(fqfn, "ab+");
   if (!output->fh) {
-    hs_log(HS_APP_NAME, 0, "%s: %s", fqfn, strerror(errno));
+    hs_log(g_module, 0, "%s: %s", fqfn, strerror(errno));
     exit(EXIT_FAILURE);
   } else {
     fseek(output->fh, 0, SEEK_END);
-    output->cp.offset = ftell(output->fh);
   }
 }

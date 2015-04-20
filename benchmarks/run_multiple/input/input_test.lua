@@ -27,7 +27,7 @@ function process_message(offset)
             msg.Timestamp = fields.time
             fields.time = nil
             msg.Fields = fields
-            inject_message(msg, fh:seek())
+            inject_message(msg)
             cnt = cnt + 1
         end
     end

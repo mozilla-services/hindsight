@@ -10,25 +10,21 @@
 #define hs_output_h_
 
 #include <lua.h>
+#include <pthread.h>
 #include <stdio.h>
-
-typedef struct hs_checkpoint {
-  FILE* fh;
-  lua_State* values;
-  size_t offset;
-  size_t id;
-} hs_checkpoint;
 
 typedef struct hs_output
 {
   FILE* fh;
-  hs_checkpoint cp;
+  char* path;
+  pthread_mutex_t lock;
+  size_t id;
+  size_t offset;
 } hs_output;
 
 
-void hs_init_output(hs_output* output, const char* path);
+void hs_init_output(hs_output* output, const char* path, const char* subdir);
 void hs_free_output(hs_output* output);
 
-void hs_open_output_file(hs_output* output, const char* path);
-
+void hs_open_output_file(hs_output* output);
 #endif

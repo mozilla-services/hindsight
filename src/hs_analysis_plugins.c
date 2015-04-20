@@ -4,7 +4,7 @@
 * License, v. 2.0. If a copy of the MPL was not distributed with this
 * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-/** @brief Hindsight configuration loader @file */
+/** @brief Hindsight analysis plugin loader @file */
 
 #include "hs_analysis_plugins.h"
 
@@ -16,17 +16,19 @@
 #include <semaphore.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "hs_input.h"
 #include "hs_logger.h"
+#include "hs_message_matcher.h"
 #include "hs_output.h"
 #include "hs_sandbox.h"
 #include "hs_util.h"
 #include "lsb.h"
 #include "lsb_output.h"
 
-
-static const char* analysis_config = "{"
+static const char* g_analysis = "analysis";
+static const char* g_sb_template = "{"
   "memory_limit = %u,"
   "instruction_limit = %u,"
   "output_limit = %u,"
@@ -39,6 +41,23 @@ static const char* analysis_config = "{"
   "},"
   "disable_modules = {io = 1}"
   "}";
+
+
+static int read_message(lua_State* lua)
+{
+  void* luserdata = lua_touserdata(lua, lua_upvalueindex(1));
+  if (NULL == luserdata) {
+    luaL_error(lua, "read_message() invalid lightuserdata");
+  }
+  lua_sandbox* lsb = (lua_sandbox*)luserdata;
+  hs_analysis_plugins* p = (hs_analysis_plugins*)lsb_get_parent(lsb);
+
+  if (!p->matched || !p->msg) {
+    lua_pushnil(lua);
+    return 1;
+  }
+  return hs_read_message(lua, p->msg);
+}
 
 
 static int inject_message(lua_State* L)
@@ -59,7 +78,7 @@ static int inject_message(lua_State* L)
   size_t output_len = 0;
   const char* output = lsb_get_output(lsb, &output_len);
 
-  pthread_mutex_lock(&p->lock);
+  pthread_mutex_lock(&p->output.lock);
   int len = hs_write_varint(header + 3, output_len);
   header[0] = 0x1e;
   header[1] = (char)(len + 1);
@@ -67,8 +86,12 @@ static int inject_message(lua_State* L)
   header[3 + len] = 0x1f;
   fwrite(header, 4 + len, 1, p->output.fh);
   fwrite(output, output_len, 1, p->output.fh);
-  p->output.cp.offset += 4 + len + output_len;
-  pthread_mutex_unlock(&p->lock);
+  p->output.offset += 4 + len + output_len;
+  if (p->output.offset >= (size_t)p->cfg->output_size) {
+    ++p->output.id;
+    hs_open_output_file(&p->output);
+  }
+  pthread_mutex_unlock(&p->output.lock);
   return 0;
 }
 
@@ -121,6 +144,7 @@ static int inject_payload(lua_State* lua)
     }
   }
 
+  // TODO set logger
   // build up a heka message table and then inject it
   lua_createtable(lua, 0, 2); // message
   lua_createtable(lua, 0, 2); // Fields
@@ -144,250 +168,41 @@ static int inject_payload(lua_State* lua)
 }
 
 
-static int read_message(lua_State* lua)
-{
-  void* luserdata = lua_touserdata(lua, lua_upvalueindex(1));
-  if (NULL == luserdata) {
-    luaL_error(lua, "read_message() invalid lightuserdata");
-  }
-  lua_sandbox* lsb = (lua_sandbox*)luserdata;
-  hs_analysis_plugins* p = (hs_analysis_plugins*)lsb_get_parent(lsb);
-
-  if (!p->matched || !p->msg) {
-    lua_pushnil(lua);
-    return 1;
-  }
-
-  int n = lua_gettop(lua);
-  if (n < 1 || n > 3) {
-    luaL_error(lua, "read_message() incorrect number of arguments");
-  }
-  size_t field_len;
-  const char* field = luaL_checklstring(lua, 1, &field_len);
-  int fi = luaL_optinteger(lua, 2, 0);
-  luaL_argcheck(lua, fi >= 0, 2, "field index must be >= 0");
-  int ai = luaL_optinteger(lua, 3, 0);
-  luaL_argcheck(lua, ai >= 0, 3, "array index must be >= 0");
-
-  if (strcmp(field, "Uuid") == 0) {
-    lua_pushlstring(lua, p->msg->uuid, 16);
-  } else if (strcmp(field, "Timestamp") == 0) {
-    lua_pushnumber(lua, p->msg->timestamp);
-  } else if (strcmp(field, "Type") == 0) {
-    if (p->msg->type) {
-      lua_pushlstring(lua, p->msg->type, p->msg->type_len);
-    } else {
-      lua_pushnil(lua);
-    }
-  } else if (strcmp(field, "Logger") == 0) {
-    if (p->msg->logger) {
-      lua_pushlstring(lua, p->msg->logger, p->msg->logger_len);
-    } else {
-      lua_pushnil(lua);
-    }
-  } else if (strcmp(field, "Severity") == 0) {
-    lua_pushinteger(lua, p->msg->severity);
-  } else if (strcmp(field, "Payload") == 0) {
-    if (p->msg->payload) {
-      lua_pushlstring(lua, p->msg->payload, p->msg->payload_len);
-    } else {
-      lua_pushnil(lua);
-    }
-    lua_pushlstring(lua, p->msg->payload, p->msg->payload_len);
-  } else if (strcmp(field, "EnvVersion") == 0) {
-    if (p->msg->env_version) {
-      lua_pushlstring(lua, p->msg->env_version, p->msg->env_version_len);
-    } else {
-      lua_pushnil(lua);
-    }
-  } else if (strcmp(field, "Pid") == 0) {
-    lua_pushinteger(lua, p->msg->pid);
-  } else if (strcmp(field, "Hostname") == 0) {
-    if (p->msg->hostname) {
-      lua_pushlstring(lua, p->msg->hostname, p->msg->hostname_len);
-    } else {
-      lua_pushnil(lua);
-    }
-  } else {
-    if (field_len >= 8
-        && memcmp(field, "Fields[", 7) == 0
-        && field[field_len - 1] == ']') {
-      hs_read_value v;
-      hs_read_message_field(p->msg, field + 7, field_len - 8, 0, 0, &v);
-      switch (v.type) {
-      case HS_READ_STRING:
-        lua_pushlstring(lua, v.u.s, v.len);
-        break;
-      case HS_READ_NUMERIC:
-        lua_pushnumber(lua, v.u.d);
-        break;
-      default:
-        lua_pushnil(lua);
-        break;
-      }
-    } else {
-      lua_pushnil(lua);
-    }
-  }
-  return 1;
-}
-
-
-static int process_message(lua_sandbox* lsb)
-{
-  static const char* func_name = "process_message";
-  lua_State* lua = lsb_get_lua(lsb);
-  if (!lua) return 1;
-
-  if (lsb_pcall_setup(lsb, func_name)) {
-    char err[LSB_ERROR_SIZE];
-    snprintf(err, LSB_ERROR_SIZE, "%s() function was not found", func_name);
-    lsb_terminate(lsb, err);
-    return 1;
-  }
-
-  if (lua_pcall(lua, 0, 2, 0) != 0) {
-    char err[LSB_ERROR_SIZE];
-    size_t len = snprintf(err, LSB_ERROR_SIZE, "%s() %s", func_name,
-                          lua_tostring(lua, -1));
-    if (len >= LSB_ERROR_SIZE) {
-      err[LSB_ERROR_SIZE - 1] = 0;
-    }
-    lsb_terminate(lsb, err);
-    return 1;
-  }
-
-  if (lua_type(lua, 1) != LUA_TNUMBER) {
-    char err[LSB_ERROR_SIZE];
-    size_t len = snprintf(err, LSB_ERROR_SIZE,
-                          "%s() must return a numeric status code",
-                          func_name);
-    if (len >= LSB_ERROR_SIZE) {
-      err[LSB_ERROR_SIZE - 1] = 0;
-    }
-    lsb_terminate(lsb, err);
-    return 1;
-  }
-
-  int status = (int)lua_tointeger(lua, 1);
-  switch (lua_type(lua, 2)) {
-  case LUA_TNIL:
-    lsb_set_error(lsb, NULL);
-    break;
-  case LUA_TSTRING:
-    lsb_set_error(lsb, lua_tostring(lua, 2));
-    break;
-  default:
-    {
-      char err[LSB_ERROR_SIZE];
-      int len = snprintf(err, LSB_ERROR_SIZE,
-                         "%s() must return a nil or string error message",
-                         func_name);
-      if (len >= LSB_ERROR_SIZE || len < 0) {
-        err[LSB_ERROR_SIZE - 1] = 0;
-      }
-      lsb_terminate(lsb, err);
-      return 1;
-    }
-    break;
-  }
-  lua_pop(lua, 2);
-  lsb_pcall_teardown(lsb);
-  return status;
-}
-
-
-static int timer_event(lua_sandbox* lsb, time_t t)
-{
-  static const char* func_name = "timer_event";
-  lua_State* lua = lsb_get_lua(lsb);
-  if (!lua) return 1;
-
-  if (lsb_pcall_setup(lsb, func_name)) {
-    char err[LSB_ERROR_SIZE];
-    snprintf(err, LSB_ERROR_SIZE, "%s() function was not found", func_name);
-    lsb_terminate(lsb, err);
-    return 1;
-  }
-
-  lua_pushnumber(lua, t * 1e9); // todo change if we need more than 1 sec resolution
-  if (lua_pcall(lua, 1, 0, 0) != 0) {
-    char err[LSB_ERROR_SIZE];
-    size_t len = snprintf(err, LSB_ERROR_SIZE, "%s() %s", func_name,
-                          lua_tostring(lua, -1));
-    if (len >= LSB_ERROR_SIZE) {
-      err[LSB_ERROR_SIZE - 1] = 0;
-    }
-    lsb_terminate(lsb, err);
-    return 1;
-  }
-  lsb_pcall_teardown(lsb);
-  lua_gc(lua, LUA_GCCOLLECT, 0);
-  return 0;
-}
-
-
-static void* analysis_thread_function(void* arg)
-{
-  hs_analysis_thread* at = (hs_analysis_thread*)arg;
-
-  hs_log("analysis_thread", 6, "starting thread [%d]", at->tid);
-  bool stop = false;
-
-  while (!stop) {
-    if (sem_wait(&at->start)) {
-      hs_log("analysis_thread", 3, "thread [%d] sem_wait error: %s", at->tid,
-             strerror(errno));
-      break;
-    }
-
-    stop = !hs_analyze_message(at);
-
-    if (sem_post(&at->plugins->finished)) {
-      hs_log("analysis_thread", 3, "thread [%d] sem_post error: %s", at->tid,
-             strerror(errno));
-    }
-    sched_yield();
-  }
-  hs_log("analysis_thread", 6, "exiting thread [%d]", at->tid);
-  pthread_exit(NULL);
-}
-
-
 static void add_to_analysis_plugins(const hs_sandbox_config* cfg,
                                     hs_analysis_plugins* plugins,
-                                    hs_sandbox* p)
+                                    hs_sandbox* sb)
 {
   int thread = 0;
-  if (plugins->cfg->threads) {
-    thread = cfg->thread % plugins->cfg->threads;
+  if (plugins->cfg->analysis_threads) {
+    thread = cfg->thread % plugins->cfg->analysis_threads;
   }
 
   hs_analysis_thread* at = &plugins->list[thread];
 
-  pthread_mutex_lock(&at->plugins->lock);
+  pthread_mutex_lock(&at->list_lock);
   // todo shrink it down if there are a lot of empty slots
   if (at->plugin_cnt < at->list_size) { // add to an empty slot
     for (int i = 0; i < at->list_size; ++i) {
       if (!at->list[i]) {
-        at->list[i] = p;
+        at->list[i] = sb;
         ++at->plugin_cnt;
       }
     }
   } else { // expand the list
     ++at->list_size;
+    // todo probably don't want to grow it by 1
     hs_sandbox** tmp = realloc(at->list,
-                               sizeof(hs_sandbox) * at->list_size); // todo probably don't want to grow it by 1
+                               sizeof(hs_sandbox) * at->list_size);
     if (tmp) {
       at->list = tmp;
-      at->list[at->list_size - 1] = p;
+      at->list[at->list_size - 1] = sb;
       ++at->plugin_cnt;
     } else {
       hs_log(HS_APP_NAME, 0, "plugins realloc failed");
       exit(EXIT_FAILURE);
     }
   }
-  pthread_mutex_unlock(&at->plugins->lock);
+  pthread_mutex_unlock(&at->list_lock);
 }
 
 
@@ -403,12 +218,20 @@ static void init_analysis_thread(hs_analysis_plugins* plugins, int tid)
     perror("start sem_init failed");
     exit(EXIT_FAILURE);
   }
-  sem_wait(&at->start);
+  if (sem_wait(&at->start)) {
+    perror("start sem_wait failed");
+    exit(EXIT_FAILURE);
+  }
+  if (pthread_mutex_init(&at->list_lock, NULL)) {
+    perror("list_lock pthread_mutex_init failed");
+    exit(EXIT_FAILURE);
+  }
 }
 
 
 static void free_analysis_thread(hs_analysis_thread* at)
 {
+  pthread_mutex_destroy(&at->list_lock);
   sem_destroy(&at->start);
   at->plugins = NULL;
   for (int i = 0; i < at->plugin_cnt; ++i) {
@@ -440,7 +263,8 @@ static int init_sandbox(hs_sandbox* sb)
   // rename output to add_to_payload
   lua_getglobal(lua, "output");
   lua_setglobal(lua, "add_to_payload");
-
+  lua_pushnil(lua);
+  lua_setglobal(lua, "output");
   return 0;
 }
 
@@ -456,32 +280,200 @@ static void terminate_sandbox(hs_analysis_thread* at, int i)
 }
 
 
-void hs_init_analysis_plugins(hs_analysis_plugins* plugins, hs_config* cfg)
+bool analyze_message(hs_analysis_thread* at)
 {
-  hs_init_output(&plugins->output, cfg->output_path);
-  hs_init_input(&plugins->input);
-  hs_init_message_match_builder(&plugins->mmb, cfg->sbc.module_path);
+  if (at->plugins->msg) {
+    hs_sandbox* sb = NULL;
+    int ret;
 
-  plugins->thread_cnt = cfg->threads;
+    pthread_mutex_lock(&at->list_lock);
+    for (int i = 0; i < at->plugin_cnt; ++i) {
+      sb = at->list[i];
+      if (!sb) continue;
+
+      at->plugins->matched = false;
+      ret = 0;
+      if (hs_eval_message_matcher(sb->mm, at->plugins->msg)) {
+        at->plugins->matched = true;
+        ret = hs_process_message(sb->lsb);
+        if (ret == 0) {
+          // todo increment process message count
+        } else if (ret < 0) {
+          // todo increment process message failure count
+        }
+      }
+
+      if (ret <= 0 && sb->ticker_interval
+          && at->plugins->current_t >= sb->next_timer_event) {
+        hs_log("analysis_thread", 7, "tid: %d plugin: %d running timer_event",
+               at->tid, i); // todo remove
+        ret = hs_timer_event(sb->lsb, at->plugins->current_t);
+        sb->next_timer_event += sb->ticker_interval;
+      }
+
+      if (ret > 0) terminate_sandbox(at, i);
+    }
+    pthread_mutex_unlock(&at->list_lock);
+  } else {
+    pthread_mutex_lock(&at->list_lock);
+    for (int i = 0; i < at->plugin_cnt; ++i) {
+      if (!at->list[i]) continue;
+
+      if (hs_timer_event(at->list[i]->lsb, at->plugins->current_t)) {
+        terminate_sandbox(at, i);
+      }
+    }
+    pthread_mutex_unlock(&at->list_lock);
+    return false;
+  }
+  return true;
+}
+
+
+static void* analysis_thread_function(void* arg)
+{
+  hs_analysis_thread* at = (hs_analysis_thread*)arg;
+
+  hs_log("analysis_thread", 6, "starting thread [%d]", at->tid);
+  bool stop = false;
+
+  while (!stop) {
+    if (sem_wait(&at->start)) {
+      hs_log("analysis_thread", 3, "thread [%d] sem_wait error: %s", at->tid,
+             strerror(errno));
+      break;
+    }
+
+    stop = !analyze_message(at);
+
+    if (sem_post(&at->plugins->finished)) {
+      hs_log("analysis_thread", 3, "thread [%d] sem_post error: %s", at->tid,
+             strerror(errno));
+    }
+    sched_yield();
+  }
+  hs_log("analysis_thread", 6, "exiting thread [%d]", at->tid);
+  pthread_exit(NULL);
+}
+
+
+static void* input_thread(void* arg)
+{
+  hs_log(HS_APP_NAME, 6, "starting hs_analysis_read_input_thread");
+
+  hs_heka_message msg;
+  hs_init_heka_message(&msg, 8);
+
+  hs_analysis_plugins* plugins = (hs_analysis_plugins*)arg;
+  plugins->msg = NULL;
+
+  hs_config* cfg = plugins->cfg;
+  if (strlen(cfg->output_path) > sizeof(plugins->input.path) - 1) {
+    fprintf(stderr, "hs_read_input path too long\n");
+    exit(EXIT_FAILURE);
+  }
+  strcpy(plugins->input.path, cfg->output_path);
+  hs_lookup_input_checkpoint(&cfg->cp_reader,
+                             "analysis_input",
+                             cfg->output_path,
+                             "input",
+                             &plugins->input.id,
+                             &plugins->input.offset);
+
+  size_t bytes_read = 0;
+  size_t cnt = 0;
+  while (!plugins->stop) {
+    if (plugins->input.fh) {
+      if (hs_find_message(&msg, &plugins->input)) {
+        ++cnt; // todo remove
+        plugins->msg = &msg;
+        plugins->current_t = time(NULL);
+
+        if (plugins->thread_cnt) {
+          for (int i = 0; i < plugins->thread_cnt; ++i) {
+            sem_post(&plugins->list[i].start);
+          }
+          sched_yield();
+          // the synchronization creates s a bottleneck of ~110-120K messages
+          // per second on my Thinkpad x230.  Threads should be used only
+          // when the amount of work done by each thread (>20us) outweighs the
+          // synchronization overhead.
+          for (int i = 0; i < plugins->thread_cnt; ++i) {
+            sem_wait(&plugins->finished);
+          }
+        } else {
+          analyze_message(&plugins->list[0]);
+        }
+      } else {
+        bytes_read = hs_read_file(&plugins->input);
+      }
+
+      if (!bytes_read) {
+        // see if the next file is there yet
+        //hs_log(HS_APP_NAME, 7, "analysis count %zu", cnt); // todo remove
+        //hs_log(HS_APP_NAME, 7, "analysis looking for the next log"); // todo remove
+        hs_open_file(&plugins->input, "input", plugins->input.id + 1);
+      }
+    } else { // still waiting on the first file
+      //hs_log(HS_APP_NAME, 7, "analysis waiting for the input file"); // todo remove
+      hs_open_file(&plugins->input, "input", plugins->input.id);
+    }
+
+    if (bytes_read || plugins->msg) {
+      plugins->msg = NULL;
+    } else {
+      sleep(1);
+    }
+  }
+
+  // signal shutdown
+  plugins->msg = NULL;
+  plugins->current_t = time(NULL);
+
+  if (plugins->thread_cnt) {
+    for (int i = 0; i < plugins->thread_cnt; ++i) {
+      sem_post(&plugins->list[i].start);
+    }
+    for (int i = 0; i < plugins->thread_cnt; ++i) {
+      sem_wait(&plugins->finished);
+    }
+  } else {
+    analyze_message(&plugins->list[0]);
+  }
+
+  hs_free_heka_message(&msg);
+
+  hs_log(HS_APP_NAME, 6, "exiting hs_analysis_read_input_thread");
+  pthread_exit(NULL);
+}
+
+
+void hs_init_analysis_plugins(hs_analysis_plugins* plugins,
+                              hs_config* cfg,
+                              hs_message_match_builder* mmb)
+{
+  hs_init_output(&plugins->output, cfg->output_path, g_analysis);
+  hs_init_input(&plugins->input);
+
+  plugins->thread_cnt = cfg->analysis_threads;
   plugins->cfg = cfg;
   plugins->stop = false;
   plugins->matched = false;
   plugins->msg = NULL;
+  plugins->mmb = mmb;
 
-  if (pthread_mutex_init(&plugins->lock, NULL)) {
-    perror("lock pthread_mutex_init failed");
-    exit(EXIT_FAILURE);
-  }
-
-  if (sem_init(&plugins->finished, 0, cfg->threads)) {
+  if (sem_init(&plugins->finished, 0, cfg->analysis_threads)) {
     perror("finished sem_init failed");
     exit(EXIT_FAILURE);
   }
 
-  if (cfg->threads) {
-    plugins->list = malloc(sizeof(hs_analysis_thread) * cfg->threads);
-    for (int i = 0; i < cfg->threads; ++i) {
-      sem_wait(&plugins->finished);
+  if (cfg->analysis_threads) {
+    plugins->list = malloc(sizeof(hs_analysis_thread) * cfg->analysis_threads);
+    for (int i = 0; i < cfg->analysis_threads; ++i) {
+      if (sem_wait(&plugins->finished)) {
+        perror("finished sem_wait failed");
+        exit(EXIT_FAILURE);
+      }
       init_analysis_thread(plugins, i);
     }
   } else {
@@ -490,11 +482,11 @@ void hs_init_analysis_plugins(hs_analysis_plugins* plugins, hs_config* cfg)
   }
 
   // extra thread for the reader is added at the end
-  plugins->threads = malloc(sizeof(pthread_t*) * (cfg->threads + 1));
+  plugins->threads = malloc(sizeof(pthread_t*) * (cfg->analysis_threads + 1));
 }
 
 
-void hs_free_analysis_plugins(hs_analysis_plugins* plugins)
+void hs_wait_analysis_plugins(hs_analysis_plugins* plugins)
 {
   void* thread_result;
   // <= collects the plugins and the reader thread
@@ -506,7 +498,11 @@ void hs_free_analysis_plugins(hs_analysis_plugins* plugins)
   }
   free(plugins->threads);
   plugins->threads = NULL;
+}
 
+
+void hs_free_analysis_plugins(hs_analysis_plugins* plugins)
+{
   if (plugins->thread_cnt == 0) {
     free_analysis_thread(&plugins->list[0]);
   } else {
@@ -517,15 +513,13 @@ void hs_free_analysis_plugins(hs_analysis_plugins* plugins)
   free(plugins->list);
   plugins->list = NULL;
 
-  hs_free_message_match_builder(&plugins->mmb);
   hs_free_input(&plugins->input);
   hs_free_output(&plugins->output);
 
-  pthread_mutex_destroy(&plugins->lock);
   sem_destroy(&plugins->finished);
   plugins->cfg = NULL;
-  plugins->thread_cnt = 0;
   plugins->msg = NULL;
+  plugins->thread_cnt = 0;
 }
 
 
@@ -533,26 +527,31 @@ void hs_load_analysis_plugins(hs_analysis_plugins* plugins,
                               const hs_config* cfg,
                               const char* path)
 {
-  struct dirent* entry;
-  DIR* dp = opendir(path);
-  if (dp == NULL) {
-    hs_log(HS_APP_NAME, 0, "%s: %s", path, strerror(errno));
+  char dir[HS_MAX_PATH];
+  if (!hs_get_fqfn(path, g_analysis, dir, sizeof(dir))) {
+    hs_log(HS_APP_NAME, 0, "analysis load path too long");
     exit(EXIT_FAILURE);
   }
 
-  char fqfn[260];
+  struct dirent* entry;
+  DIR* dp = opendir(dir);
+  if (dp == NULL) {
+    exit(EXIT_FAILURE);
+  }
+
+  char fqfn[HS_MAX_PATH];
   while ((entry = readdir(dp))) {
-    if (!hs_get_config_fqfn(path, entry->d_name, fqfn, sizeof(fqfn))) continue;
+    if (!hs_get_config_fqfn(dir, entry->d_name, fqfn, sizeof(fqfn))) continue;
     hs_sandbox_config sbc;
-    lua_State* L = hs_load_sandbox_config(fqfn, &sbc, &cfg->sbc,
-                                          HS_MODE_ANALYSIS);
+    lua_State* L = hs_load_sandbox_config(fqfn, &sbc, &cfg->apd,
+                                          HS_SB_TYPE_ANALYSIS);
     if (L) {
-      if (!hs_get_fqfn(path, sbc.filename, fqfn, sizeof(fqfn))) {
+      if (!hs_get_fqfn(dir, sbc.filename, fqfn, sizeof(fqfn))) {
         lua_close(L);
         hs_free_sandbox_config(&sbc);
         continue;
       }
-      hs_sandbox* sb = hs_create_sandbox(plugins, fqfn, analysis_config, &sbc,
+      hs_sandbox* sb = hs_create_sandbox(plugins, fqfn, g_sb_template, &sbc,
                                          L);
       if (sb) {
         size_t len = strlen(entry->d_name);
@@ -566,7 +565,7 @@ void hs_load_analysis_plugins(hs_analysis_plugins* plugins,
           memcpy(sb->state + len - 3, "dat", 3);
         }
 
-        sb->mm = hs_create_message_matcher(&plugins->mmb, sbc.message_matcher);
+        sb->mm = hs_create_message_matcher(plugins->mmb, sbc.message_matcher);
         if (!sb->mm || init_sandbox(sb)) {
           if (!sb->mm) {
             hs_log(sb->filename, 3, "invalid message_matcher: %s",
@@ -585,9 +584,7 @@ void hs_load_analysis_plugins(hs_analysis_plugins* plugins,
     }
     hs_free_sandbox_config(&sbc);
   }
-
   closedir(dp);
-  return;
 }
 
 
@@ -611,8 +608,7 @@ void hs_start_analysis_input(hs_analysis_plugins* plugins, pthread_t* t)
     exit(EXIT_FAILURE);
   }
 
-
-  if (pthread_create(t, &attr, hs_read_input_thread, (void*)plugins)) {
+  if (pthread_create(t, &attr, input_thread, (void*)plugins)) {
     perror("hs_read_input pthread_create failed");
     exit(EXIT_FAILURE);
   }
@@ -645,49 +641,4 @@ void hs_start_analysis_threads(hs_analysis_plugins* plugins)
       exit(EXIT_FAILURE);
     }
   }
-}
-
-
-bool hs_analyze_message(hs_analysis_thread* at)
-{
-  if (at->plugins->msg) {
-    hs_sandbox* sb = NULL;
-    int ret;
-    for (int i = 0; i < at->plugin_cnt; ++i) {
-      sb = at->list[i];
-      if (!sb) continue;
-
-      at->plugins->matched = false;
-      ret = 0;
-      if (hs_eval_message_matcher(sb->mm, at->plugins->msg)) {
-        at->plugins->matched = true;
-        ret = process_message(sb->lsb);
-        if (ret == 0) {
-          // todo increment process message count
-        } else if (ret < 0) {
-          // todo increment process message failure count
-        }
-      }
-
-      if (ret <= 0 && sb->ticker_interval
-          && at->plugins->current_t >= sb->next_timer_event) {
-        hs_log("analysis_thread", 7, "tid: %d plugin: %d running timer_event",
-               at->tid, i); // todo remove
-        ret = timer_event(sb->lsb, at->plugins->current_t);
-        sb->next_timer_event += sb->ticker_interval;
-      }
-
-      if (ret > 0) terminate_sandbox(at, i);
-    }
-  } else {
-    for (int i = 0; i < at->plugin_cnt; ++i) {
-      if (!at->list[i]) continue;
-
-      if (timer_event(at->list[i]->lsb, at->plugins->current_t)) {
-        terminate_sandbox(at, i);
-      }
-    }
-    return false;
-  }
-  return true;
 }

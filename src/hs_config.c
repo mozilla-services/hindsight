@@ -16,16 +16,16 @@
 
 #include "hs_logger.h"
 
-static const char* cfg_mode = "mode";
-static const char* cfg_input_path = "input_path";
 static const char* cfg_output_path = "output_path";
 static const char* cfg_output_size = "output_size";
 static const char* cfg_load_path = "sandbox_load_path";
 static const char* cfg_run_path = "sandbox_run_path";
-static const char* cfg_threads = "threads";
+static const char* cfg_threads = "analysis_threads";
 
-static const char* cfg_sb = "sandbox_defaults";
-static const char* cfg_sb_output = "output_limit";
+static const char* cfg_sb_ipd = "input_defaults";
+static const char* cfg_sb_apd = "analysis_defaults";
+static const char* cfg_sb_opd = "output_defaults";
+static const char* cfg_sb_output= "output_limit";
 static const char* cfg_sb_memory = "memory_limit";
 static const char* cfg_sb_instruction = "instruction_limit";
 static const char* cfg_sb_preserve = "preserve_data";
@@ -43,6 +43,7 @@ static void init_sandbox_config(hs_sandbox_config* cfg)
   cfg->preserve_data = false;
   cfg->module_path = NULL;
   cfg->filename = NULL;
+  cfg->message_matcher = NULL;
   cfg->ticker_interval = 0;
   cfg->thread = 0;
 }
@@ -50,14 +51,14 @@ static void init_sandbox_config(hs_sandbox_config* cfg)
 
 static void init_config(hs_config* cfg)
 {
-  cfg->mode = HS_MODE_UNKNOWN;
   cfg->run_path = NULL;
   cfg->load_path = NULL;
   cfg->output_path = NULL;
-  cfg->input_path = NULL;
   cfg->output_size = 1024 * 1024 * 64;
-  cfg->threads = 0;
-  init_sandbox_config(&cfg->sbc);
+  cfg->analysis_threads = 0;
+  init_sandbox_config(&cfg->ipd);
+  init_sandbox_config(&cfg->apd);
+  init_sandbox_config(&cfg->opd);
 }
 
 
@@ -67,7 +68,12 @@ static int check_for_unknown_options(lua_State* L, int idx, const char* parent)
   while (lua_next(L, idx) != 0) {
     switch (lua_type(L, -2)) {
     case LUA_TSTRING:
-      lua_pushfstring(L, "invalid option: '%s%s'", parent, lua_tostring(L, -2));
+      if (parent) {
+        lua_pushfstring(L, "invalid option: '%s.%s'", parent,
+                        lua_tostring(L, -2));
+      } else {
+        lua_pushfstring(L, "invalid option: '%s'", lua_tostring(L, -2));
+      }
       return 1;
     default:
       lua_pushstring(L, "non string key");
@@ -153,11 +159,13 @@ static int get_bool_item(lua_State* L, int idx, const char* name, bool* val)
 }
 
 
-static int load_sandbox_defaults(lua_State* L, hs_sandbox_config* cfg)
+static int load_sandbox_defaults(lua_State* L,
+                                 const char* key,
+                                 hs_sandbox_config* cfg)
 {
-  lua_getglobal(L, cfg_sb);
+  lua_getglobal(L, key);
   if (!lua_istable(L, -1)) {
-    lua_pushfstring(L, "%s must be a table", cfg_sb);
+    lua_pushfstring(L, "%s must be a table", key);
     return 1;
   }
   if (get_numeric_item(L, 1, cfg_sb_output, &cfg->output_limit)) return 1;
@@ -171,12 +179,14 @@ static int load_sandbox_defaults(lua_State* L, hs_sandbox_config* cfg)
   if (get_string_item(L, 1, cfg_sb_module, &cfg->module_path, NULL)) return 1;
   if (get_bool_item(L, 1, cfg_sb_preserve, &cfg->preserve_data)) return 1;
 
-  if (check_for_unknown_options(L, 1, "sandbox_default.")) return 1;
+  if (check_for_unknown_options(L, 1, key)) return 1;
 
-  remove_item(L, LUA_GLOBALSINDEX, cfg_sb);
+  remove_item(L, LUA_GLOBALSINDEX, key);
 
   return 0;
 }
+
+
 
 
 void hs_free_sandbox_config(hs_sandbox_config* cfg)
@@ -186,6 +196,9 @@ void hs_free_sandbox_config(hs_sandbox_config* cfg)
 
   free(cfg->filename);
   cfg->filename = NULL;
+
+  free(cfg->message_matcher);
+  cfg->message_matcher = NULL;
 }
 
 
@@ -200,17 +213,17 @@ void hs_free_config(hs_config* cfg)
   free(cfg->output_path);
   cfg->output_path = NULL;
 
-  free(cfg->input_path);
-  cfg->input_path = NULL;
-
-  hs_free_sandbox_config(&cfg->sbc);
+  hs_free_sandbox_config(&cfg->ipd);
+  hs_free_sandbox_config(&cfg->apd);
+  hs_free_sandbox_config(&cfg->opd);
+  hs_free_checkpoint_reader(&cfg->cp_reader);
 }
 
 
 lua_State* hs_load_sandbox_config(const char* fn,
                                   hs_sandbox_config* cfg,
                                   const hs_sandbox_config* dflt,
-                                  hs_mode mode)
+                                  hs_sb_type mode)
 {
   if (!cfg) return NULL;
 
@@ -261,11 +274,13 @@ lua_State* hs_load_sandbox_config(const char* fn,
                       &cfg->preserve_data);
   if (ret) goto cleanup;
 
-  if (mode == HS_MODE_ANALYSIS) {
+  if (mode == HS_SB_TYPE_ANALYSIS || mode == HS_SB_TYPE_OUTPUT) {
     ret = get_string_item(L, LUA_GLOBALSINDEX, cfg_sb_matcher,
                           &cfg->message_matcher, NULL);
     if (ret) goto cleanup;
+  }
 
+  if (mode == HS_SB_TYPE_ANALYSIS) {
     ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_sb_thread,
                            &cfg->thread);
     if (ret) goto cleanup;
@@ -297,42 +312,9 @@ int hs_load_config(const char* fn, hs_config* cfg)
   int ret = luaL_dofile(L, fn);
   if (ret) goto cleanup;
 
-  // set mode
-  lua_getglobal(L, cfg_mode);
-  const char* tmp = lua_tostring(L, -1);
-  if (tmp && strcmp(tmp, "input") == 0) {
-    cfg->mode = HS_MODE_INPUT;
-  } else if (tmp && strcmp(tmp, "analysis") == 0) {
-    cfg->mode = HS_MODE_ANALYSIS;
-  } else if (tmp && strcmp(tmp, "output") == 0) {
-    cfg->mode = HS_MODE_OUTPUT;
-  } else {
-    lua_pushfstring(L, "%s must be set to input|analysis|output", cfg_mode);
-    ret = 1;
-    goto cleanup;
-  }
-  remove_item(L, LUA_GLOBALSINDEX, cfg_mode);
-
   ret = get_string_item(L, LUA_GLOBALSINDEX, cfg_output_path,
                         &cfg->output_path, NULL);
   if (ret) goto cleanup;
-
-  switch (cfg->mode) {
-  case HS_MODE_OUTPUT:
-    // fall thru
-  case HS_MODE_ANALYSIS:
-    ret = get_string_item(L, LUA_GLOBALSINDEX, cfg_input_path,
-                          &cfg->input_path, NULL);
-    if (ret) goto cleanup;
-
-    ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_threads,
-                           &cfg->threads);
-    if (ret) goto cleanup;
-    break;
-  default:
-    // do nothing, it will fail with an extra option
-    break;
-  }
 
   ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_output_size,
                          &cfg->output_size);
@@ -346,10 +328,23 @@ int hs_load_config(const char* fn, hs_config* cfg)
                         NULL);
   if (ret) goto cleanup;
 
-  ret = load_sandbox_defaults(L, &cfg->sbc);
+  ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_threads,
+                         &cfg->analysis_threads);
   if (ret) goto cleanup;
 
-  ret = check_for_unknown_options(L, LUA_GLOBALSINDEX, "");
+  ret = load_sandbox_defaults(L, cfg_sb_ipd, &cfg->ipd);
+  if (ret) goto cleanup;
+
+  ret = load_sandbox_defaults(L, cfg_sb_apd, &cfg->apd);
+  if (ret) goto cleanup;
+
+  ret = load_sandbox_defaults(L, cfg_sb_opd, &cfg->opd);
+  if (ret) goto cleanup;
+
+  ret = check_for_unknown_options(L, LUA_GLOBALSINDEX, NULL);
+  if (ret) goto cleanup;
+
+  hs_init_checkpoint_reader(&cfg->cp_reader, cfg->output_path);
 
 cleanup:
   if (ret) {

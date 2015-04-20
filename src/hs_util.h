@@ -44,4 +44,6 @@ int hs_write_varint(char* buf, unsigned long long i);
 unsigned const char*
 hs_read_varint(unsigned const char* p, unsigned const char* e, long long* vi);
 
+size_t hs_find_first_id(const char* path);
+
 #endif

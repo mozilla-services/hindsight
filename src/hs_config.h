@@ -12,25 +12,23 @@
 #include <lua.h>
 #include <stdbool.h>
 
-typedef enum {
-  HS_MODE_UNKNOWN,
-  HS_MODE_INPUT,
-  HS_MODE_ANALYSIS,
-  HS_MODE_OUTPUT,
+#include "hs_checkpoint_reader.h"
 
-  HS_MODE_MAX
-} hs_mode;
+typedef enum {
+  HS_SB_TYPE_UNKNOWN,
+  HS_SB_TYPE_INPUT,
+  HS_SB_TYPE_ANALYSIS,
+  HS_SB_TYPE_OUTPUT
+} hs_sb_type;
 
 typedef struct hs_sandbox_config
 {
+  hs_sb_type type;
   char* module_path;
   char* filename;
+  char* message_matcher; // analysis/output sandbox only
 
-  // analysis sandbox only
-  char* message_matcher;
-  int thread;
-  // end analysis sandbox only
-
+  int thread; // analysis sandbox only
   int output_limit;
   int memory_limit;
   int instruction_limit;
@@ -40,14 +38,15 @@ typedef struct hs_sandbox_config
 
 typedef struct hs_config
 {
-  hs_mode mode;
   char* run_path;
   char* load_path;
   char* output_path;
-  char* input_path; // used by analysis/output
+  hs_checkpoint_reader cp_reader;
   int output_size;
-  int threads;
-  hs_sandbox_config sbc;
+  int analysis_threads;
+  hs_sandbox_config ipd; // input plugin defaults
+  hs_sandbox_config apd; // analysis plugin defaults
+  hs_sandbox_config opd; // output plugin defaults
 } hs_config;
 
 
@@ -79,7 +78,7 @@ void hs_free_config(hs_config* cfg);
 lua_State* hs_load_sandbox_config(const char* fn,
                                   hs_sandbox_config* cfg,
                                   const hs_sandbox_config* dflt,
-                                  hs_mode mode);
+                                  hs_sb_type mode);
 
 /**
  * Loads the Hinsight configuration from a file

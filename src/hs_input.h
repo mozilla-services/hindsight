@@ -20,22 +20,26 @@
 
 typedef struct hs_input
 {
-  char path[230];
-  char file[260];
+  FILE* fh;
   unsigned char* buf;
+
   size_t bufsize;
   size_t id;
   size_t offset;
   size_t readpos;
   size_t scanpos;
   size_t msglen;
-  FILE* fh;
+
+  pthread_mutex_t lock;
+  char path[HS_MAX_PATH - 30];
+  char file[HS_MAX_PATH];
 } hs_input;
 
 
 void hs_init_input(hs_input* input);
 void hs_free_input(hs_input* input);
 
-void* hs_read_input_thread(void* arg);
+int hs_open_file(hs_input* hsi, const char* subdir, size_t id);
+size_t hs_read_file(hs_input* hsi);
 
 #endif

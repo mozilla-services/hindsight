@@ -19,7 +19,7 @@ local fn = read_config("input_file")
 
 function process_message(offset)
     local fh = assert(io.open(fn, "rb"))
-    fh:seek("set", offset)
+    if offset then fh:seek("set", offset) end
 
     for line in io.input(fh):lines() do
         local fields = grammar:match(line)
@@ -27,7 +27,7 @@ function process_message(offset)
             msg.Timestamp = fields.time
             fields.time = nil
             msg.Fields = fields
-            inject_message(msg, fh:seek())
+            inject_message(msg)
             cnt = cnt + 1
         end
     end

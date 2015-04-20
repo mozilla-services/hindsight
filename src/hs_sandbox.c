@@ -118,8 +118,8 @@ hs_sandbox* hs_create_sandbox(void* parent,
 {
 
   char config[1024 * 2];
-  char lpath[260] = { 0 };
-  char cpath[260] = { 0 };
+  char lpath[HS_MAX_PATH] = { 0 };
+  char cpath[HS_MAX_PATH] = { 0 };
 
   if (cfg->module_path) {
 #if defined(_WIN32)
@@ -191,4 +191,98 @@ void hs_free_sandbox(hs_sandbox* p)
     free(p->mm);
     p->mm = NULL;
   }
+}
+
+
+int hs_process_message(lua_sandbox* lsb)
+{
+  static const char* func_name = "process_message";
+  lua_State* lua = lsb_get_lua(lsb);
+  if (!lua) return 1;
+
+  if (lsb_pcall_setup(lsb, func_name)) {
+    char err[LSB_ERROR_SIZE];
+    snprintf(err, LSB_ERROR_SIZE, "%s() function was not found", func_name);
+    lsb_terminate(lsb, err);
+    return 1;
+  }
+
+  if (lua_pcall(lua, 0, 2, 0) != 0) {
+    char err[LSB_ERROR_SIZE];
+    size_t len = snprintf(err, LSB_ERROR_SIZE, "%s() %s", func_name,
+                          lua_tostring(lua, -1));
+    if (len >= LSB_ERROR_SIZE) {
+      err[LSB_ERROR_SIZE - 1] = 0;
+    }
+    lsb_terminate(lsb, err);
+    return 1;
+  }
+
+  if (lua_type(lua, 1) != LUA_TNUMBER) {
+    char err[LSB_ERROR_SIZE];
+    size_t len = snprintf(err, LSB_ERROR_SIZE,
+                          "%s() must return a numeric status code",
+                          func_name);
+    if (len >= LSB_ERROR_SIZE) {
+      err[LSB_ERROR_SIZE - 1] = 0;
+    }
+    lsb_terminate(lsb, err);
+    return 1;
+  }
+
+  int status = (int)lua_tointeger(lua, 1);
+  switch (lua_type(lua, 2)) {
+  case LUA_TNIL:
+    lsb_set_error(lsb, NULL);
+    break;
+  case LUA_TSTRING:
+    lsb_set_error(lsb, lua_tostring(lua, 2));
+    break;
+  default:
+    {
+      char err[LSB_ERROR_SIZE];
+      int len = snprintf(err, LSB_ERROR_SIZE,
+                         "%s() must return a nil or string error message",
+                         func_name);
+      if (len >= LSB_ERROR_SIZE || len < 0) {
+        err[LSB_ERROR_SIZE - 1] = 0;
+      }
+      lsb_terminate(lsb, err);
+      return 1;
+    }
+    break;
+  }
+  lua_pop(lua, 2);
+  lsb_pcall_teardown(lsb);
+  return status;
+}
+
+
+int hs_timer_event(lua_sandbox* lsb, time_t t)
+{
+  static const char* func_name = "timer_event";
+  lua_State* lua = lsb_get_lua(lsb);
+  if (!lua) return 1;
+
+  if (lsb_pcall_setup(lsb, func_name)) {
+    char err[LSB_ERROR_SIZE];
+    snprintf(err, LSB_ERROR_SIZE, "%s() function was not found", func_name);
+    lsb_terminate(lsb, err);
+    return 1;
+  }
+
+  lua_pushnumber(lua, t * 1e9); // todo change if we need more than 1 sec resolution
+  if (lua_pcall(lua, 1, 0, 0) != 0) {
+    char err[LSB_ERROR_SIZE];
+    size_t len = snprintf(err, LSB_ERROR_SIZE, "%s() %s", func_name,
+                          lua_tostring(lua, -1));
+    if (len >= LSB_ERROR_SIZE) {
+      err[LSB_ERROR_SIZE - 1] = 0;
+    }
+    lsb_terminate(lsb, err);
+    return 1;
+  }
+  lsb_pcall_teardown(lsb);
+  lua_gc(lua, LUA_GCCOLLECT, 0);
+  return 0;
 }

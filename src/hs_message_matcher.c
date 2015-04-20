@@ -15,6 +15,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "hs_heka_message.h"
+
 
 static const char* grammar =
   "local l = require 'lpeg'\n"
@@ -468,8 +470,9 @@ void hs_free_message_match_builder(hs_message_match_builder* mmb)
 }
 
 
-hs_message_matcher* hs_create_message_matcher(hs_message_match_builder* mmb,
-                                              const char* exp)
+hs_message_matcher*
+hs_create_message_matcher(const hs_message_match_builder* mmb,
+                          const char* exp)
 {
   lua_getglobal(mmb->parser, "parse");
   if (!lua_isfunction(mmb->parser, -1)) {

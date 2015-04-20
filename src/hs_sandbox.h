@@ -33,4 +33,8 @@ hs_sandbox* hs_create_sandbox(void* parent,
 
 void hs_free_sandbox(hs_sandbox* p);
 
+
+int hs_process_message(lua_sandbox* lsb);
+int hs_timer_event(lua_sandbox* lsb, time_t t);
+
 #endif

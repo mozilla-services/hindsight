@@ -25,8 +25,9 @@ void hs_init_message_match_builder(hs_message_match_builder* mmb,
                                    const char* module_path);
 void hs_free_message_match_builder(hs_message_match_builder* mmb);
 
-hs_message_matcher* hs_create_message_matcher(hs_message_match_builder* mmb,
-                                              const char* exp);
+hs_message_matcher*
+hs_create_message_matcher(const hs_message_match_builder* mmb,
+                          const char* exp);
 void hs_free_message_matcher(hs_message_matcher* mm);
 bool hs_eval_message_matcher(hs_message_matcher* mm, hs_heka_message* m);
 

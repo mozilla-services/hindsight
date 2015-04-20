@@ -20,77 +20,22 @@
 #include <unistd.h>
 
 #include "hs_analysis_plugins.h"
+#include "hs_checkpoint_writer.h"
 #include "hs_config.h"
 #include "hs_input.h"
 #include "hs_input_plugins.h"
 #include "hs_logger.h"
+#include "hs_output_plugins.h"
 #include "hs_sandbox.h"
 
 static sem_t g_shutdown;
+
 
 static void stop_signal(int sig)
 {
   fprintf(stderr, "stop signal received %d\n", sig);
   signal(SIGINT, SIG_DFL);
   sem_post(&g_shutdown);
-}
-
-
-static void input_main(hs_config* cfg)
-{
-  hs_input_plugins plugins;
-  hs_init_input_plugins(&plugins, cfg, &g_shutdown);
-  hs_load_input_plugins(&plugins, cfg, cfg->run_path);
-
-  struct timespec ts;
-  while (true) {
-    if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
-      hs_log(HS_APP_NAME, 3, "clock_gettime failed");
-    }
-    ts.tv_sec += 60;
-    if (!sem_timedwait(&g_shutdown, &ts)) {
-      sem_post(&g_shutdown);
-      break; // shutting down
-    }
-    fprintf(stderr, "todo scan the load directory\n");
-  }
-  hs_stop_input_plugins(&plugins);
-  hs_free_input_plugins(&plugins);
-  hs_free_config(cfg);
-  hs_free_log();
-}
-
-
-static void analysis_main(hs_config* cfg)
-{
-  hs_analysis_plugins plugins;
-  hs_init_analysis_plugins(&plugins, cfg);
-  if (cfg->threads) {
-    hs_start_analysis_threads(&plugins);
-  }
-  hs_load_analysis_plugins(&plugins, cfg, cfg->run_path);
-
-  sched_yield();
-
-  // the input uses the extra thread slot allocated at the end
-  hs_start_analysis_input(&plugins, &plugins.threads[cfg->threads]);
-
-  struct timespec ts;
-  while (true) {
-    if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
-      hs_log(HS_APP_NAME, 3, "clock_gettime failed");
-    }
-    ts.tv_sec += 60;
-    if (!sem_timedwait(&g_shutdown, &ts)) {
-      sem_post(&g_shutdown);
-      break; // shutting down
-    }
-    fprintf(stderr, "todo scan the load directory\n");
-  }
-  plugins.stop = true;
-  hs_free_analysis_plugins(&plugins);
-  hs_free_config(cfg);
-  hs_free_log();
 }
 
 
@@ -124,23 +69,73 @@ int main(int argc, char* argv[])
   if (hs_load_config(argv[1], &cfg)) {
     return EXIT_FAILURE;
   }
+
+  hs_log(HS_APP_NAME, 6, "starting");
   signal(SIGINT, stop_signal);
 
-  switch (cfg.mode) {
-  case HS_MODE_INPUT:
-    hs_log(HS_APP_NAME, 6, "starting (input mode)");
-    input_main(&cfg);
-    break;
-  case HS_MODE_ANALYSIS:
-    hs_log(HS_APP_NAME, 6, "starting (analysis mode)");
-    analysis_main(&cfg);
-    break;
-  default:
-    fprintf(stderr, "'output' mode has not been implemented yet\n");
-    return EXIT_FAILURE;
-    break;
+  hs_message_match_builder mmb;
+  hs_init_message_match_builder(&mmb, cfg.ipd.module_path);
+
+  hs_input_plugins ips;
+  hs_init_input_plugins(&ips, &cfg, &g_shutdown);
+  hs_load_input_plugins(&ips, &cfg, cfg.run_path);
+
+  hs_analysis_plugins aps;
+  hs_init_analysis_plugins(&aps, &cfg, &mmb);
+  if (cfg.analysis_threads) {
+    hs_start_analysis_threads(&aps);
   }
-  hs_log(HS_APP_NAME, 6, "exiting", cfg.mode);
+  hs_load_analysis_plugins(&aps, &cfg, cfg.run_path);
+
+  hs_output_plugins ops;
+  hs_init_output_plugins(&ops, &cfg, &mmb);
+  hs_load_output_plugins(&ops, &cfg, cfg.run_path);
+
+  hs_checkpoint_writer cp;
+  hs_init_checkpoint_writer(&cp, &ips, NULL, &ops, cfg.output_path);
+  hs_init_checkpoint_writer(&cp, &ips, &aps, &ops, cfg.output_path);
+
+
+  sched_yield();
+  // the input uses the extra thread slot allocated at the end
+  hs_start_analysis_input(&aps, &aps.threads[cfg.analysis_threads]);
+
+  struct timespec ts;
+  int cnt = 0;
+  while (true) {
+    if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
+      hs_log(HS_APP_NAME, 3, "clock_gettime failed");
+    }
+    ts.tv_sec += 1;
+    if (!sem_timedwait(&g_shutdown, &ts)) {
+      sem_post(&g_shutdown);
+      break; // shutting down
+    }
+    hs_write_checkpoints(&cp);
+    if (++cnt == 60) {
+      fprintf(stderr, "todo scan and move the load directories\n");
+      cnt = 0;
+    }
+  }
+  aps.stop = true;
+  ops.stop = true;
+
+  hs_stop_input_plugins(&ips);
+  hs_wait_input_plugins(&ips);
+  hs_wait_analysis_plugins(&aps);
+  hs_wait_output_plugins(&ops);
+
+  hs_write_checkpoints(&cp);
+
+  hs_free_input_plugins(&ips);
+  hs_free_analysis_plugins(&aps);
+  hs_free_output_plugins(&ops);
+  hs_free_message_match_builder(&mmb);
+  hs_free_checkpoint_writer(&cp);
+  hs_free_config(&cfg);
+  hs_free_log();
+
+  hs_log(HS_APP_NAME, 6, "exiting");
   sem_destroy(&g_shutdown);
   return 0;
 }

@@ -9,9 +9,13 @@
 #ifndef hs_heka_message_h_
 #define hs_heka_message_h_
 
+#include <lauxlib.h>
+#include <lua.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+
+#include "hs_input.h"
 
 typedef enum {
   HS_FIELD_STRING,
@@ -51,6 +55,7 @@ typedef struct hs_heka_field
 
 typedef struct hs_heka_message
 {
+  const unsigned char* msg;
   const char* uuid;
   const char* type;
   const char* logger;
@@ -63,6 +68,7 @@ typedef struct hs_heka_message
   int32_t severity;
   int32_t pid;
 
+  int msg_len;
   int type_len;
   int logger_len;
   int payload_len;
@@ -70,7 +76,6 @@ typedef struct hs_heka_message
   int hostname_len;
   int fields_len;
   int fields_size;
-
 } hs_heka_message;
 
 
@@ -96,6 +101,7 @@ void hs_init_heka_message(hs_heka_message* m, size_t size);
 void hs_free_heka_message(hs_heka_message* m);
 
 void hs_clear_heka_message(hs_heka_message* m);
+bool hs_find_message(hs_heka_message* m, hs_input* hsi);
 bool hs_decode_heka_message(hs_heka_message* m,
                             const unsigned char* buf,
                             size_t len);
@@ -105,4 +111,5 @@ bool hs_read_message_field(hs_heka_message* m,
                           int fi,
                           int ai,
                           hs_read_value *val);
+int hs_read_message(lua_State* lua, hs_heka_message* m);
 #endif
