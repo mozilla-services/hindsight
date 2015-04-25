@@ -12,7 +12,7 @@ set(CPACK_PACKAGE_VERSION_PATCH 9)
 set(PROJECT_PATH "${CMAKE_BINARY_DIR}/${PROJECT_NAME}")
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 include(trink)
-include(externals)
+find_package(luasandbox REQUIRED)
 
 if(CMAKE_HOST_UNIX)
   find_library(PTHREAD_LIBRARY pthread)
@@ -29,6 +29,4 @@ endif()
 include_directories(${PROJECT_PATH}/include)
 
 add_subdirectory(src)
-install(FILES ${LUA_SANDBOX_LIBRARIES} DESTINATION lib)
-install(DIRECTORY "${CMAKE_BINARY_DIR}/ep_base/Source/lua_sandbox/modules/" DESTINATION hindsight/modules)
 

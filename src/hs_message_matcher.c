@@ -8,9 +8,9 @@
 
 #include "hs_message_matcher.h"
 
-#include <lauxlib.h>
-#include <lua.h>
-#include <lualib.h>
+#include <luasandbox/lauxlib.h>
+#include <luasandbox/lua.h>
+#include <luasandbox/lualib.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>

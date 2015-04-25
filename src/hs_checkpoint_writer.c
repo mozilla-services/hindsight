@@ -9,7 +9,7 @@
 #include "hs_checkpoint_writer.h"
 
 #include <errno.h>
-#include <lauxlib.h>
+#include <luasandbox/lauxlib.h>
 #include <stdlib.h>
 #include <string.h>
 

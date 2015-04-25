@@ -8,8 +8,8 @@
 
 #include "hs_config.h"
 
-#include <lauxlib.h>
-#include <lua.h>
+#include <luasandbox/lauxlib.h>
+#include <luasandbox/lua.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

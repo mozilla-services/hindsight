@@ -9,9 +9,9 @@
 #ifndef hs_sandbox_h_
 #define hs_sandbox_h_
 
+#include <luasandbox.h>
 #include <time.h>
 
-#include "lsb.h"
 #include "hs_config.h"
 #include "hs_message_matcher.h"
 

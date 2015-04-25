@@ -18,6 +18,8 @@
 #define snprintf _snprintf
 #endif
 
+#define LUASANDBOX_MODULES "${LUASANDBOX_MODULES}"
+
 #define mu_assert(cond, ...)                                                   \
 do {                                                                           \
   if (!(cond)) {                                                               \

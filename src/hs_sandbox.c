@@ -9,7 +9,7 @@
 #include "hs_sandbox.h"
 
 #include <ctype.h>
-#include <lauxlib.h>
+#include <luasandbox/lauxlib.h>
 #include <stdlib.h>
 
 #include "hs_logger.h"

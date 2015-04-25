@@ -7,7 +7,7 @@
 /** @brief Hindsight main executable @file */
 
 #include <errno.h>
-#include <lauxlib.h>
+#include <luasandbox/lauxlib.h>
 #include <pthread.h>
 #include <sched.h>
 #include <semaphore.h>

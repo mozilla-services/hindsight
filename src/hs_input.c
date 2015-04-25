@@ -9,7 +9,7 @@
 #include "hs_input.h"
 
 #include <errno.h>
-#include <lauxlib.h>
+#include <luasandbox/lauxlib.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>

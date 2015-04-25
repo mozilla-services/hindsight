@@ -9,7 +9,7 @@
 #include "hs_output.h"
 
 #include <errno.h>
-#include <lauxlib.h>
+#include <luasandbox/lauxlib.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>

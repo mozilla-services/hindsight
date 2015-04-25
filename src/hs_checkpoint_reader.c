@@ -11,8 +11,8 @@
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
-#include <lauxlib.h>
-#include <lualib.h>
+#include <luasandbox/lauxlib.h>
+#include <luasandbox/lualib.h>
 #include <stdlib.h>
 #include <string.h>
 

@@ -8,12 +8,15 @@
 
 #include "hs_input_plugins.h"
 
+
 #include <assert.h>
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
-#include <lauxlib.h>
-#include <lua.h>
+#include <luasandbox.h>
+#include <luasandbox/lauxlib.h>
+#include <luasandbox/lua.h>
+#include <luasandbox_output.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,8 +26,6 @@
 #include "hs_logger.h"
 #include "hs_sandbox.h"
 #include "hs_util.h"
-#include "lsb.h"
-#include "lsb_output.h"
 
 static const char g_input[] = "input";
 static const char g_module[] = "hs_input_plugins";

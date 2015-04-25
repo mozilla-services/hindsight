@@ -92,7 +92,7 @@ static char* test_true_matcher()
   hs_message_match_builder mmb;
   hs_init_heka_message(&m, 16);
   mu_assert(hs_decode_heka_message(&m, pb, pblen - 1), "decode failed");
-  hs_init_message_match_builder(&mmb, "hindsight/modules");
+  hs_init_message_match_builder(&mmb, LUASANDBOX_MODULES);
   for (int i = 0; tests[i]; ++i) {
     hs_message_matcher* mm = hs_create_message_matcher(&mmb, tests[i]);
     mu_assert(mm, "failed to create the matcher");
@@ -153,7 +153,7 @@ static char* test_false_matcher()
   hs_message_match_builder mmb;
   hs_init_heka_message(&m, 8);
   mu_assert(hs_decode_heka_message(&m, pb, pblen - 1), "decode failed");
-  hs_init_message_match_builder(&mmb, "hindsight/modules");
+  hs_init_message_match_builder(&mmb, LUASANDBOX_MODULES);
   for (int i = 0; tests[i]; ++i) {
     hs_message_matcher* mm = hs_create_message_matcher(&mmb, tests[i]);
     mu_assert(mm, "failed to create the matcher");
@@ -201,7 +201,7 @@ static char* test_malformed_matcher()
   hs_message_match_builder mmb;
   hs_init_heka_message(&m, 8);
   mu_assert(hs_decode_heka_message(&m, pb, pblen - 1), "decode failed");
-  hs_init_message_match_builder(&mmb, "hindsight/modules");
+  hs_init_message_match_builder(&mmb, LUASANDBOX_MODULES);
   for (int i = 0; tests[i]; ++i) {
     hs_message_matcher* mm = hs_create_message_matcher(&mmb, tests[i]);
     mu_assert(mm == NULL, "created malformed matcher");
@@ -218,7 +218,7 @@ static char* benchmark_matcher_create()
   const char* exp = "Type == 'TEST' && Severity == 6";
 
   hs_message_match_builder mmb;
-  hs_init_message_match_builder(&mmb, "hindsight/modules");
+  hs_init_message_match_builder(&mmb, LUASANDBOX_MODULES);
 
   clock_t t = clock();
   for (int x = 0; x < iter; ++x) {
@@ -249,7 +249,7 @@ static char* benchmark_match()
   hs_init_heka_message(&m, 8);
   mu_assert(hs_decode_heka_message(&m, pb, pblen - 1), "decode failed");
   hs_message_match_builder mmb;
-  hs_init_message_match_builder(&mmb, "hindsight/modules");
+  hs_init_message_match_builder(&mmb, LUASANDBOX_MODULES);
 
   for (int i = 0; tests[i]; i++) {
     hs_message_matcher* mm = hs_create_message_matcher(&mmb, tests[i]);

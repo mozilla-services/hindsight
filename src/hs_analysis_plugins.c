@@ -11,7 +11,9 @@
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
-#include <lauxlib.h>
+#include <luasandbox.h>
+#include <luasandbox/lauxlib.h>
+#include <luasandbox_output.h>
 #include <pthread.h>
 #include <semaphore.h>
 #include <stdlib.h>
@@ -24,8 +26,6 @@
 #include "hs_output.h"
 #include "hs_sandbox.h"
 #include "hs_util.h"
-#include "lsb.h"
-#include "lsb_output.h"
 
 static const char* g_analysis = "analysis";
 static const char* g_sb_template = "{"
