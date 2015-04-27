@@ -22,13 +22,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "hs_logger.h"
 #include "hs_sandbox.h"
 #include "hs_util.h"
 
-static const char g_input[] = "input";
-static const char g_module[] = "hs_input_plugins";
+static const char g_module[] = "input_plugins";
 
 static const char* g_sb_template = "{"
   "memory_limit = %u,"
@@ -66,10 +66,16 @@ static int process_message(lua_sandbox* lsb, hs_input_plugin* p)
 
   if (lsb_pcall_setup(lsb, func_name)) return 1;
 
-  if (p->cp_string) {
-    lua_pushstring(lua, p->cp_string);
-  } else {
+  switch (p->cp.type) {
+  case HS_CP_STRING:
+    lua_pushlstring(lua, p->cp.value.s, p->cp.len);
+    break;
+  case HS_CP_NUMERIC:
+    lua_pushnumber(lua, p->cp.value.d);
+    break;
+  default:
     lua_pushnil(lua);
+    break;
   }
 
   if (lua_pcall(lua, 1, 2, 0) != 0) {
@@ -159,38 +165,11 @@ static int inject_message(lua_State* L)
 
   size_t output_len = 0;
   const char* output = lsb_get_output(lsb, &output_len);
+  if (!hs_load_checkpoint(L, 2, &p->cp)) {
+    return luaL_error(L, "inject_message() only accepts numeric"
+                      " or string checkpoints < %d", HS_MAX_PATH);
 
-  switch (lua_type(L, 2)) {
-  case LUA_TSTRING:
-    {
-      size_t len;
-      const char* cp = lua_tolstring(L, 2, &len);
-      ++len;
-      if (cp) {
-        if (len > HS_MAX_PATH) {
-          luaL_error(L, "inject_message() checkpoint exceeds %d bytes",
-                     HS_MAX_PATH);
-        } else if (len > p->cp_cap) {
-          free(p->cp_string);
-          // allocate a little extra room for growth
-          p->cp_cap = len + 8 <= HS_MAX_PATH ? len + 8 : len;
-          p->cp_string = malloc(p->cp_cap);
-          if (!p->cp_string) {
-            p->cp_cap = 0;
-            luaL_error(L, "inject_message() checkpoint malloc failed");
-          }
-        }
-        memcpy(p->cp_string, cp, len);
-      }
-    }
-    break;
-  case LUA_TNONE:
-  case LUA_TNIL:
-    break;
-  default:
-    return luaL_error(L, "inject_message() only accepts string checkpoints");
   }
-
   pthread_mutex_lock(&p->plugins->output.lock);
   int len = write_varint(header + 3, output_len);
   header[0] = 0x1e;
@@ -213,6 +192,30 @@ static int inject_message(lua_State* L)
 }
 
 
+static void init_ip_checkpoint(hs_ip_checkpoint* cp)
+{
+  if (pthread_mutex_init(&cp->lock, NULL)) {
+    perror("cp lock pthread_mutex_init failed");
+    exit(EXIT_FAILURE);
+  }
+  cp->type = HS_CP_NONE;
+  cp->len = 0;
+  cp->cap = 0;
+  cp->value.d = 0;
+}
+
+
+static void free_ip_checkpoint(hs_ip_checkpoint* cp)
+{
+  cp->type = HS_CP_NONE;
+  if (cp->type == HS_CP_STRING) {
+    free(cp->value.s);
+    cp->value.s = NULL;
+  }
+  pthread_mutex_destroy(&cp->lock);
+}
+
+
 static hs_input_plugin* create_input_plugin(const char* file,
                                             const char* cfg_template,
                                             const hs_sandbox_config* cfg,
@@ -222,17 +225,13 @@ static hs_input_plugin* create_input_plugin(const char* file,
   if (!p) return NULL;
   p->list_index = -1;
 
-  if (pthread_mutex_init(&p->cp_lock, NULL)) {
-    perror("cp_lock pthread_mutex_init failed");
-    exit(EXIT_FAILURE);
-  }
-
   p->sb = hs_create_sandbox(p, file, cfg_template, cfg, env);
   if (!p->sb) {
     free(p);
     hs_log(g_module, 3, "lsb_create_custom failed: %s", file);
     return NULL;
   }
+  init_ip_checkpoint(&p->cp);
   return p;
 }
 
@@ -242,11 +241,8 @@ static void free_input_plugin(hs_input_plugin* p)
   hs_free_sandbox(p->sb);
   free(p->sb);
   p->sb = NULL;
-
   p->plugins = NULL;
-  free(p->cp_string);
-  p->cp_string = NULL;
-  pthread_mutex_destroy(&p->cp_lock);
+  free_ip_checkpoint(&p->cp);
 }
 
 
@@ -270,7 +266,6 @@ static void* input_thread(void* arg)
   hs_input_plugin* p = (hs_input_plugin*)arg;
   struct timespec ts;
   int ret = 0;
-  bool run_once = p->sb->ticker_interval == 0;
 
   hs_log(g_module, 6, "starting: %s", p->sb->filename);
   while (true) {
@@ -283,7 +278,8 @@ static void* input_thread(void* arg)
                  lsb_get_error(p->sb->lsb));
         }
       }
-      if (run_once) break; // run once
+
+      if (p->sb->ticker_interval == 0) break; // run once
 
       if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
         hs_log(g_module, 3, "clock_gettime failed: %s", p->sb->filename);
@@ -296,31 +292,27 @@ static void* input_thread(void* arg)
       }
       // poll
     } else {
-      const char* err = lsb_get_error(p->sb->lsb);
-      if (!strcmp(err, "shutting down")) {
-        hs_log(g_module, 2, "file: %s received: %d %s", p->sb->filename, ret,
-               err);
-      }
       break;
     }
   }
-  hs_log(g_module, 6, "exiting file: %s received: %d msg: %s", p->sb->filename,
-         ret, lsb_get_error(p->sb->lsb));
 
-  // sandbox terminated or running once, don't wait for the join to clean up
-  // the most recent checkpoint can be lost under these conditions
-  // TODO write the checkpoint back to the Lua table and hold it in memory
-  if (!p->sb && run_once) {
-    pthread_mutex_lock(&p->plugins->list_lock);
-    if (pthread_detach(p->thread)) {
-      hs_log(g_module, 3, "thread could not be detached");
-    }
-    p->plugins->list[p->list_index] = NULL;
-    --p->plugins->list_len;
-    pthread_mutex_unlock(&p->plugins->list_lock);
-    free_input_plugin(p);
-    free(p);
+  hs_log(g_module, 6, "detaching: %s received: %d msg: %s",
+         p->sb->filename, ret, lsb_get_error(p->sb->lsb));
+
+  // hold the current checkpoint in memory until we shutdown
+  // to facilitate resuming where it left off
+  hs_update_checkpoint(&p->plugins->cfg->cp_reader, p->sb->filename, &p->cp);
+
+  pthread_mutex_lock(&p->plugins->list_lock);
+  hs_input_plugins* plugins = p->plugins;
+  plugins->list[p->list_index] = NULL;
+  if (pthread_detach(p->thread)) {
+    hs_log(g_module, 3, "thread could not be detached");
   }
+  free_input_plugin(p);
+  free(p);
+  --plugins->list_cnt;
+  pthread_mutex_unlock(&plugins->list_lock);
   pthread_exit(NULL);
 }
 
@@ -328,11 +320,12 @@ static void* input_thread(void* arg)
 static void add_to_input_plugins(hs_input_plugins* plugins, hs_input_plugin* p)
 {
   pthread_mutex_lock(&plugins->list_lock);
-  if (plugins->list_len < plugins->list_cap) {
+  if (plugins->list_cnt < plugins->list_cap) {
     for (int i = 0; i < plugins->list_cap; ++i) {
       if (!plugins->list[i]) {
         plugins->list[i] = p;
         p->list_index = i;
+        ++plugins->list_cnt;
         break;
       }
     }
@@ -346,18 +339,18 @@ static void add_to_input_plugins(hs_input_plugins* plugins, hs_input_plugin* p)
     if (tmp) {
       plugins->list = tmp;
       plugins->list[p->list_index] = p;
-      ++plugins->list_len;
+      ++plugins->list_cnt;
     } else {
       hs_log(g_module, 0, "plugins realloc failed");
       exit(EXIT_FAILURE);
     }
   }
+  pthread_mutex_unlock(&plugins->list_lock);
   assert(p->list_index >= 0);
 
   hs_lookup_checkpoint(&p->plugins->cfg->cp_reader,
                        p->sb->filename,
-                       &p->cp_string,
-                       &p->cp_cap);
+                       &p->cp);
 
   int ret = pthread_create(&p->thread,
                            NULL,
@@ -367,7 +360,6 @@ static void add_to_input_plugins(hs_input_plugins* plugins, hs_input_plugin* p)
     perror("pthread_create failed");
     exit(EXIT_FAILURE);
   }
-  pthread_mutex_unlock(&plugins->list_lock);
 }
 
 
@@ -375,12 +367,13 @@ void hs_init_input_plugins(hs_input_plugins* plugins,
                            hs_config* cfg,
                            sem_t* shutdown)
 {
-  hs_init_output(&plugins->output, cfg->output_path, g_input);
+  hs_init_output(&plugins->output, cfg->output_path, hs_input_dir);
   plugins->cfg = cfg;
   plugins->shutdown = shutdown;
-  plugins->list_len = 0;
+  plugins->list_cnt = 0;
   plugins->list = NULL;
   plugins->list_cap = 0;
+  plugins->stop = false;
   if (pthread_mutex_init(&plugins->list_lock, NULL)) {
     perror("list_lock pthread_mutex_init failed");
     exit(EXIT_FAILURE);
@@ -390,36 +383,28 @@ void hs_init_input_plugins(hs_input_plugins* plugins,
 
 void hs_wait_input_plugins(hs_input_plugins* plugins)
 {
-  void* thread_result;
-  for (int i = 0; i < plugins->list_len; ++i) {
-    if (plugins->list[i]) {
-      int ret = pthread_join(plugins->list[i]->thread, &thread_result);
-      if (ret) {
-        perror("pthread_join failed");
-      }
+  while (true) {
+    if (plugins->list_cnt == 0) {
+      pthread_mutex_lock(&plugins->list_lock);
+      pthread_mutex_unlock(&plugins->list_lock);
+      return;
     }
+    usleep(100000);
   }
 }
 
 
 void hs_free_input_plugins(hs_input_plugins* plugins)
 {
-  for (int i = 0; i < plugins->list_len; ++i) {
-    if (plugins->list[i]) {
-      free_input_plugin(plugins->list[i]);
-      free(plugins->list[i]);
-      plugins->list[i] = NULL;
-    }
-  }
-
   free(plugins->list);
   plugins->list = NULL;
 
   pthread_mutex_destroy(&plugins->list_lock);
   hs_free_output(&plugins->output);
   plugins->cfg = NULL;
-  plugins->list_len = 0;
+  plugins->list_cnt = 0;
   plugins->list_cap = 0;
+  plugins->stop = false;
 }
 
 
@@ -427,8 +412,8 @@ void hs_load_input_plugins(hs_input_plugins* plugins, const hs_config* cfg,
                            const char* path)
 {
   char dir[HS_MAX_PATH];
-  if (!hs_get_fqfn(path, g_input, dir, sizeof(dir))) {
-    hs_log(HS_APP_NAME, 0, "input load path too long");
+  if (!hs_get_fqfn(path, hs_input_dir, dir, sizeof(dir))) {
+    hs_log(g_module, 0, "input load path too long");
     exit(EXIT_FAILURE);
   }
 
@@ -455,9 +440,9 @@ void hs_load_input_plugins(hs_input_plugins* plugins, const hs_config* cfg,
       if (p) {
         p->plugins = plugins;
 
-        size_t len = strlen(entry->d_name) + sizeof(g_input) + 2;
+        size_t len = strlen(entry->d_name) + strlen(hs_input_dir) + 2;
         p->sb->filename = malloc(len);
-        snprintf(p->sb->filename, len, "%s/%s", g_input, entry->d_name);
+        snprintf(p->sb->filename, len, "%s/%s", hs_input_dir, entry->d_name);
 
         if (sbc.preserve_data) {
           len = strlen(fqfn);
@@ -486,7 +471,12 @@ void hs_load_input_plugins(hs_input_plugins* plugins, const hs_config* cfg,
 
 void hs_stop_input_plugins(hs_input_plugins* plugins)
 {
-  for (int i = 0; i < plugins->list_len; ++i) {
-    stop_sandbox(plugins->list[i]->sb->lsb);
+  plugins->stop = true;
+  pthread_mutex_lock(&plugins->list_lock);
+  for (int i = 0; i < plugins->list_cap; ++i) {
+    if (plugins->list[i]) {
+      stop_sandbox(plugins->list[i]->sb->lsb);
+    }
   }
+  pthread_mutex_unlock(&plugins->list_lock);
 }

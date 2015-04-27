@@ -14,8 +14,6 @@
 #include <stdlib.h>
 #include <time.h>
 
-const char* HS_APP_NAME = "hindsight";
-
 static pthread_mutex_t g_logger;
 static int g_loglevel;
 

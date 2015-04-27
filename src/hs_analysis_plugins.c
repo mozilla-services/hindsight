@@ -27,7 +27,7 @@
 #include "hs_sandbox.h"
 #include "hs_util.h"
 
-static const char* g_analysis = "analysis";
+static const char g_module[] = "analysis_plugins";
 static const char* g_sb_template = "{"
   "memory_limit = %u,"
   "instruction_limit = %u,"
@@ -198,7 +198,7 @@ static void add_to_analysis_plugins(const hs_sandbox_config* cfg,
       at->list[at->list_size - 1] = sb;
       ++at->plugin_cnt;
     } else {
-      hs_log(HS_APP_NAME, 0, "plugins realloc failed");
+      hs_log(g_module, 0, "plugins realloc failed");
       exit(EXIT_FAILURE);
     }
   }
@@ -254,7 +254,7 @@ static int init_sandbox(hs_sandbox* sb)
 
   int ret = lsb_init(sb->lsb, sb->state);
   if (ret) {
-    hs_log(sb->filename, 3, "lsb_init() received: %d %s", ret,
+    hs_log(g_module, 3, "lsb_init: %s received: %d %s", sb->filename, ret,
            lsb_get_error(sb->lsb));
     return ret;
   }
@@ -271,7 +271,7 @@ static int init_sandbox(hs_sandbox* sb)
 
 static void terminate_sandbox(hs_analysis_thread* at, int i)
 {
-  hs_log(at->list[i]->filename, 3, "terminated: %s",
+  hs_log(g_module, 3, "terminated: %s msg: %s", at->list[i]->filename,
          lsb_get_error(at->list[i]->lsb));
   hs_free_sandbox(at->list[i]);
   free(at->list[i]);
@@ -305,7 +305,7 @@ bool analyze_message(hs_analysis_thread* at)
 
       if (ret <= 0 && sb->ticker_interval
           && at->plugins->current_t >= sb->next_timer_event) {
-        hs_log("analysis_thread", 7, "tid: %d plugin: %d running timer_event",
+        hs_log(g_module, 7, "tid: %d plugin: %d running timer_event",
                at->tid, i); // todo remove
         ret = hs_timer_event(sb->lsb, at->plugins->current_t);
         sb->next_timer_event += sb->ticker_interval;
@@ -334,12 +334,12 @@ static void* analysis_thread_function(void* arg)
 {
   hs_analysis_thread* at = (hs_analysis_thread*)arg;
 
-  hs_log("analysis_thread", 6, "starting thread [%d]", at->tid);
+  hs_log(g_module, 6, "starting thread [%d]", at->tid);
   bool stop = false;
 
   while (!stop) {
     if (sem_wait(&at->start)) {
-      hs_log("analysis_thread", 3, "thread [%d] sem_wait error: %s", at->tid,
+      hs_log(g_module, 3, "thread [%d] sem_wait error: %s", at->tid,
              strerror(errno));
       break;
     }
@@ -347,19 +347,19 @@ static void* analysis_thread_function(void* arg)
     stop = !analyze_message(at);
 
     if (sem_post(&at->plugins->finished)) {
-      hs_log("analysis_thread", 3, "thread [%d] sem_post error: %s", at->tid,
+      hs_log(g_module, 3, "thread [%d] sem_post error: %s", at->tid,
              strerror(errno));
     }
     sched_yield();
   }
-  hs_log("analysis_thread", 6, "exiting thread [%d]", at->tid);
+  hs_log(g_module, 6, "exiting thread [%d]", at->tid);
   pthread_exit(NULL);
 }
 
 
 static void* input_thread(void* arg)
 {
-  hs_log(HS_APP_NAME, 6, "starting hs_analysis_read_input_thread");
+  hs_log(g_module, 6, "starting input thread");
 
   hs_heka_message msg;
   hs_init_heka_message(&msg, 8);
@@ -374,18 +374,18 @@ static void* input_thread(void* arg)
   }
   strcpy(plugins->input.path, cfg->output_path);
   hs_lookup_input_checkpoint(&cfg->cp_reader,
-                             "analysis_input",
+                             hs_analysis_dir,
                              cfg->output_path,
-                             "input",
+                             hs_input_dir,
                              &plugins->input.id,
                              &plugins->input.offset);
+  plugins->cp_id = plugins->input.id;
+  plugins->cp_offset = plugins->input.offset;
 
   size_t bytes_read = 0;
-  size_t cnt = 0;
   while (!plugins->stop) {
     if (plugins->input.fh) {
       if (hs_find_message(&msg, &plugins->input)) {
-        ++cnt; // todo remove
         plugins->msg = &msg;
         plugins->current_t = time(NULL);
 
@@ -404,19 +404,22 @@ static void* input_thread(void* arg)
         } else {
           analyze_message(&plugins->list[0]);
         }
+        // advance the checkpoint
+        pthread_mutex_lock(&plugins->cp_lock);
+        plugins->cp_id = plugins->input.id;
+        plugins->cp_offset = plugins->input.offset -
+          (plugins->input.readpos - plugins->input.scanpos);
+        pthread_mutex_unlock(&plugins->cp_lock);
       } else {
         bytes_read = hs_read_file(&plugins->input);
       }
 
       if (!bytes_read) {
         // see if the next file is there yet
-        //hs_log(HS_APP_NAME, 7, "analysis count %zu", cnt); // todo remove
-        //hs_log(HS_APP_NAME, 7, "analysis looking for the next log"); // todo remove
-        hs_open_file(&plugins->input, "input", plugins->input.id + 1);
+        hs_open_file(&plugins->input, hs_input_dir, plugins->input.id + 1);
       }
     } else { // still waiting on the first file
-      //hs_log(HS_APP_NAME, 7, "analysis waiting for the input file"); // todo remove
-      hs_open_file(&plugins->input, "input", plugins->input.id);
+      hs_open_file(&plugins->input, hs_input_dir, plugins->input.id);
     }
 
     if (bytes_read || plugins->msg) {
@@ -443,7 +446,7 @@ static void* input_thread(void* arg)
 
   hs_free_heka_message(&msg);
 
-  hs_log(HS_APP_NAME, 6, "exiting hs_analysis_read_input_thread");
+  hs_log(g_module, 6, "exiting hs_analysis_read_input_thread");
   pthread_exit(NULL);
 }
 
@@ -452,7 +455,7 @@ void hs_init_analysis_plugins(hs_analysis_plugins* plugins,
                               hs_config* cfg,
                               hs_message_match_builder* mmb)
 {
-  hs_init_output(&plugins->output, cfg->output_path, g_analysis);
+  hs_init_output(&plugins->output, cfg->output_path, hs_analysis_dir);
   hs_init_input(&plugins->input);
 
   plugins->thread_cnt = cfg->analysis_threads;
@@ -461,9 +464,16 @@ void hs_init_analysis_plugins(hs_analysis_plugins* plugins,
   plugins->matched = false;
   plugins->msg = NULL;
   plugins->mmb = mmb;
+  plugins->cp_id = 0;
+  plugins->cp_offset = 0;
 
   if (sem_init(&plugins->finished, 0, cfg->analysis_threads)) {
     perror("finished sem_init failed");
+    exit(EXIT_FAILURE);
+  }
+
+  if (pthread_mutex_init(&plugins->cp_lock, NULL)) {
+    perror("cp_lock pthread_mutex_init failed");
     exit(EXIT_FAILURE);
   }
 
@@ -516,6 +526,7 @@ void hs_free_analysis_plugins(hs_analysis_plugins* plugins)
   hs_free_input(&plugins->input);
   hs_free_output(&plugins->output);
 
+  pthread_mutex_destroy(&plugins->cp_lock);
   sem_destroy(&plugins->finished);
   plugins->cfg = NULL;
   plugins->msg = NULL;
@@ -528,8 +539,8 @@ void hs_load_analysis_plugins(hs_analysis_plugins* plugins,
                               const char* path)
 {
   char dir[HS_MAX_PATH];
-  if (!hs_get_fqfn(path, g_analysis, dir, sizeof(dir))) {
-    hs_log(HS_APP_NAME, 0, "analysis load path too long");
+  if (!hs_get_fqfn(path, hs_analysis_dir, dir, sizeof(dir))) {
+    hs_log(g_module, 0, "load path too long");
     exit(EXIT_FAILURE);
   }
 
@@ -568,7 +579,7 @@ void hs_load_analysis_plugins(hs_analysis_plugins* plugins,
         sb->mm = hs_create_message_matcher(plugins->mmb, sbc.message_matcher);
         if (!sb->mm || init_sandbox(sb)) {
           if (!sb->mm) {
-            hs_log(sb->filename, 3, "invalid message_matcher: %s",
+            hs_log(g_module, 3, "%s invalid message_matcher: %s", sb->filename,
                    sbc.message_matcher);
           }
           hs_free_sandbox(sb);

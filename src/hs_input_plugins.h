@@ -14,6 +14,7 @@
 #include <stddef.h>
 
 #include "hs_config.h"
+#include "hs_checkpoint_reader.h"
 #include "hs_output.h"
 #include "hs_sandbox.h"
 
@@ -26,10 +27,7 @@ struct hs_input_plugin
   hs_input_plugins* plugins;
   pthread_t thread;
   int list_index;
-
-  pthread_mutex_t cp_lock;
-  char* cp_string;  // string checkpoint
-  unsigned cp_cap;  // string checkpoint capacity
+  hs_ip_checkpoint cp;
 };
 
 struct hs_input_plugins
@@ -39,8 +37,9 @@ struct hs_input_plugins
   hs_config* cfg;
 
   pthread_mutex_t list_lock;
-  int list_len;
+  int list_cnt;
   int list_cap;
+  bool stop;
 
   hs_output output;
 };

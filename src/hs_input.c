@@ -18,6 +18,7 @@
 #include "hs_logger.h"
 #include "hs_util.h"
 
+static const char g_module[] = "input_reader";
 
 int hs_open_file(hs_input* hsi, const char* subdir, size_t id)
 {
@@ -25,7 +26,7 @@ int hs_open_file(hs_input* hsi, const char* subdir, size_t id)
   int ret = snprintf(path, sizeof(path), "%s/%s/%zu.log", hsi->path, subdir,
                      id);
   if (ret < 0 || ret > (int)sizeof(path) - 1) {
-    hs_log(HS_APP_NAME, 0, "%zu.log: fully qualiifed path is greater than %zu",
+    hs_log(g_module, 0, "%zu.log: fully qualiifed path is greater than %zu",
            hsi->id, sizeof(path));
     exit(EXIT_FAILURE);
   }
@@ -38,29 +39,27 @@ int hs_open_file(hs_input* hsi, const char* subdir, size_t id)
     }
 
     if (hsi->id == id && hsi->offset) {
-      hs_log(HS_APP_NAME, 6, "opened input file: %s offset: %zu", path,
+      hs_log(g_module, 7, "opened file: %s offset: %zu", path,
              hsi->offset);
       if (fseek(fh, hsi->offset, SEEK_SET)) {
-        hs_log(HS_APP_NAME, 2, "invalid offset: %zu file: %s error: %d",
+        hs_log(g_module, 2, "invalid offset: %zu file: %s error: %d",
                hsi->offset,
                hsi->file,
                ferror(fh));
       }
     } else {
-      hs_log(HS_APP_NAME, 7, "opened input file: %s", path);
+      hs_log(g_module, 7, "opened file: %s", path);
     }
 
     if (hsi->fh) {
       fclose(hsi->fh);
     }
-    pthread_mutex_lock(&hsi->lock);
     if (hsi->id != id) {
       hsi->id = id;
       hsi->offset = 0;
     }
     strcpy(hsi->file, path);
     hsi->fh = fh;
-    pthread_mutex_unlock(&hsi->lock);
   }
   return 0;
 }
@@ -70,15 +69,11 @@ size_t hs_read_file(hs_input* hsi)
 {
   if (hsi->scanpos != 0) { // shift the message left
     if (hsi->scanpos == hsi->readpos) {
-      pthread_mutex_lock(&hsi->lock);
       hsi->scanpos = hsi->readpos = 0;
-      pthread_mutex_unlock(&hsi->lock);
     } else {
       memmove(hsi->buf, hsi->buf + hsi->scanpos, hsi->readpos - hsi->scanpos);
-      pthread_mutex_lock(&hsi->lock);
       hsi->readpos = hsi->readpos - hsi->scanpos;
       hsi->scanpos = 0;
-      pthread_mutex_unlock(&hsi->lock);
     }
   }
 
@@ -87,14 +82,14 @@ size_t hs_read_file(hs_input* hsi)
     if (newsize > HS_MAX_MSG_LEN) {
       newsize = HS_MAX_MSG_LEN;
     }
-    hs_log(HS_APP_NAME, 7, "expand buf from: %zu to: %zu", hsi->bufsize,
+    hs_log(g_module, 7, "expand buf from: %zu to: %zu", hsi->bufsize,
            newsize);
     unsigned char* tmp = realloc(hsi->buf, newsize);
     if (tmp) {
       hsi->buf = tmp;
       hsi->bufsize = newsize;
     } else {
-      hs_log(HS_APP_NAME, 0, "input buffer reallocation failed");
+      hs_log(g_module, 0, "buffer reallocation failed");
       exit(EXIT_FAILURE);
     }
   }
@@ -107,41 +102,36 @@ size_t hs_read_file(hs_input* hsi)
 }
 
 
-void hs_init_input(hs_input* input)
+void hs_init_input(hs_input* hsi)
 {
-  input->fh = NULL;
-  input->path[0] = 0;
-  input->file[0] = 0;
-  input->bufsize = BUFSIZ;
-  input->id = 0;
-  input->offset = 0;
-  input->readpos = 0;
-  input->scanpos = 0;
-  input->msglen = 0;
-  input->buf = malloc(input->bufsize);
-  if (!input->buf) {
-    hs_log(HS_APP_NAME, 0, "input buffer allocation failed");
-    exit(EXIT_FAILURE);
-  }
-  if (pthread_mutex_init(&input->lock, NULL)) {
-    perror("input lock pthread_mutex_init failed");
+  hsi->fh = NULL;
+  hsi->path[0] = 0;
+  hsi->file[0] = 0;
+  hsi->bufsize = BUFSIZ;
+  hsi->id = 0;
+  hsi->offset = 0;
+  hsi->readpos = 0;
+  hsi->scanpos = 0;
+  hsi->msglen = 0;
+  hsi->buf = malloc(hsi->bufsize);
+  if (!hsi->buf) {
+    hs_log(g_module, 0, "buffer allocation failed");
     exit(EXIT_FAILURE);
   }
 }
 
 
-void hs_free_input(hs_input* input)
+void hs_free_input(hs_input* hsi)
 {
-  if (input->fh) fclose(input->fh);
-  input->path[0] = 0;
-  input->file[0] = 0;
-  free(input->buf);
-  input->buf = NULL;
-  input->bufsize = 0;
-  input->id = 0;
-  input->offset = 0;
-  input->readpos = 0;
-  input->scanpos = 0;
-  input->msglen = 0;
-  pthread_mutex_destroy(&input->lock);
+  if (hsi->fh) fclose(hsi->fh);
+  hsi->path[0] = 0;
+  hsi->file[0] = 0;
+  free(hsi->buf);
+  hsi->buf = NULL;
+  hsi->bufsize = 0;
+  hsi->id = 0;
+  hsi->offset = 0;
+  hsi->readpos = 0;
+  hsi->scanpos = 0;
+  hsi->msglen = 0;
 }

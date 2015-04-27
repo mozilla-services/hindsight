@@ -16,6 +16,11 @@
 
 #include "hs_logger.h"
 
+const char* hs_input_dir = "input";
+const char* hs_analysis_dir = "analysis";
+
+static const char g_module[] = "config_parser";
+
 static const char* cfg_output_path = "output_path";
 static const char* cfg_output_size = "output_size";
 static const char* cfg_load_path = "sandbox_load_path";
@@ -229,7 +234,7 @@ lua_State* hs_load_sandbox_config(const char* fn,
 
   lua_State* L = luaL_newstate();
   if (!L) {
-    hs_log(HS_APP_NAME, 3, "luaL_newstate failed: %s", fn);
+    hs_log(g_module, 3, "luaL_newstate failed: %s", fn);
     return NULL;
   }
 
@@ -288,7 +293,7 @@ lua_State* hs_load_sandbox_config(const char* fn,
 
 cleanup:
   if (ret) {
-    hs_log(HS_APP_NAME, 3, "loading %s failed: %s", fn, lua_tostring(L, -1));
+    hs_log(g_module, 3, "loading %s failed: %s", fn, lua_tostring(L, -1));
     lua_close(L);
     return NULL;
   }
@@ -303,7 +308,7 @@ int hs_load_config(const char* fn, hs_config* cfg)
 
   lua_State* L = luaL_newstate();
   if (!L) {
-    hs_log(HS_APP_NAME, 3, "luaL_newstate failed: %s", fn);
+    hs_log(g_module, 3, "luaL_newstate failed: %s", fn);
     return 1;
   }
 
@@ -348,7 +353,7 @@ int hs_load_config(const char* fn, hs_config* cfg)
 
 cleanup:
   if (ret) {
-    hs_log(HS_APP_NAME, 3, "loading %s failed: %s", fn, lua_tostring(L, -1));
+    hs_log(g_module, 3, "loading %s failed: %s", fn, lua_tostring(L, -1));
   }
   lua_close(L);
 

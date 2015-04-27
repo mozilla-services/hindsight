@@ -1,0 +1,25 @@
+[hekad]
+maxprocs = 1
+base_dir = "."
+share_dir = "."
+
+[FxaAuthWebserverBin]
+type = "LogstreamerInput"
+log_directory = "/work/git/hindsight/release/output"
+file_match = '0\.log'
+decoder = "ProtobufDecoder"
+#synchronous_decode = true
+
+[Counter]
+type = "SandboxFilter"
+filename = "analysis_run/counter.lua"
+message_matcher = "TRUE"
+
+#[FileOutput]
+#message_matcher = "TRUE"
+#path = "heka_analysis_out.log"
+#perm = "666"
+#flush_count = 100
+#flush_operator = "OR"
+#encoder = "ProtobufEncoder"
+

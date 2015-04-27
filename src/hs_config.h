@@ -14,6 +14,9 @@
 
 #include "hs_checkpoint_reader.h"
 
+extern const char* hs_input_dir;
+extern const char* hs_analysis_dir;
+
 typedef enum {
   HS_SB_TYPE_UNKNOWN,
   HS_SB_TYPE_INPUT,

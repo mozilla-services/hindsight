@@ -41,6 +41,10 @@ struct hs_analysis_plugins
   bool stop;
   bool matched;
 
+  pthread_mutex_t cp_lock;
+  size_t cp_id;
+  size_t cp_offset;
+
   hs_output output;
 };
 

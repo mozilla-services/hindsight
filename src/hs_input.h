@@ -30,14 +30,13 @@ typedef struct hs_input
   size_t scanpos;
   size_t msglen;
 
-  pthread_mutex_t lock;
   char path[HS_MAX_PATH - 30];
   char file[HS_MAX_PATH];
 } hs_input;
 
 
-void hs_init_input(hs_input* input);
-void hs_free_input(hs_input* input);
+void hs_init_input(hs_input* hsi);
+void hs_free_input(hs_input* hsi);
 
 int hs_open_file(hs_input* hsi, const char* subdir, size_t id);
 size_t hs_read_file(hs_input* hsi);

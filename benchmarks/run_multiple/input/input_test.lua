@@ -17,9 +17,9 @@ local cnt = 0;
 
 local fn = read_config("input_file")
 
-function process_message(offset)
+--[[
+function process_message()
     local fh = assert(io.open(fn, "rb"))
-    fh:seek("set", offset)
 
     for line in io.input(fh):lines() do
         local fields = grammar:match(line)
@@ -35,3 +35,44 @@ function process_message(offset)
 
     return 0, tostring(cnt)
 end
+--]]
+
+function process_message(offset)
+    local fh = assert(io.open(fn, "rb"))
+    if offset then fh:seek("set", offset) end
+
+    for line in io.input(fh):lines() do
+        local fields = grammar:match(line)
+        if fields then
+            msg.Timestamp = fields.time
+            fields.time = nil
+            msg.Fields = fields
+            inject_message(msg, fh:seek())
+            cnt = cnt + 1
+        end
+    end
+    fh:close()
+
+    return 0, tostring(cnt)
+end
+
+--[[
+function process_message(offset)
+    local fh = assert(io.open(fn, "rb"))
+    if offset then fh:seek("set", tonumber(offset)) end
+
+    for line in io.input(fh):lines() do
+        local fields = grammar:match(line)
+        if fields then
+            msg.Timestamp = fields.time
+            fields.time = nil
+            msg.Fields = fields
+            inject_message(msg, tostring(fh:seek()))
+            cnt = cnt + 1
+        end
+    end
+    fh:close()
+
+    return 0, tostring(cnt)
+end
+--]]

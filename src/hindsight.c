@@ -28,6 +28,8 @@
 #include "hs_output_plugins.h"
 #include "hs_sandbox.h"
 
+
+static const char g_module[] = "hindsight";
 static sem_t g_shutdown;
 
 
@@ -70,7 +72,7 @@ int main(int argc, char* argv[])
     return EXIT_FAILURE;
   }
 
-  hs_log(HS_APP_NAME, 6, "starting");
+  hs_log(g_module, 6, "starting");
   signal(SIGINT, stop_signal);
 
   hs_message_match_builder mmb;
@@ -91,10 +93,9 @@ int main(int argc, char* argv[])
   hs_init_output_plugins(&ops, &cfg, &mmb);
   hs_load_output_plugins(&ops, &cfg, cfg.run_path);
 
-  hs_checkpoint_writer cp;
-  hs_init_checkpoint_writer(&cp, &ips, NULL, &ops, cfg.output_path);
-  hs_init_checkpoint_writer(&cp, &ips, &aps, &ops, cfg.output_path);
-
+  hs_checkpoint_writer cpw;
+  hs_init_checkpoint_writer(&cpw, &ips, NULL, &ops, cfg.output_path);
+  hs_init_checkpoint_writer(&cpw, &ips, &aps, &ops, cfg.output_path);
 
   sched_yield();
   // the input uses the extra thread slot allocated at the end
@@ -104,38 +105,37 @@ int main(int argc, char* argv[])
   int cnt = 0;
   while (true) {
     if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
-      hs_log(HS_APP_NAME, 3, "clock_gettime failed");
+      hs_log(g_module, 3, "clock_gettime failed");
     }
     ts.tv_sec += 1;
     if (!sem_timedwait(&g_shutdown, &ts)) {
       sem_post(&g_shutdown);
       break; // shutting down
     }
-    hs_write_checkpoints(&cp);
+    hs_write_checkpoints(&cpw, &cfg.cp_reader);
     if (++cnt == 60) {
-      fprintf(stderr, "todo scan and move the load directories\n");
+      hs_log(g_module, 7, "todo scan and move the load directories");
       cnt = 0;
     }
   }
   aps.stop = true;
   ops.stop = true;
-
   hs_stop_input_plugins(&ips);
   hs_wait_input_plugins(&ips);
   hs_wait_analysis_plugins(&aps);
   hs_wait_output_plugins(&ops);
 
-  hs_write_checkpoints(&cp);
+  hs_write_checkpoints(&cpw, &cfg.cp_reader);
 
   hs_free_input_plugins(&ips);
   hs_free_analysis_plugins(&aps);
   hs_free_output_plugins(&ops);
   hs_free_message_match_builder(&mmb);
-  hs_free_checkpoint_writer(&cp);
+  hs_free_checkpoint_writer(&cpw);
   hs_free_config(&cfg);
   hs_free_log();
 
-  hs_log(HS_APP_NAME, 6, "exiting");
+  hs_log(g_module, 6, "exiting");
   sem_destroy(&g_shutdown);
   return 0;
 }

@@ -9,8 +9,6 @@
 #ifndef hs_logger_h_
 #define hs_logger_h_
 
-extern const char* HS_APP_NAME;
-
 // todo add an option to output Heka protobuf logs
 
 /**

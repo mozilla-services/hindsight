@@ -17,7 +17,7 @@
 #include "hs_logger.h"
 #include "hs_util.h"
 
-static const char g_module[] = "hs_output";
+static const char g_module[] = "output";
 
 
 void hs_init_output(hs_output* output, const char* path, const char* subdir)

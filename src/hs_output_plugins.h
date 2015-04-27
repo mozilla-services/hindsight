@@ -32,7 +32,7 @@ struct hs_output_plugins
   hs_config* cfg;
   hs_message_match_builder* mmb;
 
-  int list_len;
+  int list_cnt;
   int list_cap;
   bool stop;
 
@@ -58,6 +58,8 @@ struct hs_output_plugin
   pthread_mutex_t cp_lock;
   size_t cp_id[2];
   size_t cp_offset[2];
+  size_t cur_id[2];
+  size_t cur_offset[2];
 };
 
 
@@ -69,5 +71,4 @@ void hs_load_output_plugins(hs_output_plugins* plugins,
                             const hs_config* cfg,
                             const char* path);
 void hs_wait_output_plugins(hs_output_plugins* plugins);
-bool hs_output_message(hs_output_plugin* p);
 #endif

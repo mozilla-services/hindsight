@@ -20,17 +20,17 @@
 #include "hs_output_plugins.h"
 #include "hs_util.h"
 
-static const char g_module[] = "hs_checkpoint_writer";
+static const char g_module[] = "checkpoint_writer";
 
-void hs_init_checkpoint_writer(hs_checkpoint_writer* cp,
-                        hs_input_plugins* ip,
-                        hs_analysis_plugins* ap,
-                        hs_output_plugins* op,
-                        const char* path)
+void hs_init_checkpoint_writer(hs_checkpoint_writer* cpw,
+                               hs_input_plugins* ip,
+                               hs_analysis_plugins* ap,
+                               hs_output_plugins* op,
+                               const char* path)
 {
-  cp->input_plugins = ip;
-  cp->analysis_plugins = ap;
-  cp->output_plugins = op;
+  cpw->input_plugins = ip;
+  cpw->analysis_plugins = ap;
+  cpw->output_plugins = op;
 
   char fqfn[HS_MAX_PATH];
   if (!hs_get_fqfn(path, "hindsight.cp", fqfn, sizeof(fqfn))) {
@@ -39,90 +39,88 @@ void hs_init_checkpoint_writer(hs_checkpoint_writer* cp,
     exit(EXIT_FAILURE);
   }
 
-  cp->fh = fopen(fqfn, "wb");
-  if (!cp->fh) {
+  cpw->fh = fopen(fqfn, "wb");
+  if (!cpw->fh) {
     hs_log(g_module, 0, "%s: %s", fqfn, strerror(errno));
     exit(EXIT_FAILURE);
   }
 }
 
 
-void hs_free_checkpoint_writer(hs_checkpoint_writer* cp)
+void hs_free_checkpoint_writer(hs_checkpoint_writer* cpw)
 {
-  if (cp->fh) fclose(cp->fh);
-  cp->fh = NULL;
-  cp->analysis_plugins = NULL;
-  cp->input_plugins = NULL;
-  cp->output_plugins = NULL;
+  if (cpw->fh) fclose(cpw->fh);
+  cpw->fh = NULL;
+  cpw->analysis_plugins = NULL;
+  cpw->input_plugins = NULL;
+  cpw->output_plugins = NULL;
 }
 
 
-void hs_write_checkpoints(hs_checkpoint_writer* cp)
+void hs_write_checkpoints(hs_checkpoint_writer* cpw, hs_checkpoint_reader* cpr)
 {
-  if (fseek(cp->fh, 0, SEEK_SET)) {
-    hs_log(g_module, 3, "checkpoint_writer fseek() error: %d", ferror(cp->fh));
+  cpw->fh = freopen(NULL, "wb", cpw->fh);
+  if (!cpw->fh) {
+    hs_log(g_module, 1, "checkpoint_writer freopen() error: %d",
+           ferror(cpw->fh));
     return;
   }
-  if (cp->input_plugins) {
+  if (cpw->input_plugins) {
     hs_input_plugin* p;
-    pthread_mutex_lock(&cp->input_plugins->list_lock);
-    for (int i = 0; i < cp->input_plugins->list_cap; ++i) {
-      p = cp->input_plugins->list[i];
+    pthread_mutex_lock(&cpw->input_plugins->list_lock);
+    for (int i = 0; i < cpw->input_plugins->list_cap; ++i) {
+      p = cpw->input_plugins->list[i];
       if (p) {
-        pthread_mutex_lock(&p->cp_lock);
-        if (p->cp_string) {
-          fprintf(cp->fh, "_G['%s'] = '", p->sb->filename);
-          hs_output_lua_string(cp->fh, p->cp_string);
-          fwrite("'\n", 2, 1, cp->fh);
-        }
-        pthread_mutex_unlock(&p->cp_lock);
+        pthread_mutex_lock(&p->cp.lock);
+        hs_update_checkpoint(cpr, p->sb->filename, &p->cp);
+        pthread_mutex_unlock(&p->cp.lock);
       }
     }
-    pthread_mutex_unlock(&cp->input_plugins->list_lock);
+    pthread_mutex_unlock(&cpw->input_plugins->list_lock);
 
-    pthread_mutex_lock(&cp->input_plugins->output.lock);
-    fprintf(cp->fh, "last_output_id_input = %zu\n",
-            cp->input_plugins->output.id);
-    fflush(cp->input_plugins->output.fh);
-    pthread_mutex_unlock(&cp->input_plugins->output.lock);
+    pthread_mutex_lock(&cpw->input_plugins->output.lock);
+    hs_update_id_checkpoint(cpr, "last_output_id_input",
+                            cpw->input_plugins->output.id);
+    fflush(cpw->input_plugins->output.fh);
+    pthread_mutex_unlock(&cpw->input_plugins->output.lock);
   }
 
-  if (cp->analysis_plugins) {
-    long pos = 0;
+  if (cpw->analysis_plugins) {
+    long offset = 0;
     size_t id = 0;
-    hs_input* hsi = &cp->analysis_plugins->input;
-    pthread_mutex_lock(&cp->analysis_plugins->input.lock);
-    if (hsi->fh) {
-      pos = hsi->offset - (hsi->readpos - hsi->scanpos);
-      id = hsi->id;
-    }
-    pthread_mutex_unlock(&cp->analysis_plugins->input.lock);
-    fprintf(cp->fh, "analysis_input = '%zu:%ld'\n", id, pos);
+    pthread_mutex_lock(&cpw->analysis_plugins->cp_lock);
+    id = cpw->analysis_plugins->cp_id;
+    offset = cpw->analysis_plugins->cp_offset;
+    pthread_mutex_unlock(&cpw->analysis_plugins->cp_lock);
+    hs_update_input_checkpoint(cpr, hs_analysis_dir, hs_input_dir, id, offset);
 
-    pthread_mutex_lock(&cp->analysis_plugins->output.lock);
-    fprintf(cp->fh, "last_output_id_analysis = %zu\n",
-            cp->analysis_plugins->output.id);
-    fflush(cp->analysis_plugins->output.fh);
-    pthread_mutex_unlock(&cp->analysis_plugins->output.lock);
+    pthread_mutex_lock(&cpw->analysis_plugins->output.lock);
+    hs_update_id_checkpoint(cpr, "last_output_id_analysis",
+                            cpw->analysis_plugins->output.id);
+    fflush(cpw->analysis_plugins->output.fh);
+    pthread_mutex_unlock(&cpw->analysis_plugins->output.lock);
   }
 
-  if (cp->output_plugins) {
-    pthread_mutex_lock(&cp->output_plugins->list_lock);
-    for (int i = 0; i < cp->output_plugins->list_cap; ++i) {
-      if (cp->output_plugins->list[i]) {
-        pthread_mutex_lock(&cp->output_plugins->list[i]->cp_lock);
-        fprintf(cp->fh, "_G['%s'] = '%zu:%zu'\n",
-                cp->output_plugins->list[i]->sb->filename,
-                cp->output_plugins->list[i]->cp_id[0],
-                cp->output_plugins->list[i]->cp_offset[0]);
-        fprintf(cp->fh, "_G['analysis %s'] = '%zu:%zu'\n",
-                cp->output_plugins->list[i]->sb->filename,
-                cp->output_plugins->list[i]->cp_id[1],
-                cp->output_plugins->list[i]->cp_offset[1]);
-        pthread_mutex_unlock(&cp->output_plugins->list[i]->cp_lock);
+  if (cpw->output_plugins) {
+    pthread_mutex_lock(&cpw->output_plugins->list_lock);
+    for (int i = 0; i < cpw->output_plugins->list_cap; ++i) {
+      if (cpw->output_plugins->list[i]) {
+        pthread_mutex_lock(&cpw->output_plugins->list[i]->cp_lock);
+        hs_update_input_checkpoint(cpr,
+                                   cpw->output_plugins->list[i]->sb->filename,
+                                   hs_input_dir,
+                                   cpw->output_plugins->list[i]->cp_id[0],
+                                   cpw->output_plugins->list[i]->cp_offset[0]);
+        hs_update_input_checkpoint(cpr,
+                                   cpw->output_plugins->list[i]->sb->filename,
+                                   hs_analysis_dir,
+                                   cpw->output_plugins->list[i]->cp_id[1],
+                                   cpw->output_plugins->list[i]->cp_offset[1]);
+        pthread_mutex_unlock(&cpw->output_plugins->list[i]->cp_lock);
       }
     }
-    pthread_mutex_unlock(&cp->output_plugins->list_lock);
+    pthread_mutex_unlock(&cpw->output_plugins->list_lock);
   }
-  fflush(cp->fh);
+  hs_output_checkpoints(cpr, cpw->fh);
+  fflush(cpw->fh);
 }

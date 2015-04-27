@@ -16,6 +16,8 @@
 
 #define MAX_VARINT_BYTES 10
 
+static const char g_module[] = "message_reader";
+
 static unsigned const char*
 read_key(unsigned const char* p, int* tag, int* wiretype)
 {
@@ -272,13 +274,11 @@ bool hs_find_message(hs_heka_message* m, hs_input* hsi)
                             hsi->readpos - hsi->scanpos);
   if (p) {
     if (p != hsi->buf + hsi->scanpos) {
-      hs_log(HS_APP_NAME, 4, "discarded bytes: %zu offset %zu",
+      hs_log(g_module, 4, "discarded bytes: %zu offset %zu",
              p - hsi->buf + hsi->scanpos,
-             ftell(hsi->fh) - (hsi->readpos - (hsi->scanpos + 2)));
+             ftell(hsi->fh) - (hsi->readpos - hsi->scanpos));
     }
-    pthread_mutex_lock(&hsi->lock);
     hsi->scanpos = p - hsi->buf;
-    pthread_mutex_unlock(&hsi->lock);
 
     if (hsi->readpos - hsi->scanpos < 2) {
       return false; // header length is not buf
@@ -298,34 +298,26 @@ bool hs_find_message(hs_heka_message* m, hs_input* hsi)
       if (mend > hsi->readpos) return false; // message is not in buf
 
       if (hs_decode_heka_message(m, &hsi->buf[hend], hsi->msglen)) {
-        pthread_mutex_lock(&hsi->lock);
         hsi->scanpos = mend;
-        pthread_mutex_unlock(&hsi->lock);
         hsi->msglen = 0;
       } else {
-        hs_log(HS_APP_NAME, 4, "message decode failure file: %s offset %zu",
+        hs_log(g_module, 4, "decode failure file: %s offset %zu",
                hsi->file,
                ftell(hsi->fh) - (hsi->readpos - hend));
-        pthread_mutex_lock(&hsi->lock);
         ++hsi->scanpos;
-        pthread_mutex_unlock(&hsi->lock);
       }
     } else {
-      hs_log(HS_APP_NAME, 4,
-             "message header decode failure file: %s offset %lld",
+      hs_log(g_module, 4,
+             "header decode failure file: %s offset %lld",
              hsi->file,
-             ftell(hsi->fh) - (hsi->readpos - (hsi->scanpos + 2)));
-      pthread_mutex_lock(&hsi->lock);
+             ftell(hsi->fh) - (hsi->readpos - hsi->scanpos));
       ++hsi->scanpos;
-      pthread_mutex_unlock(&hsi->lock);
     }
   } else {
-    hs_log(HS_APP_NAME, 4, "discarded bytes: %zu offset %zu",
+    hs_log(g_module, 4, "discarded bytes: %zu offset %zu",
            hsi->readpos - hsi->scanpos,
-           ftell(hsi->fh) - (hsi->readpos - (hsi->scanpos + 2)));
-    pthread_mutex_lock(&hsi->lock);
+           ftell(hsi->fh) - (hsi->readpos - hsi->scanpos));
     hsi->scanpos = hsi->readpos = 0;
-    pthread_mutex_unlock(&hsi->lock);
   }
   return true;
 }
@@ -434,7 +426,7 @@ bool hs_decode_heka_message(hs_heka_message* m,
         hs_heka_field* tmp = realloc(m->fields,
                                      m->fields_size * sizeof(hs_heka_field));
         if (!tmp) {
-          hs_log(HS_APP_NAME, 0, "message fields reallocation failed");
+          hs_log(g_module, 0, "fields reallocation failed");
           exit(EXIT_FAILURE);
         }
         m->fields = tmp;
@@ -451,18 +443,18 @@ bool hs_decode_heka_message(hs_heka_message* m,
   while (cp && cp < ep);
 
   if (!cp) {
-    hs_log(HS_APP_NAME, 4, "error in tag: %d wiretype: %d offset: %d", tag,
+    hs_log(g_module, 4, "error in tag: %d wiretype: %d offset: %d", tag,
            wiretype, lp - buf);
     return false;
   }
 
   if (!m->uuid) {
-    hs_log(HS_APP_NAME, 4, "missing uuid");
+    hs_log(g_module, 4, "missing uuid");
     return false;
   }
 
   if (!m->timestamp) {
-    hs_log(HS_APP_NAME, 4, "missing timestamp");
+    hs_log(g_module, 4, "missing timestamp");
     return false;
   }
 
@@ -475,7 +467,7 @@ void hs_init_heka_message(hs_heka_message* m, size_t size)
   m->fields_size = (int)size;
   m->fields = malloc(m->fields_size * sizeof(hs_heka_field));
   if (!m->fields) {
-    hs_log(HS_APP_NAME, 0, "message fields allocation failed");
+    hs_log(g_module, 0, "fields allocation failed");
     exit(EXIT_FAILURE);
   }
   hs_clear_heka_message(m);

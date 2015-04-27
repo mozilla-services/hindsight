@@ -12,6 +12,7 @@
 #include <stdio.h>
 
 #include "hs_analysis_plugins.h"
+#include "hs_checkpoint_reader.h"
 #include "hs_input_plugins.h"
 #include "hs_output_plugins.h"
 #include "hs_output.h"
@@ -23,14 +24,14 @@ typedef struct hs_checkpoint_writer {
   hs_output_plugins* output_plugins;
 } hs_checkpoint_writer;
 
-void hs_init_checkpoint_writer(hs_checkpoint_writer* cp,
+void hs_init_checkpoint_writer(hs_checkpoint_writer* cpw,
                         hs_input_plugins* ip,
                         hs_analysis_plugins* ap,
                         hs_output_plugins* op,
                         const char* path);
-void hs_free_checkpoint_writer(hs_checkpoint_writer* cp);
+void hs_free_checkpoint_writer(hs_checkpoint_writer* cpw);
 
-void hs_write_checkpoints(hs_checkpoint_writer* cp);
+void hs_write_checkpoints(hs_checkpoint_writer* cpw, hs_checkpoint_reader* cpr);
 
 
 #endif

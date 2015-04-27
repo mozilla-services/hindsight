@@ -28,10 +28,8 @@
 #include "hs_sandbox.h"
 #include "hs_util.h"
 
-static const char g_module[] = "hs_output_plugins";
+static const char g_module[] = "output_plugins";
 static const char g_output[] = "output";
-static const char g_analysis[] = "analysis";
-static const char g_input[] = "input";
 
 static const char* g_sb_template = "{"
   "memory_limit = %u,"
@@ -102,20 +100,58 @@ static void free_output_plugin(hs_output_plugin* p)
 }
 
 
-static void terminate_sandbox(hs_output_plugin* p)
+static bool output_message(hs_output_plugin* p)
 {
-  hs_log(g_module, 3, "file: %s terminated: %s", p->sb->filename,
-         lsb_get_error(p->sb->lsb));
-  hs_free_sandbox(p->sb);
-  free(p->sb);
-  p->sb = NULL;
+  if (p->msg) {
+    int ret;
+    p->matched = false;
+    ret = 0;
+    if (hs_eval_message_matcher(p->sb->mm, p->msg)) {
+      p->matched = true;
+      ret = hs_process_message(p->sb->lsb);
+      if (ret <= 0) {
+        switch (ret) {
+        case 0:
+          // todo increment process message count
+          break;
+        case -1:
+          // todo increment process message failure count
+          break;
+          // default ignore
+        }
+        // advance the checkpoint
+        pthread_mutex_lock(&p->cp_lock);
+        p->cp_id[0] = p->cur_id[0];
+        p->cp_offset[0] = p->cur_offset[0];
+        p->cp_id[1] = p->cur_id[1];
+        p->cp_offset[1] = p->cur_offset[1];
+        pthread_mutex_unlock(&p->cp_lock);
+      }
+    } else {
+      hs_log(g_module, 3, "terminated: %s msg: %s", p->sb->filename,
+             lsb_get_error(p->sb->lsb));
+      return false;
+    }
+
+    if (p->sb->ticker_interval && p->current_t >= p->sb->next_timer_event) {
+      ret = hs_timer_event(p->sb->lsb, p->current_t);
+      p->sb->next_timer_event += p->sb->ticker_interval;
+    }
+  } else {
+    if (p->sb) {
+      if (hs_timer_event(p->sb->lsb, p->current_t)) {
+        hs_log(g_module, 3, "terminated: %s msg: %s", p->sb->filename,
+               lsb_get_error(p->sb->lsb));
+      }
+    }
+    return false;
+  }
+  return true;
 }
 
 
 static void* input_thread(void* arg)
 {
-  hs_log(g_module, 6, "starting input thread");
-
   hs_heka_message im, *pim = NULL;
   hs_init_heka_message(&im, 8);
 
@@ -123,8 +159,9 @@ static void* input_thread(void* arg)
   hs_init_heka_message(&am, 8);
 
   hs_output_plugin* p = (hs_output_plugin*)arg;
+  hs_log(g_module, 6, "starting: %s", p->sb->filename);
 
-  size_t bytes_read[2] = {0};
+  size_t bytes_read[2] = { 0 };
   while (!p->plugins->stop) {
     if (p->input.fh && !pim) {
       if (hs_find_message(&im, &p->input)) {
@@ -134,11 +171,10 @@ static void* input_thread(void* arg)
       }
 
       if (!bytes_read[0]) {
-        hs_open_file(&p->input, g_input, p->input.id + 1);
+        hs_open_file(&p->input, hs_input_dir, p->input.id + 1);
       }
     } else if (!p->input.fh) { // still waiting on the first file
-      hs_log(g_module, 7, "output waiting for the input file"); // todo remove
-      hs_open_file(&p->input, g_input, p->input.id);
+      hs_open_file(&p->input, hs_input_dir, p->input.id);
     }
 
     if (p->analysis.fh && !pam) {
@@ -149,11 +185,10 @@ static void* input_thread(void* arg)
       }
 
       if (!bytes_read[1]) {
-        hs_open_file(&p->analysis, g_analysis, p->analysis.id + 1);
+        hs_open_file(&p->analysis, hs_analysis_dir, p->analysis.id + 1);
       }
     } else if (!p->analysis.fh) { // still waiting on the first file
-      hs_log(g_module, 7, "output waiting for the analysis file"); // todo remove
-      hs_open_file(&p->analysis, g_analysis, p->analysis.id);
+      hs_open_file(&p->analysis, hs_analysis_dir, p->analysis.id);
     }
 
     // if we have one send the oldest first
@@ -161,23 +196,30 @@ static void* input_thread(void* arg)
       if (pam) {
         if (pim->timestamp <= pam->timestamp) {
           p->msg = pim;
-          pim = NULL;
         } else {
           p->msg = pam;
-          pam = NULL;
         }
       } else {
         p->msg = pim;
-        pim = NULL;
       }
     } else if (pam) {
       p->msg = pam;
-      pam = NULL;
     }
 
     if (p->msg) {
+      if (p->msg == pim) {
+        pim = NULL;
+        p->cur_id[0] = p->input.id;
+        p->cur_offset[0] = p->input.offset -
+          (p->input.readpos - p->input.scanpos);
+      } else {
+        pam = NULL;
+        p->cur_id[1] = p->analysis.id;
+        p->cur_offset[1] = p->analysis.offset -
+          (p->analysis.readpos - p->analysis.scanpos);
+      }
       p->current_t = time(NULL);
-      if (!hs_output_message(p)) break; // fatal error
+      if (!output_message(p)) break; // fatal error
       p->msg = NULL;
     } else if (!bytes_read[0] && !bytes_read[1]) {
       sleep(1);
@@ -187,27 +229,35 @@ static void* input_thread(void* arg)
   // signal shutdown
   p->msg = NULL;
   p->current_t = time(NULL);
-  hs_output_message(p);
-
-  // sandbox terminated, don't wait for the join to clean up
-  // the most recent checkpoint can be lost under these conditions
-  // TODO write the checkpoint back to the Lua table and hold it in memory
-  if (!p->sb) {
-    if (pthread_detach(p->thread)) {
-      hs_log(g_module, 3, "thread could not be detached");
-    }
-    pthread_mutex_lock(&p->plugins->list_lock);
-    p->plugins->list[p->list_index] = NULL;
-    --p->plugins->list_len;
-    pthread_mutex_unlock(&p->plugins->list_lock);
-    free_output_plugin(p);
-    free(p);
-  }
-
+  output_message(p);
   hs_free_heka_message(&am);
   hs_free_heka_message(&im);
 
-  hs_log(g_module, 6, "exiting input_thread");
+  hs_log(g_module, 6, "detaching: %s", p->sb->filename);
+
+  // hold the current checkpoints in memory incase we restart it
+  hs_update_input_checkpoint(&p->plugins->cfg->cp_reader,
+                             p->sb->filename,
+                             hs_input_dir,
+                             p->cp_id[0],
+                             p->cp_offset[0]);
+
+  hs_update_input_checkpoint(&p->plugins->cfg->cp_reader,
+                             p->sb->filename,
+                             hs_analysis_dir,
+                             p->cp_id[1],
+                             p->cp_offset[1]);
+
+  pthread_mutex_lock(&p->plugins->list_lock);
+  hs_output_plugins* plugins = p->plugins;
+  plugins->list[p->list_index] = NULL;
+  if (pthread_detach(p->thread)) {
+    hs_log(g_module, 3, "thread could not be detached");
+  }
+  free_output_plugin(p);
+  free(p);
+  --plugins->list_cnt;
+  pthread_mutex_unlock(&plugins->list_lock);
   pthread_exit(NULL);
 }
 
@@ -216,7 +266,7 @@ static void add_to_output_plugins(hs_output_plugins* plugins,
                                   hs_output_plugin* p)
 {
   pthread_mutex_lock(&plugins->list_lock);
-  if (plugins->list_len < plugins->list_cap) {
+  if (plugins->list_cnt < plugins->list_cap) {
     for (int i = 0; i < plugins->list_cap; ++i) {
       if (!plugins->list[i]) {
         plugins->list[i] = p;
@@ -234,12 +284,13 @@ static void add_to_output_plugins(hs_output_plugins* plugins,
     if (tmp) {
       plugins->list = tmp;
       plugins->list[p->list_index] = p;
-      ++plugins->list_len;
+      ++plugins->list_cnt;
     } else {
       hs_log(g_module, 0, "plugins realloc failed");
       exit(EXIT_FAILURE);
     }
   }
+  pthread_mutex_unlock(&plugins->list_lock);
   assert(p->list_index >= 0);
 
   hs_config* cfg = p->plugins->cfg;
@@ -253,29 +304,20 @@ static void add_to_output_plugins(hs_output_plugins* plugins,
   // sync the output and read checkpoints
   // the read and output checkpoints can differ to allow for batching
   hs_lookup_input_checkpoint(&cfg->cp_reader, p->sb->filename, cfg->output_path,
-                             g_input, &p->input.id, &p->input.offset);
-  p->cp_id[0] = p->input.id;
-  p->cp_offset[0] = p->input.offset;
+                             hs_input_dir, &p->input.id, &p->input.offset);
+  p->cur_id[0] = p->cp_id[0] = p->input.id;
+  p->cur_offset[0] = p->cp_offset[0] = p->input.offset;
 
-  size_t len = strlen(p->sb->filename) + sizeof(g_analysis) + 2;
-  char* tmp = malloc(len);
-  if (!tmp) {
-    fprintf(stderr, "input_thread tmp malloc failed\n");
-    exit(EXIT_FAILURE);
-  }
-  snprintf(tmp, len, "%s %s", g_analysis, p->sb->filename);
-  hs_lookup_input_checkpoint(&cfg->cp_reader, tmp, cfg->output_path,
-                             g_analysis, &p->analysis.id, &p->analysis.offset);
-  free(tmp);
-  p->cp_id[1] = p->analysis.id;
-  p->cp_offset[1] = p->analysis.offset;
+  hs_lookup_input_checkpoint(&cfg->cp_reader, p->sb->filename, cfg->output_path,
+                             hs_analysis_dir, &p->analysis.id, &p->analysis.offset);
+  p->cur_id[1] = p->cp_id[1] = p->analysis.id;
+  p->cur_offset[1] = p->cp_offset[1] = p->analysis.offset;
 
   int ret = pthread_create(&p->thread, NULL, input_thread, (void*)p);
   if (ret) {
     perror("pthread_create failed");
     exit(EXIT_FAILURE);
   }
-  pthread_mutex_unlock(&plugins->list_lock);
 }
 
 
@@ -306,7 +348,7 @@ void hs_init_output_plugins(hs_output_plugins* plugins,
   plugins->cfg = cfg;
   plugins->mmb = mmb;
   plugins->list = NULL;
-  plugins->list_len = 0;
+  plugins->list_cnt = 0;
   plugins->list_cap = 0;
   plugins->stop = false;
   if (pthread_mutex_init(&plugins->list_lock, NULL)) {
@@ -318,14 +360,13 @@ void hs_init_output_plugins(hs_output_plugins* plugins,
 
 void hs_wait_output_plugins(hs_output_plugins* plugins)
 {
-  void* thread_result;
-  for (int i = 0; i < plugins->list_cap; ++i) {
-    if (plugins->list[i]) {
-      int ret = pthread_join(plugins->list[i]->thread, &thread_result);
-      if (ret) {
-        perror("pthread_join failed");
-      }
+  while (true) {
+    if (plugins->list_cnt == 0) {
+      pthread_mutex_lock(&plugins->list_lock);
+      pthread_mutex_unlock(&plugins->list_lock);
+      return;
     }
+    usleep(100000);
   }
 }
 
@@ -344,7 +385,7 @@ void hs_free_output_plugins(hs_output_plugins* plugins)
   pthread_mutex_destroy(&plugins->list_lock);
   plugins->list = NULL;
   plugins->cfg = NULL;
-  plugins->list_len = 0;
+  plugins->list_cnt = 0;
   plugins->list_cap = 0;
 }
 
@@ -355,7 +396,7 @@ void hs_load_output_plugins(hs_output_plugins* plugins,
 {
   char dir[HS_MAX_PATH];
   if (!hs_get_fqfn(path, g_output, dir, sizeof(dir))) {
-    hs_log(HS_APP_NAME, 0, "output load path too long");
+    hs_log(g_module, 0, "load path too long");
     exit(EXIT_FAILURE);
   }
 
@@ -382,7 +423,7 @@ void hs_load_output_plugins(hs_output_plugins* plugins,
       if (p) {
         p->plugins = plugins;
 
-        size_t len = strlen(entry->d_name) + sizeof(g_output) + 2;
+        size_t len = strlen(entry->d_name) + sizeof(g_output) + 1;
         p->sb->filename = malloc(len);
         snprintf(p->sb->filename, len, "%s/%s", g_output, entry->d_name);
 
@@ -413,54 +454,4 @@ void hs_load_output_plugins(hs_output_plugins* plugins,
     hs_free_sandbox_config(&sbc);
   }
   closedir(dp);
-}
-
-
-bool hs_output_message(hs_output_plugin* p)
-{
-  if (p->msg) {
-    int ret;
-    p->matched = false;
-    ret = 0;
-    if (hs_eval_message_matcher(p->sb->mm, p->msg)) {
-      p->matched = true;
-      ret = hs_process_message(p->sb->lsb);
-      if (ret <= 0) {
-        switch (ret) {
-        case 0:
-          // todo increment process message count
-          break;
-        case -1:
-          // todo increment process message failure count
-          break;
-          // default ignore
-        }
-        // advance the checkpoint
-        pthread_mutex_lock(&p->cp_lock);
-        p->cp_id[0] = p->input.id;
-        p->cp_offset[0] = p->input.offset - (p->input.readpos - p->input.scanpos);
-        p->cp_id[1] = p->analysis.id;
-        p->cp_offset[1] = p->analysis.offset -
-          (p->analysis.readpos - p->analysis.scanpos);
-        pthread_mutex_unlock(&p->cp_lock);
-      }
-    } else {
-      terminate_sandbox(p);
-      return false;
-    }
-
-    if (p->sb->ticker_interval && p->current_t >= p->sb->next_timer_event) {
-      hs_log(g_module, 7, "running timer_event: %s", p->sb->filename); // todo remove
-      ret = hs_timer_event(p->sb->lsb, p->current_t);
-      p->sb->next_timer_event += p->sb->ticker_interval;
-    }
-  } else {
-    if (p->sb) {
-      if (hs_timer_event(p->sb->lsb, p->current_t)) {
-        terminate_sandbox(p);
-      }
-    }
-    return false;
-  }
-  return true;
 }
