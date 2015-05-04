@@ -22,7 +22,8 @@ typedef struct hs_message_match_builder {
 
 
 void hs_init_message_match_builder(hs_message_match_builder* mmb,
-                                   const char* module_path);
+                                   const char* lua_path,
+                                   const char* lua_cpath);
 void hs_free_message_match_builder(hs_message_match_builder* mmb);
 
 hs_message_matcher*

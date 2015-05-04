@@ -76,7 +76,8 @@ int main(int argc, char* argv[])
   signal(SIGINT, stop_signal);
 
   hs_message_match_builder mmb;
-  hs_init_message_match_builder(&mmb, cfg.ipd.module_path);
+  hs_init_message_match_builder(&mmb, cfg.analysis_lua_path,
+                                cfg.analysis_lua_cpath);
 
   hs_input_plugins ips;
   hs_init_input_plugins(&ips, &cfg, &g_shutdown);

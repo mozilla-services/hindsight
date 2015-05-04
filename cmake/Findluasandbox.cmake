@@ -30,8 +30,8 @@ MARK_AS_ADVANCED(LUASB_LIBRARY)
 
 # Look for the sandbox modules.
 FIND_PATH(LUASANDBOX_MODULES NAMES
-    lpeg.so
-    PATHS "/usr/local/lib/luasandbox/modules" "/usr/lib/luasandbox/modules"
+    modules
+    PATHS "/usr/local/lib/luasandbox" "/usr/lib/luasandbox"
 )
 MARK_AS_ADVANCED(LUASANDBOX_MODULES)
 

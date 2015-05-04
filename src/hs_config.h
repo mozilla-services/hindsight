@@ -27,7 +27,6 @@ typedef enum {
 typedef struct hs_sandbox_config
 {
   hs_sb_type type;
-  char* module_path;
   char* filename;
   char* message_matcher; // analysis/output sandbox only
 
@@ -44,6 +43,10 @@ typedef struct hs_config
   char* run_path;
   char* load_path;
   char* output_path;
+  char* io_lua_path;
+  char* io_lua_cpath;
+  char* analysis_lua_path;
+  char* analysis_lua_cpath;
   hs_checkpoint_reader cp_reader;
   int output_size;
   int analysis_threads;

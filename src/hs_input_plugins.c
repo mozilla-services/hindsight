@@ -217,15 +217,27 @@ static void free_ip_checkpoint(hs_ip_checkpoint* cp)
 
 
 static hs_input_plugin* create_input_plugin(const char* file,
-                                            const char* cfg_template,
-                                            const hs_sandbox_config* cfg,
+                                            const hs_config* cfg,
+                                            const hs_sandbox_config* sbc,
                                             lua_State* env)
 {
   hs_input_plugin* p = calloc(1, sizeof(hs_input_plugin));
   if (!p) return NULL;
   p->list_index = -1;
 
-  p->sb = hs_create_sandbox(p, file, cfg_template, cfg, env);
+  char lsb_config[1024 * 2];
+  int ret = snprintf(lsb_config, sizeof(lsb_config), g_sb_template,
+                     sbc->memory_limit,
+                     sbc->instruction_limit,
+                     sbc->output_limit,
+                     cfg->io_lua_path,
+                     cfg->io_lua_cpath);
+
+  if (ret < 0 || ret > (int)sizeof(lsb_config) - 1) {
+    return NULL;
+  }
+
+  p->sb = hs_create_sandbox(p, file, lsb_config, sbc, env);
   if (!p->sb) {
     free(p);
     hs_log(g_module, 3, "lsb_create_custom failed: %s", file);
@@ -436,7 +448,7 @@ void hs_load_input_plugins(hs_input_plugins* plugins, const hs_config* cfg,
         hs_free_sandbox_config(&sbc);
         continue;
       }
-      hs_input_plugin* p = create_input_plugin(fqfn, g_sb_template, &sbc, L);
+      hs_input_plugin* p = create_input_plugin(fqfn, cfg, &sbc, L);
       if (p) {
         p->plugins = plugins;
 

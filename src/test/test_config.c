@@ -31,6 +31,14 @@ static char* test_load_default_config()
             cfg.run_path);
   mu_assert(strcmp(cfg.load_path, "load") == 0, "received %s",
             cfg.load_path);
+  mu_assert(strcmp(cfg.io_lua_path, "io/?.lua") == 0, "received %s",
+            cfg.io_lua_path);
+  mu_assert(strcmp(cfg.io_lua_cpath, "io/?.so") == 0, "received %s",
+            cfg.io_lua_cpath);
+  mu_assert(strcmp(cfg.analysis_lua_path, "analysis/?.lua") == 0, "received %s",
+            cfg.analysis_lua_path);
+  mu_assert(strcmp(cfg.analysis_lua_cpath, "analysis/?.so") == 0, "received %s",
+            cfg.analysis_lua_cpath);
   mu_assert(cfg.ipd.output_limit == 1024 * 64, "received %d",
             cfg.ipd.output_limit);
   mu_assert(cfg.ipd.memory_limit == 1024 * 1024 * 8, "received %d",
@@ -39,8 +47,6 @@ static char* test_load_default_config()
             cfg.ipd.instruction_limit);
   mu_assert(cfg.ipd.preserve_data == false, "received %d",
             cfg.ipd.preserve_data);
-  mu_assert(strcmp(cfg.ipd.module_path, "module") == 0, "received %s",
-            cfg.ipd.module_path);
   hs_free_config(&cfg);
   return NULL;
 }
@@ -58,6 +64,14 @@ static char* test_load_config()
             cfg.run_path);
   mu_assert(strcmp(cfg.load_path, "load") == 0, "received %s",
             cfg.load_path);
+  mu_assert(strcmp(cfg.io_lua_path, "io/?.lua") == 0, "received %s",
+            cfg.io_lua_path);
+  mu_assert(strcmp(cfg.io_lua_cpath, "io/?.so") == 0, "received %s",
+            cfg.io_lua_cpath);
+  mu_assert(strcmp(cfg.analysis_lua_path, "analysis/?.lua") == 0, "received %s",
+            cfg.analysis_lua_path);
+  mu_assert(strcmp(cfg.analysis_lua_cpath, "analysis/?.so") == 0, "received %s",
+            cfg.analysis_lua_cpath);
   mu_assert(cfg.ipd.output_limit == 1023, "received %d",
             cfg.ipd.output_limit);
   mu_assert(cfg.ipd.memory_limit == 32767, "received %d",
@@ -66,8 +80,6 @@ static char* test_load_config()
             cfg.ipd.instruction_limit);
   mu_assert(cfg.ipd.preserve_data == true, "received %d",
             cfg.ipd.preserve_data);
-  mu_assert(strcmp(cfg.ipd.module_path, "module") == 0, "received %s",
-            cfg.ipd.module_path);
   hs_free_config(&cfg);
   return NULL;
 }

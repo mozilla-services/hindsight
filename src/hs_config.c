@@ -26,6 +26,10 @@ static const char* cfg_output_size = "output_size";
 static const char* cfg_load_path = "sandbox_load_path";
 static const char* cfg_run_path = "sandbox_run_path";
 static const char* cfg_threads = "analysis_threads";
+static const char* cfg_analysis_lua_path = "analysis_lua_path";
+static const char* cfg_analysis_lua_cpath = "analysis_lua_cpath";
+static const char* cfg_io_lua_path = "io_lua_path";
+static const char* cfg_io_lua_cpath = "io_lua_cpath";
 
 static const char* cfg_sb_ipd = "input_defaults";
 static const char* cfg_sb_apd = "analysis_defaults";
@@ -34,7 +38,6 @@ static const char* cfg_sb_output= "output_limit";
 static const char* cfg_sb_memory = "memory_limit";
 static const char* cfg_sb_instruction = "instruction_limit";
 static const char* cfg_sb_preserve = "preserve_data";
-static const char* cfg_sb_module = "module_path";
 static const char* cfg_sb_filename = "filename";
 static const char* cfg_sb_ticker_interval = "ticker_interval";
 static const char* cfg_sb_thread = "thread";
@@ -46,7 +49,6 @@ static void init_sandbox_config(hs_sandbox_config* cfg)
   cfg->memory_limit = 1024 * 1024 * 8;
   cfg->instruction_limit = 1000000;
   cfg->preserve_data = false;
-  cfg->module_path = NULL;
   cfg->filename = NULL;
   cfg->message_matcher = NULL;
   cfg->ticker_interval = 0;
@@ -59,6 +61,10 @@ static void init_config(hs_config* cfg)
   cfg->run_path = NULL;
   cfg->load_path = NULL;
   cfg->output_path = NULL;
+  cfg->io_lua_path = NULL;
+  cfg->io_lua_cpath = NULL;
+  cfg->analysis_lua_path = NULL;
+  cfg->analysis_lua_cpath = NULL;
   cfg->output_size = 1024 * 1024 * 64;
   cfg->analysis_threads = 0;
   init_sandbox_config(&cfg->ipd);
@@ -181,7 +187,6 @@ static int load_sandbox_defaults(lua_State* L,
   if (get_numeric_item(L, 1, cfg_sb_ticker_interval, &cfg->ticker_interval)) {
     return 1;
   }
-  if (get_string_item(L, 1, cfg_sb_module, &cfg->module_path, NULL)) return 1;
   if (get_bool_item(L, 1, cfg_sb_preserve, &cfg->preserve_data)) return 1;
 
   if (check_for_unknown_options(L, 1, key)) return 1;
@@ -192,13 +197,8 @@ static int load_sandbox_defaults(lua_State* L,
 }
 
 
-
-
 void hs_free_sandbox_config(hs_sandbox_config* cfg)
 {
-  free(cfg->module_path);
-  cfg->module_path = NULL;
-
   free(cfg->filename);
   cfg->filename = NULL;
 
@@ -218,9 +218,22 @@ void hs_free_config(hs_config* cfg)
   free(cfg->output_path);
   cfg->output_path = NULL;
 
+  free(cfg->io_lua_path);
+  cfg->io_lua_path = NULL;
+
+  free(cfg->io_lua_cpath);
+  cfg->io_lua_cpath = NULL;
+
+  free(cfg->analysis_lua_path);
+  cfg->analysis_lua_path = NULL;
+
+  free(cfg->analysis_lua_cpath);
+  cfg->analysis_lua_cpath = NULL;
+
   hs_free_sandbox_config(&cfg->ipd);
   hs_free_sandbox_config(&cfg->apd);
   hs_free_sandbox_config(&cfg->opd);
+
   hs_free_checkpoint_reader(&cfg->cp_reader);
 }
 
@@ -239,13 +252,11 @@ lua_State* hs_load_sandbox_config(const char* fn,
   }
 
   init_sandbox_config(cfg);
-  char* module_path = NULL;
   if (dflt) {
     cfg->output_limit = dflt->output_limit;
     cfg->memory_limit = dflt->memory_limit;
     cfg->instruction_limit = dflt->instruction_limit;
     cfg->preserve_data = dflt->preserve_data;
-    module_path = dflt->module_path;
   }
 
   int ret = luaL_dofile(L, fn);
@@ -269,10 +280,6 @@ lua_State* hs_load_sandbox_config(const char* fn,
 
   ret = get_string_item(L, LUA_GLOBALSINDEX, cfg_sb_filename, &cfg->filename,
                         NULL);
-  if (ret) goto cleanup;
-
-  ret = get_string_item(L, LUA_GLOBALSINDEX, cfg_sb_module, &cfg->module_path,
-                        module_path);
   if (ret) goto cleanup;
 
   ret = get_bool_item(L, LUA_GLOBALSINDEX, cfg_sb_preserve,
@@ -331,6 +338,22 @@ int hs_load_config(const char* fn, hs_config* cfg)
 
   ret = get_string_item(L, LUA_GLOBALSINDEX, cfg_run_path, &cfg->run_path,
                         NULL);
+  if (ret) goto cleanup;
+
+  ret = get_string_item(L, LUA_GLOBALSINDEX, cfg_io_lua_path, &cfg->io_lua_path,
+                        NULL);
+  if (ret) goto cleanup;
+
+  ret = get_string_item(L, LUA_GLOBALSINDEX, cfg_io_lua_cpath,
+                        &cfg->io_lua_cpath, NULL);
+  if (ret) goto cleanup;
+
+  ret = get_string_item(L, LUA_GLOBALSINDEX, cfg_analysis_lua_path,
+                        &cfg->analysis_lua_path, NULL);
+  if (ret) goto cleanup;
+
+  ret = get_string_item(L, LUA_GLOBALSINDEX, cfg_analysis_lua_cpath,
+                        &cfg->analysis_lua_cpath, NULL);
   if (ret) goto cleanup;
 
   ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_threads,

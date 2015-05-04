@@ -14,11 +14,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define TEST_LUA_PATH "${LUASANDBOX_MODULES}/modules/?.lua"
+
 #ifdef _WIN32
 #define snprintf _snprintf
+#define TEST_LUA_CPATH "${LUASANDBOX_MODULES}/modules/?.dll"
+#else
+#define TEST_LUA_CPATH "${LUASANDBOX_MODULES}/modules/?.so"
 #endif
-
-#define LUASANDBOX_MODULES "${LUASANDBOX_MODULES}"
 
 #define mu_assert(cond, ...)                                                   \
 do {                                                                           \

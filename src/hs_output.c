@@ -85,4 +85,5 @@ void hs_open_output_file(hs_output* output)
   } else {
     fseek(output->fh, 0, SEEK_END);
   }
+  output->offset = ftell(output->fh);
 }

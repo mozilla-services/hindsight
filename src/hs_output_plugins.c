@@ -62,13 +62,25 @@ static int read_message(lua_State* lua)
 
 
 static hs_output_plugin* create_output_plugin(const char* file,
-                                              const char* cfg_template,
-                                              const hs_sandbox_config* cfg,
+                                              const hs_config* cfg,
+                                              const hs_sandbox_config* sbc,
                                               lua_State* env)
 {
   hs_output_plugin* p = calloc(1, sizeof(hs_output_plugin));
   if (!p) return NULL;
   p->list_index = -1;
+
+  char lsb_config[1024 * 2];
+  int ret = snprintf(lsb_config, sizeof(lsb_config), g_sb_template,
+                     sbc->memory_limit,
+                     sbc->instruction_limit,
+                     sbc->output_limit,
+                     cfg->io_lua_path,
+                     cfg->io_lua_cpath);
+
+  if (ret < 0 || ret > (int)sizeof(lsb_config) - 1) {
+    return NULL;
+  }
 
   if (pthread_mutex_init(&p->cp_lock, NULL)) {
     perror("cp_lock pthread_mutex_init failed");
@@ -78,7 +90,7 @@ static hs_output_plugin* create_output_plugin(const char* file,
   hs_init_input(&p->input);
   hs_init_input(&p->analysis);
 
-  p->sb = hs_create_sandbox(p, file, cfg_template, cfg, env);
+  p->sb = hs_create_sandbox(p, file, lsb_config, sbc, env);
   if (!p->sb) {
     free(p);
     hs_log(g_module, 3, "lsb_create_custom failed: %s", file);
@@ -419,7 +431,7 @@ void hs_load_output_plugins(hs_output_plugins* plugins,
         hs_free_sandbox_config(&sbc);
         continue;
       }
-      hs_output_plugin* p = create_output_plugin(fqfn, g_sb_template, &sbc, L);
+      hs_output_plugin* p = create_output_plugin(fqfn, cfg, &sbc, L);
       if (p) {
         p->plugins = plugins;
 

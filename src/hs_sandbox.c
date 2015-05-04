@@ -80,8 +80,6 @@ static void populate_environment(lua_State* sb,
   lua_setfield(sb, -2, "instruction_limit");
   lua_pushboolean(sb, sbc->preserve_data);
   lua_setfield(sb, -2, "preserve_data");
-  lua_pushstring(sb, sbc->module_path);
-  lua_setfield(sb, -2, "module_path");
   lua_pushstring(sb, sbc->filename);
   lua_setfield(sb, -2, "filename");
   lua_pushinteger(sb, sbc->ticker_interval);
@@ -93,77 +91,26 @@ static void populate_environment(lua_State* sb,
 }
 
 
-static int expand_path(const char* path, int n, const char* fmt, char* opath)
-{
-  // not an exhaustive check, just making sure the Lua markers are accounted for
-  for (int i = 0; (path[i]); ++i) {
-    if (path[i] == '\'' || path[i] == ';' || path[i] == '?'
-        || !isprint(path[i])) {
-      return 1;
-    }
-  }
-  int result = snprintf(opath, n, fmt, path);
-  if (result < 0 || result > n - 1) {
-    return 1;
-  }
-  return 0;
-}
-
-
 hs_sandbox* hs_create_sandbox(void* parent,
                               const char* file,
-                              const char* cfg_template,
-                              const hs_sandbox_config* cfg,
+                              const char* lsb_config,
+                              const hs_sandbox_config* sbc,
                               lua_State* env)
 {
-
-  char config[1024 * 2];
-  char lpath[HS_MAX_PATH] = { 0 };
-  char cpath[HS_MAX_PATH] = { 0 };
-
-  if (cfg->module_path) {
-#if defined(_WIN32)
-    if (expand_path(cfg->module_path, sizeof(lpath), "%s\\?.lua", lpath)) {
-      return NULL;
-    }
-    if (expand_path(cfg->module_path, sizeof(cpath), "%s\\?.dll", cpath)) {
-      return NULL;
-    }
-#else
-    if (expand_path(cfg->module_path, sizeof(lpath), "%s/?.lua", lpath)) {
-      return NULL;
-    }
-    if (expand_path(cfg->module_path, sizeof(cpath), "%s/?.so", cpath)) {
-      return NULL;
-    }
-#endif
-  }
-
-  int ret = snprintf(config, sizeof(config), cfg_template,
-                     cfg->memory_limit,
-                     cfg->instruction_limit,
-                     cfg->output_limit,
-                     lpath,
-                     cpath);
-
-  if (ret < 0 || ret > (int)sizeof(config) - 1) {
-    return NULL;
-  }
-
   hs_sandbox* p = calloc(1, sizeof(hs_sandbox));
   if (!p) return NULL;
 
-  p->ticker_interval = cfg->ticker_interval;
+  p->ticker_interval = sbc->ticker_interval;
   // distribute when the timer_events will fire
   p->next_timer_event = time(NULL) + rand() % 60;
 
-  p->lsb = lsb_create_custom(parent, file, config);
+  p->lsb = lsb_create_custom(parent, file, lsb_config);
   if (!p->lsb) {
     free(p);
     hs_log(file, 3, "lsb_create_custom failed");
     return NULL;
   }
-  populate_environment(lsb_get_lua(p->lsb), env, cfg);
+  populate_environment(lsb_get_lua(p->lsb), env, sbc);
   p->mm = NULL;
   return p;
 }

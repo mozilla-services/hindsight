@@ -538,6 +538,7 @@ void hs_load_analysis_plugins(hs_analysis_plugins* plugins,
                               const hs_config* cfg,
                               const char* path)
 {
+  char lsb_config[1024 * 2];
   char dir[HS_MAX_PATH];
   if (!hs_get_fqfn(path, hs_analysis_dir, dir, sizeof(dir))) {
     hs_log(g_module, 0, "load path too long");
@@ -557,13 +558,21 @@ void hs_load_analysis_plugins(hs_analysis_plugins* plugins,
     lua_State* L = hs_load_sandbox_config(fqfn, &sbc, &cfg->apd,
                                           HS_SB_TYPE_ANALYSIS);
     if (L) {
-      if (!hs_get_fqfn(dir, sbc.filename, fqfn, sizeof(fqfn))) {
+      int ret = snprintf(lsb_config, sizeof(lsb_config), g_sb_template,
+                         sbc.memory_limit,
+                         sbc.instruction_limit,
+                         sbc.output_limit,
+                         cfg->io_lua_path,
+                         cfg->io_lua_cpath);
+      if (ret < 0 || ret > (int)sizeof(lsb_config) - 1 ||
+          !hs_get_fqfn(dir, sbc.filename, fqfn, sizeof(fqfn))) {
         lua_close(L);
         hs_free_sandbox_config(&sbc);
         continue;
       }
-      hs_sandbox* sb = hs_create_sandbox(plugins, fqfn, g_sb_template, &sbc,
-                                         L);
+
+      hs_sandbox* sb = hs_create_sandbox(plugins, fqfn, lsb_config, &sbc, L);
+
       if (sb) {
         size_t len = strlen(entry->d_name);
         sb->filename = malloc(len + 1);

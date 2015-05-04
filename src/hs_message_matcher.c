@@ -417,7 +417,8 @@ void load_expression_node(lua_State* L, match_node* mn)
 
 
 void hs_init_message_match_builder(hs_message_match_builder* mmb,
-                                   const char* module_path)
+                                   const char* lua_path,
+                                   const char* lua_cpath)
 {
   mmb->parser = luaL_newstate();
   if (!mmb->parser) {
@@ -426,14 +427,9 @@ void hs_init_message_match_builder(hs_message_match_builder* mmb,
   }
 
   lua_createtable(mmb->parser, 0, 1);
-#if defined(_WIN32)
-  lua_pushfstring(mmb->parser, "%s\\?.dll", module_path);
-  lua_pushfstring(mmb->parser, "%s\\?.lua", module_path);
-#else
-  lua_pushfstring(mmb->parser, "%s/?.so", module_path);
-  lua_pushfstring(mmb->parser, "%s/?.lua", module_path);
-#endif
-  lua_setfield(mmb->parser, -3, "path");
+  lua_pushstring(mmb->parser, lua_path);
+  lua_setfield(mmb->parser, -2, "path");
+  lua_pushstring(mmb->parser, lua_cpath);
   lua_setfield(mmb->parser, -2, "cpath");
   lua_setfield(mmb->parser, LUA_REGISTRYINDEX, "lsb_config");
 

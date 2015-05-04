@@ -27,8 +27,8 @@ typedef struct hs_sandbox
 
 hs_sandbox* hs_create_sandbox(void* parent,
                               const char* file,
-                              const char* cfg_template,
-                              const hs_sandbox_config* cfg,
+                              const char* lsb_config,
+                              const hs_sandbox_config* sbc,
                               lua_State* env);
 
 void hs_free_sandbox(hs_sandbox* p);
