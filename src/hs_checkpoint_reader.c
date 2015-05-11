@@ -108,7 +108,7 @@ bool hs_load_checkpoint(lua_State* L, int idx, hs_ip_checkpoint* cp)
     const char* tmp = lua_tolstring(L, idx, &len);
     cp->len = (unsigned)len;
     ++len;
-    if (tmp && len <= HS_MAX_PATH) {
+    if (tmp && len <= HS_MAX_IP_CHECKPOINT) {
       if (len > cp->cap) {
         free(cp->value.s);
         cp->value.s = malloc(len);

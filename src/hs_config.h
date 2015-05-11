@@ -48,6 +48,7 @@ typedef struct hs_config
   char* analysis_lua_path;
   char* analysis_lua_cpath;
   hs_checkpoint_reader cp_reader;
+  int max_message_size;
   int output_size;
   int analysis_threads;
   hs_sandbox_config ipd; // input plugin defaults

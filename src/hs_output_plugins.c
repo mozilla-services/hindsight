@@ -87,8 +87,8 @@ static hs_output_plugin* create_output_plugin(const char* file,
     exit(EXIT_FAILURE);
   }
 
-  hs_init_input(&p->input);
-  hs_init_input(&p->analysis);
+  hs_init_input(&p->input, cfg->max_message_size, cfg->output_path);
+  hs_init_input(&p->analysis, cfg->max_message_size, cfg->output_path);
 
   p->sb = hs_create_sandbox(p, file, lsb_config, sbc, env);
   if (!p->sb) {
@@ -176,31 +176,31 @@ static void* input_thread(void* arg)
   size_t bytes_read[2] = { 0 };
   while (!p->plugins->stop) {
     if (p->input.fh && !pim) {
-      if (hs_find_message(&im, &p->input)) {
+      if (hs_find_message(&im, &p->input.ib)) {
         pim = &im;
       } else {
         bytes_read[0] = hs_read_file(&p->input);
       }
 
       if (!bytes_read[0]) {
-        hs_open_file(&p->input, hs_input_dir, p->input.id + 1);
+        hs_open_file(&p->input, hs_input_dir, p->input.ib.id + 1);
       }
     } else if (!p->input.fh) { // still waiting on the first file
-      hs_open_file(&p->input, hs_input_dir, p->input.id);
+      hs_open_file(&p->input, hs_input_dir, p->input.ib.id);
     }
 
     if (p->analysis.fh && !pam) {
-      if (hs_find_message(&am, &p->analysis)) {
+      if (hs_find_message(&am, &p->analysis.ib)) {
         pam = &am;
       } else {
         bytes_read[1] = hs_read_file(&p->analysis);
       }
 
       if (!bytes_read[1]) {
-        hs_open_file(&p->analysis, hs_analysis_dir, p->analysis.id + 1);
+        hs_open_file(&p->analysis, hs_analysis_dir, p->analysis.ib.id + 1);
       }
     } else if (!p->analysis.fh) { // still waiting on the first file
-      hs_open_file(&p->analysis, hs_analysis_dir, p->analysis.id);
+      hs_open_file(&p->analysis, hs_analysis_dir, p->analysis.ib.id);
     }
 
     // if we have one send the oldest first
@@ -221,14 +221,14 @@ static void* input_thread(void* arg)
     if (p->msg) {
       if (p->msg == pim) {
         pim = NULL;
-        p->cur_id[0] = p->input.id;
-        p->cur_offset[0] = p->input.offset -
-          (p->input.readpos - p->input.scanpos);
+        p->cur_id[0] = p->input.ib.id;
+        p->cur_offset[0] = p->input.ib.offset -
+          (p->input.ib.readpos - p->input.ib.scanpos);
       } else {
         pam = NULL;
-        p->cur_id[1] = p->analysis.id;
-        p->cur_offset[1] = p->analysis.offset -
-          (p->analysis.readpos - p->analysis.scanpos);
+        p->cur_id[1] = p->analysis.ib.id;
+        p->cur_offset[1] = p->analysis.ib.offset -
+          (p->analysis.ib.readpos - p->analysis.ib.scanpos);
       }
       p->current_t = time(NULL);
       if (!output_message(p)) break; // fatal error
@@ -306,24 +306,25 @@ static void add_to_output_plugins(hs_output_plugins* plugins,
   assert(p->list_index >= 0);
 
   hs_config* cfg = p->plugins->cfg;
-  if (strlen(cfg->output_path) > sizeof(p->input.path) - 1) {
-    fprintf(stderr, "input_thread path too long\n");
-    exit(EXIT_FAILURE);
-  }
-  strcpy(p->input.path, cfg->output_path);
-  strcpy(p->analysis.path, cfg->output_path);
-
   // sync the output and read checkpoints
   // the read and output checkpoints can differ to allow for batching
-  hs_lookup_input_checkpoint(&cfg->cp_reader, p->sb->filename, cfg->output_path,
-                             hs_input_dir, &p->input.id, &p->input.offset);
-  p->cur_id[0] = p->cp_id[0] = p->input.id;
-  p->cur_offset[0] = p->cp_offset[0] = p->input.offset;
+  hs_lookup_input_checkpoint(&cfg->cp_reader,
+                             p->sb->filename,
+                             cfg->output_path,
+                             hs_input_dir,
+                             &p->input.ib.id,
+                             &p->input.ib.offset);
+  p->cur_id[0] = p->cp_id[0] = p->input.ib.id;
+  p->cur_offset[0] = p->cp_offset[0] = p->input.ib.offset;
 
-  hs_lookup_input_checkpoint(&cfg->cp_reader, p->sb->filename, cfg->output_path,
-                             hs_analysis_dir, &p->analysis.id, &p->analysis.offset);
-  p->cur_id[1] = p->cp_id[1] = p->analysis.id;
-  p->cur_offset[1] = p->cp_offset[1] = p->analysis.offset;
+  hs_lookup_input_checkpoint(&cfg->cp_reader,
+                             p->sb->filename,
+                             cfg->output_path,
+                             hs_analysis_dir,
+                             &p->analysis.ib.id,
+                             &p->analysis.ib.offset);
+  p->cur_id[1] = p->cp_id[1] = p->analysis.ib.id;
+  p->cur_offset[1] = p->cp_offset[1] = p->analysis.ib.offset;
 
   int ret = pthread_create(&p->thread, NULL, input_thread, (void*)p);
   if (ret) {
@@ -446,7 +447,8 @@ void hs_load_output_plugins(hs_output_plugins* plugins,
           memcpy(p->sb->state + len - 3, "dat", 3);
         }
 
-        p->sb->mm = hs_create_message_matcher(plugins->mmb, sbc.message_matcher);
+        p->sb->mm = hs_create_message_matcher(plugins->mmb,
+                                              sbc.message_matcher);
         if (!p->sb->mm || init_sandbox(p->sb)) {
           if (!p->sb->mm) {
             hs_log(g_module, 3, "file: %s invalid message_matcher: %s",

@@ -368,24 +368,19 @@ static void* input_thread(void* arg)
   plugins->msg = NULL;
 
   hs_config* cfg = plugins->cfg;
-  if (strlen(cfg->output_path) > sizeof(plugins->input.path) - 1) {
-    fprintf(stderr, "hs_read_input path too long\n");
-    exit(EXIT_FAILURE);
-  }
-  strcpy(plugins->input.path, cfg->output_path);
   hs_lookup_input_checkpoint(&cfg->cp_reader,
                              hs_analysis_dir,
                              cfg->output_path,
                              hs_input_dir,
-                             &plugins->input.id,
-                             &plugins->input.offset);
-  plugins->cp_id = plugins->input.id;
-  plugins->cp_offset = plugins->input.offset;
+                             &plugins->input.ib.id,
+                             &plugins->input.ib.offset);
+  plugins->cp_id = plugins->input.ib.id;
+  plugins->cp_offset = plugins->input.ib.offset;
 
   size_t bytes_read = 0;
   while (!plugins->stop) {
     if (plugins->input.fh) {
-      if (hs_find_message(&msg, &plugins->input)) {
+      if (hs_find_message(&msg, &plugins->input.ib)) {
         plugins->msg = &msg;
         plugins->current_t = time(NULL);
 
@@ -406,9 +401,9 @@ static void* input_thread(void* arg)
         }
         // advance the checkpoint
         pthread_mutex_lock(&plugins->cp_lock);
-        plugins->cp_id = plugins->input.id;
-        plugins->cp_offset = plugins->input.offset -
-          (plugins->input.readpos - plugins->input.scanpos);
+        plugins->cp_id = plugins->input.ib.id;
+        plugins->cp_offset = plugins->input.ib.offset -
+          (plugins->input.ib.readpos - plugins->input.ib.scanpos);
         pthread_mutex_unlock(&plugins->cp_lock);
       } else {
         bytes_read = hs_read_file(&plugins->input);
@@ -416,10 +411,10 @@ static void* input_thread(void* arg)
 
       if (!bytes_read) {
         // see if the next file is there yet
-        hs_open_file(&plugins->input, hs_input_dir, plugins->input.id + 1);
+        hs_open_file(&plugins->input, hs_input_dir, plugins->input.ib.id + 1);
       }
     } else { // still waiting on the first file
-      hs_open_file(&plugins->input, hs_input_dir, plugins->input.id);
+      hs_open_file(&plugins->input, hs_input_dir, plugins->input.ib.id);
     }
 
     if (bytes_read || plugins->msg) {
@@ -456,7 +451,7 @@ void hs_init_analysis_plugins(hs_analysis_plugins* plugins,
                               hs_message_match_builder* mmb)
 {
   hs_init_output(&plugins->output, cfg->output_path, hs_analysis_dir);
-  hs_init_input(&plugins->input);
+  hs_init_input(&plugins->input, cfg->max_message_size, cfg->output_path);
 
   plugins->thread_cnt = cfg->analysis_threads;
   plugins->cfg = cfg;

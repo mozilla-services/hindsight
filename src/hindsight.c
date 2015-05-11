@@ -95,7 +95,6 @@ int main(int argc, char* argv[])
   hs_load_output_plugins(&ops, &cfg, cfg.run_path);
 
   hs_checkpoint_writer cpw;
-  hs_init_checkpoint_writer(&cpw, &ips, NULL, &ops, cfg.output_path);
   hs_init_checkpoint_writer(&cpw, &ips, &aps, &ops, cfg.output_path);
 
   sched_yield();

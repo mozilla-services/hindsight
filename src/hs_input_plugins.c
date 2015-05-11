@@ -26,6 +26,7 @@
 
 #include "hs_logger.h"
 #include "hs_sandbox.h"
+#include "hs_heka_stream_reader.h"
 #include "hs_util.h"
 
 static const char g_module[] = "input_plugins";
@@ -36,6 +37,7 @@ static const char* g_sb_template = "{"
   "output_limit = %u,"
   "path = [[%s]],"
   "cpath = [[%s]],"
+  "max_message_size = %u,"
   "remove_entries = {"
   "[''] = {'dofile','load','loadfile','loadstring','newproxy','print'},"
   "os = {'getenv','exit','setlocale'}"
@@ -158,16 +160,29 @@ static int inject_message(lua_State* L)
   lua_sandbox* lsb = (lua_sandbox*)luserdata;
   hs_input_plugin* p = (hs_input_plugin*)lsb_get_parent(lsb);
 
-  if (lsb_output_protobuf(lsb, 1, 0) != 0) {
-    luaL_error(L, "inject_message() could not encode protobuf - %s",
-               lsb_get_error(lsb));
+  size_t output_len;
+  const char* output;
+  if (lua_type(L, 1) == LUA_TUSERDATA) {
+    void* ud = luaL_checkudata(L, 1, mozsvc_heka_stream_reader);
+    luaL_argcheck(L, ud != NULL, 1, "invalid userdata type");
+    heka_stream_reader* hsr = (heka_stream_reader*)ud;
+    if (hsr->msg.msg) {
+      output_len = hsr->msg.msg_len;
+      output = (const char*)hsr->msg.msg;
+    } else {
+      return luaL_error(L, "attempted to inject a nil message");
+    }
+  } else {
+    if (lsb_output_protobuf(lsb, 1, 0) != 0) {
+      return luaL_error(L, "inject_message() could not encode protobuf - %s",
+                 lsb_get_error(lsb));
+    }
+    output_len = 0;
+    output = lsb_get_output(lsb, &output_len);
   }
-
-  size_t output_len = 0;
-  const char* output = lsb_get_output(lsb, &output_len);
   if (!hs_load_checkpoint(L, 2, &p->cp)) {
     return luaL_error(L, "inject_message() only accepts numeric"
-                      " or string checkpoints < %d", HS_MAX_PATH);
+                      " or string checkpoints < %d", HS_MAX_IP_CHECKPOINT);
 
   }
   pthread_mutex_lock(&p->plugins->output.lock);
@@ -231,7 +246,8 @@ static hs_input_plugin* create_input_plugin(const char* file,
                      sbc->instruction_limit,
                      sbc->output_limit,
                      cfg->io_lua_path,
-                     cfg->io_lua_cpath);
+                     cfg->io_lua_cpath,
+                     cfg->max_message_size);
 
   if (ret < 0 || ret > (int)sizeof(lsb_config) - 1) {
     return NULL;
@@ -243,6 +259,15 @@ static hs_input_plugin* create_input_plugin(const char* file,
     hs_log(g_module, 3, "lsb_create_custom failed: %s", file);
     return NULL;
   }
+
+  // preload the Heka stream reader module
+  lua_State* L = lsb_get_lua(p->sb->lsb);
+  luaL_findtable(L, LUA_REGISTRYINDEX, "_PRELOADED", 1);
+  lua_pushstring(L, "heka_stream_reader");
+  lua_pushcfunction(L, luaopen_heka_stream_reader);
+  lua_rawset(L, -3);
+  lua_pop(L, 1); // remove the preloaded table
+
   init_ip_checkpoint(&p->cp);
   return p;
 }
@@ -268,7 +293,6 @@ static int init_input_plugin(hs_input_plugin* p)
            p->sb->filename, ret, lsb_get_error(p->sb->lsb));
     return ret;
   }
-
   return 0;
 }
 

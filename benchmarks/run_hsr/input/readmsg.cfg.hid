@@ -1,0 +1,3 @@
+filename = "readmsg.lua"
+instruction_limit = 0
+input_file = "/work/git/hindsight/release/output/input/0.log"

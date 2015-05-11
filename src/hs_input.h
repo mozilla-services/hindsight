@@ -13,32 +13,43 @@
 
 #include <pthread.h>
 #include <stdio.h>
+#include <stdbool.h>
 
-#define HS_MIN_MSG_LEN 26
-#define HS_MAX_MSG_LEN 1024 * 64
-#define HS_MAX_HDR_LEN 255 + 3
+#define HS_MIN_MSG_SIZE 26
+#define HS_MAX_HDR_SIZE 255 + 3
+extern int hs_max_msg_size;
 
-typedef struct hs_input
+typedef struct hs_input_buffer
 {
-  FILE* fh;
   unsigned char* buf;
-
+  char* name;
+  size_t namesize;
   size_t bufsize;
   size_t id;
   size_t offset;
   size_t readpos;
   size_t scanpos;
   size_t msglen;
+  size_t max_message_size;
+} hs_input_buffer;
 
-  char path[HS_MAX_PATH - 30];
-  char file[HS_MAX_PATH];
+typedef struct hs_input
+{
+  FILE* fh;
+  char* path;
+  hs_input_buffer ib;
 } hs_input;
 
 
-void hs_init_input(hs_input* hsi);
+void hs_init_input(hs_input* hsi, size_t max_message_size, const char* path);
 void hs_free_input(hs_input* hsi);
 
+void hs_init_input_buffer(hs_input_buffer* b, size_t max_message_size);
+void hs_free_input_buffer(hs_input_buffer* b);
+bool hs_expand_input_buffer(hs_input_buffer* b, size_t len);
+
 int hs_open_file(hs_input* hsi, const char* subdir, size_t id);
+
 size_t hs_read_file(hs_input* hsi);
 
 #endif

@@ -210,7 +210,7 @@ static char* test_read_message_field()
   mu_assert(v.type == HS_READ_NIL, "%d", v.type);
 
   mu_assert(hs_read_message_field(&m, "bool", 4, 0, 0, &v), "standalone");
-  mu_assert(v.type == HS_READ_NUMERIC, "%d", v.type);
+  mu_assert(v.type == HS_READ_BOOL, "%d", v.type);
   mu_assert(v.u.d == 1, "invalid value: %g", v.u.d);
 
   hs_free_heka_message(&m);

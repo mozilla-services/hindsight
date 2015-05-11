@@ -27,10 +27,10 @@ int hs_open_file(hs_input* hsi, const char* subdir, size_t id)
                      id);
   if (ret < 0 || ret > (int)sizeof(path) - 1) {
     hs_log(g_module, 0, "%zu.log: fully qualiifed path is greater than %zu",
-           hsi->id, sizeof(path));
+           hsi->ib.id, sizeof(path));
     exit(EXIT_FAILURE);
   }
-  if (strcmp(hsi->file, path) == 0) return 0;
+  if (hsi->ib.name && strcmp(hsi->ib.name, path) == 0) return 0;
 
   FILE* fh = fopen(path, "r");
   if (fh) {
@@ -38,13 +38,12 @@ int hs_open_file(hs_input* hsi, const char* subdir, size_t id)
       exit(EXIT_FAILURE);
     }
 
-    if (hsi->id == id && hsi->offset) {
+    if (hsi->ib.id == id && hsi->ib.offset) {
       hs_log(g_module, 7, "opened file: %s offset: %zu", path,
-             hsi->offset);
-      if (fseek(fh, hsi->offset, SEEK_SET)) {
-        hs_log(g_module, 2, "invalid offset: %zu file: %s error: %d",
-               hsi->offset,
-               hsi->file,
+             hsi->ib.offset);
+      if (fseek(fh, hsi->ib.offset, SEEK_SET)) {
+        hs_log(g_module, 2, "file: %s invalid offset: %zu error: %d", path,
+               hsi->ib.offset,
                ferror(fh));
       }
     } else {
@@ -54,11 +53,20 @@ int hs_open_file(hs_input* hsi, const char* subdir, size_t id)
     if (hsi->fh) {
       fclose(hsi->fh);
     }
-    if (hsi->id != id) {
-      hsi->id = id;
-      hsi->offset = 0;
+    if (hsi->ib.id != id) {
+      hsi->ib.id = id;
+      hsi->ib.offset = 0;
     }
-    strcpy(hsi->file, path);
+    if (ret >= (int)hsi->ib.namesize) {
+      free(hsi->ib.name);
+      hsi->ib.namesize = (size_t)(ret + 1);
+      hsi->ib.name = malloc(hsi->ib.namesize);
+      if (!hsi->ib.name) {
+        hs_log(g_module, 2, "file: %s malloc failed", path);
+        exit(EXIT_FAILURE);
+      }
+    }
+    strcpy(hsi->ib.name, path);
     hsi->fh = fh;
   }
   return 0;
@@ -67,71 +75,122 @@ int hs_open_file(hs_input* hsi, const char* subdir, size_t id)
 
 size_t hs_read_file(hs_input* hsi)
 {
-  if (hsi->scanpos != 0) { // shift the message left
-    if (hsi->scanpos == hsi->readpos) {
-      hsi->scanpos = hsi->readpos = 0;
-    } else {
-      memmove(hsi->buf, hsi->buf + hsi->scanpos, hsi->readpos - hsi->scanpos);
-      hsi->readpos = hsi->readpos - hsi->scanpos;
-      hsi->scanpos = 0;
-    }
+  if (!hs_expand_input_buffer(&hsi->ib, 0)) {
+    hs_log(g_module, 0, "buffer reallocation failed");
+    exit(EXIT_FAILURE);
   }
-
-  if (hsi->msglen + HS_MAX_HDR_LEN > hsi->bufsize) { // expand the buffer
-    size_t newsize = hsi->bufsize * 2;
-    if (newsize > HS_MAX_MSG_LEN) {
-      newsize = HS_MAX_MSG_LEN;
-    }
-    hs_log(g_module, 7, "expand buf from: %zu to: %zu", hsi->bufsize,
-           newsize);
-    unsigned char* tmp = realloc(hsi->buf, newsize);
-    if (tmp) {
-      hsi->buf = tmp;
-      hsi->bufsize = newsize;
-    } else {
-      hs_log(g_module, 0, "buffer reallocation failed");
-      exit(EXIT_FAILURE);
-    }
-  }
-
-  size_t nread = fread(hsi->buf + hsi->readpos, 1, hsi->bufsize - hsi->readpos,
+  size_t nread = fread(hsi->ib.buf + hsi->ib.readpos,
+                       1,
+                       hsi->ib.bufsize - hsi->ib.readpos,
                        hsi->fh);
-  hsi->offset += nread;
-  hsi->readpos += nread;
+  hsi->ib.offset += nread;
+  hsi->ib.readpos += nread;
   return nread;
 }
 
 
-void hs_init_input(hs_input* hsi)
+void hs_init_input(hs_input* hsi, size_t max_message_size, const char* path)
 {
   hsi->fh = NULL;
-  hsi->path[0] = 0;
-  hsi->file[0] = 0;
-  hsi->bufsize = BUFSIZ;
-  hsi->id = 0;
-  hsi->offset = 0;
-  hsi->readpos = 0;
-  hsi->scanpos = 0;
-  hsi->msglen = 0;
-  hsi->buf = malloc(hsi->bufsize);
-  if (!hsi->buf) {
-    hs_log(g_module, 0, "buffer allocation failed");
+  if (strlen(path) > HS_MAX_PATH - 30) {
+    hs_log(g_module, 0, "path too long");
     exit(EXIT_FAILURE);
   }
+  hsi->path = malloc(strlen(path) + 1);
+  if (!hsi->path) {
+    hs_log(g_module, 0, "path malloc failed");
+    exit(EXIT_FAILURE);
+  }
+  strcpy(hsi->path, path);
+  hs_init_input_buffer(&hsi->ib, max_message_size);
 }
 
 
 void hs_free_input(hs_input* hsi)
 {
   if (hsi->fh) fclose(hsi->fh);
-  hsi->path[0] = 0;
-  hsi->file[0] = 0;
-  free(hsi->buf);
-  hsi->buf = NULL;
-  hsi->bufsize = 0;
-  hsi->id = 0;
-  hsi->offset = 0;
-  hsi->readpos = 0;
-  hsi->scanpos = 0;
-  hsi->msglen = 0;
+  free(hsi->path);
+  hsi->path = NULL;
+  hs_free_input_buffer(&hsi->ib);
+}
+
+
+void hs_init_input_buffer(hs_input_buffer* b, size_t max_message_size)
+{
+  b->name = NULL;
+  b->namesize = 0;
+  b->bufsize = BUFSIZ;
+  if (max_message_size < 1024) {
+    b->max_message_size = 1024;
+  } else {
+    b->max_message_size = max_message_size;
+  }
+  b->id = 0;
+  b->offset = 0;
+  b->readpos = 0;
+  b->scanpos = 0;
+  b->msglen = 0;
+  b->buf = malloc(b->bufsize);
+  if (!b->buf) {
+    hs_log(g_module, 0, "buffer allocation failed");
+    exit(EXIT_FAILURE);
+  }
+}
+
+
+void hs_free_input_buffer(hs_input_buffer* b)
+{
+  free(b->buf);
+  b->buf = NULL;
+  b->bufsize = 0;
+
+  free(b->name);
+  b->name = NULL;
+  b->namesize = 0;
+
+  b->id = 0;
+  b->offset = 0;
+  b->readpos = 0;
+  b->scanpos = 0;
+  b->msglen = 0;
+}
+
+
+bool hs_expand_input_buffer(hs_input_buffer* b, size_t len)
+{
+  if (b->scanpos != 0) { // shift the message left
+    if (b->scanpos == b->readpos) {
+      b->scanpos = b->readpos = 0;
+    } else {
+      memmove(b->buf, b->buf + b->scanpos, b->readpos - b->scanpos);
+      b->readpos = b->readpos - b->scanpos;
+      b->scanpos = 0;
+    }
+  }
+
+  if (b->msglen + HS_MAX_HDR_SIZE > b->bufsize
+      || b->readpos + len > b->bufsize) {
+    size_t newsize;
+    if (b->msglen + HS_MAX_HDR_SIZE > b->readpos + len) {
+      newsize = b->msglen + HS_MAX_HDR_SIZE;
+    } else {
+      newsize = b->readpos + len;
+    }
+
+    if (newsize > b->max_message_size + HS_MAX_HDR_SIZE) {
+      return false;
+    }
+    hs_log("input_buffer", 7, "expand buffer\tname:%s\tfrom:%zu\tto:%zu",
+           b->name,
+           b->bufsize,
+           newsize);
+    unsigned char* tmp = realloc(b->buf, newsize);
+    if (tmp) {
+      b->buf = tmp;
+      b->bufsize = newsize;
+    } else {
+      return false;
+    }
+  }
+  return true;
 }

@@ -1,3 +1,7 @@
+-- This Source Code Form is subject to the terms of the Mozilla Public
+-- License, v. 2.0. If a copy of the MPL was not distributed with this
+-- file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
 require "io"
 
 local clf = require "common_log_format"
@@ -21,7 +25,7 @@ function process_message(offset)
     local fh = assert(io.open(fn, "rb"))
     if offset then fh:seek("set", offset) end
 
-    for line in io.input(fh):lines() do
+    for line in fh:lines() do
         local fields = grammar:match(line)
         if fields then
             msg.Timestamp = fields.time

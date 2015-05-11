@@ -249,7 +249,8 @@ read_double_value(const unsigned char* p, const unsigned char* e, int ai,
   return true;
 }
 
-static size_t decode_header(unsigned char* buf, size_t len)
+static size_t decode_header(unsigned char* buf, size_t len,
+                            size_t max_message_size)
 {
   if (*buf != 0x08) return 0;
 
@@ -257,7 +258,7 @@ static size_t decode_header(unsigned char* buf, size_t len)
   if (p && p < buf + len - 1) {
     long long vi;
     if (hs_read_varint(p + 1, buf + len, &vi)) {
-      if (vi > HS_MIN_MSG_LEN && vi <= HS_MAX_MSG_LEN) {
+      if (vi > HS_MIN_MSG_SIZE && (size_t)vi <= max_message_size) {
         return vi;
       }
     }
@@ -266,60 +267,66 @@ static size_t decode_header(unsigned char* buf, size_t len)
 }
 
 
-bool hs_find_message(hs_heka_message* m, hs_input* hsi)
+bool hs_find_message(hs_heka_message* m, hs_input_buffer* hsib)
 {
-  if (hsi->readpos == hsi->scanpos) return false;
+  if (hsib->readpos == hsib->scanpos) return false;
 
-  unsigned char* p = memchr(&hsi->buf[hsi->scanpos], 0x1e,
-                            hsi->readpos - hsi->scanpos);
+  unsigned char* p = memchr(&hsib->buf[hsib->scanpos], 0x1e,
+                            hsib->readpos - hsib->scanpos);
   if (p) {
-    if (p != hsi->buf + hsi->scanpos) {
-      hs_log(g_module, 4, "discarded bytes: %zu offset %zu",
-             p - hsi->buf + hsi->scanpos,
-             ftell(hsi->fh) - (hsi->readpos - hsi->scanpos));
+    if (p != hsib->buf + hsib->scanpos) {
+      hs_log(g_module, 4, "discarded bytes\tname:%s\toffset:%zu\tbytes:%zu",
+             hsib->name,
+             hsib->offset - (p - hsib->buf - hsib->scanpos),
+             p - hsib->buf - hsib->scanpos);
     }
-    hsi->scanpos = p - hsi->buf;
+    hsib->scanpos = p - hsib->buf;
 
-    if (hsi->readpos - hsi->scanpos < 2) {
+    if (hsib->readpos - hsib->scanpos < 2) {
       return false; // header length is not buf
     }
 
-    size_t hlen = hsi->buf[hsi->scanpos + 1];
-    size_t hend = hsi->scanpos + hlen + 3;
-    if (hend > hsi->readpos) return false; // header is not in buf
-    if (hsi->buf[hend - 1] != 0x1f) return false; // invalid header termination
+    size_t hlen = hsib->buf[hsib->scanpos + 1];
+    size_t hend = hsib->scanpos + hlen + 3;
+    if (hend > hsib->readpos) return false; // header is not in buf
+    if (hsib->buf[hend - 1] != 0x1f) return false; // invalid header termination
 
-    if (!hsi->msglen) {
-      hsi->msglen = decode_header(&hsi->buf[hsi->scanpos + 2], hlen);
+    if (!hsib->msglen) {
+      hsib->msglen = decode_header(&hsib->buf[hsib->scanpos + 2], hlen,
+                                   hsib->max_message_size);
     }
 
-    if (hsi->msglen) {
-      size_t mend = hend + hsi->msglen;
-      if (mend > hsi->readpos) return false; // message is not in buf
+    if (hsib->msglen) {
+      size_t mend = hend + hsib->msglen;
+      if (mend > hsib->readpos) return false; // message is not in buf
 
-      if (hs_decode_heka_message(m, &hsi->buf[hend], hsi->msglen)) {
-        hsi->scanpos = mend;
-        hsi->msglen = 0;
+      if (hs_decode_heka_message(m, &hsib->buf[hend], hsib->msglen)) {
+        hsib->scanpos = mend;
+        hsib->msglen = 0;
+        return true;
       } else {
-        hs_log(g_module, 4, "decode failure file: %s offset %zu",
-               hsi->file,
-               ftell(hsi->fh) - (hsi->readpos - hend));
-        ++hsi->scanpos;
+        hs_log(g_module, 4, "decode failure\tname:%s\toffset:%zu",
+               hsib->name,
+               hsib->offset - (hsib->readpos - hend));
+        ++hsib->scanpos;
+        return hs_find_message(m, hsib);
       }
     } else {
       hs_log(g_module, 4,
-             "header decode failure file: %s offset %lld",
-             hsi->file,
-             ftell(hsi->fh) - (hsi->readpos - hsi->scanpos));
-      ++hsi->scanpos;
+             "header decode failure\tname:%s\toffset:%zu",
+             hsib->name,
+             hsib->offset - (hsib->readpos - hsib->scanpos));
+      ++hsib->scanpos;
+      return hs_find_message(m, hsib);
     }
   } else {
-    hs_log(g_module, 4, "discarded bytes: %zu offset %zu",
-           hsi->readpos - hsi->scanpos,
-           ftell(hsi->fh) - (hsi->readpos - hsi->scanpos));
-    hsi->scanpos = hsi->readpos = 0;
+    hs_log(g_module, 4, "discarded bytes\tname:%s\toffset:%zu\tbytes:%zu",
+           hsib->name,
+           hsib->offset - (hsib->readpos - hsib->scanpos),
+           hsib->readpos - hsib->scanpos);
+    hsib->scanpos = hsib->readpos = 0;
   }
-  return true;
+  return false;
 }
 
 
@@ -338,8 +345,6 @@ bool hs_decode_heka_message(hs_heka_message* m,
   int wiretype = 0;
   int tag = 0;
   hs_clear_heka_message(m);
-  m->msg = buf;
-  m->msg_len = (int)len;
 
   do {
     cp = read_key(cp, &tag, &wiretype);
@@ -443,21 +448,23 @@ bool hs_decode_heka_message(hs_heka_message* m,
   while (cp && cp < ep);
 
   if (!cp) {
-    hs_log(g_module, 4, "error in tag: %d wiretype: %d offset: %d", tag,
+    hs_log(g_module, 4, "decode message\ttag:%d\twiretype:%d\toffset:%d", tag,
            wiretype, lp - buf);
     return false;
   }
 
   if (!m->uuid) {
-    hs_log(g_module, 4, "missing uuid");
+    hs_log(g_module, 4, "decode message\tmissing uuid");
     return false;
   }
 
   if (!m->timestamp) {
-    hs_log(g_module, 4, "missing timestamp");
+    hs_log(g_module, 4, "decode message\tmissing timestamp");
     return false;
   }
 
+  m->msg = buf;
+  m->msg_len = (int)len;
   return true;
 }
 
@@ -526,8 +533,13 @@ bool hs_read_message_field(hs_heka_message* m, const char* name, size_t nlen,
         case HS_FIELD_BYTES:
           return read_string_value(p, e, ai, val);
         case HS_FIELD_INTEGER:
-        case HS_FIELD_BOOL:
           return read_integer_value(p, e, ai, val);
+        case HS_FIELD_BOOL:
+          if (read_integer_value(p, e, ai, val)) {
+            val->type = HS_READ_BOOL;
+            return true;
+          }
+          return false;
         case HS_FIELD_DOUBLE:
           return read_double_value(p, e, ai, val);
         default:
@@ -552,6 +564,11 @@ int hs_read_message(lua_State* lua, hs_heka_message* m)
   luaL_argcheck(lua, fi >= 0, 2, "field index must be >= 0");
   int ai = luaL_optinteger(lua, 3, 0);
   luaL_argcheck(lua, ai >= 0, 3, "array index must be >= 0");
+
+  if (!m->msg) {
+    lua_pushnil(lua);
+    return 1;
+  }
 
   if (strcmp(field, "Uuid") == 0) {
     lua_pushlstring(lua, m->uuid, 16);
@@ -606,6 +623,9 @@ int hs_read_message(lua_State* lua, hs_heka_message* m)
         break;
       case HS_READ_NUMERIC:
         lua_pushnumber(lua, v.u.d);
+        break;
+      case HS_READ_BOOL:
+        lua_pushboolean(lua, v.u.d);
         break;
       default:
         lua_pushnil(lua);

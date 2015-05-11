@@ -258,7 +258,7 @@ bool eval_node(match_node* mn, hs_heka_message* m)
         case TYPE_BOOLEAN:
           if (hs_read_message_field(m, mn->variable,
                                     mn->variable_len, mn->fi, mn->ai, &val)
-              && val.type == HS_READ_NUMERIC) {
+              && (val.type == HS_READ_NUMERIC || val.type == HS_READ_BOOL)) {
             return numeric_test(mn, val.u.d);
           }
           break;

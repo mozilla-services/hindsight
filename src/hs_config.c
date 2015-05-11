@@ -30,6 +30,7 @@ static const char* cfg_analysis_lua_path = "analysis_lua_path";
 static const char* cfg_analysis_lua_cpath = "analysis_lua_cpath";
 static const char* cfg_io_lua_path = "io_lua_path";
 static const char* cfg_io_lua_cpath = "io_lua_cpath";
+static const char* cfg_max_message_size = "max_message_size";
 
 static const char* cfg_sb_ipd = "input_defaults";
 static const char* cfg_sb_apd = "analysis_defaults";
@@ -67,6 +68,7 @@ static void init_config(hs_config* cfg)
   cfg->analysis_lua_cpath = NULL;
   cfg->output_size = 1024 * 1024 * 64;
   cfg->analysis_threads = 0;
+  cfg->max_message_size = 1024 * 64;
   init_sandbox_config(&cfg->ipd);
   init_sandbox_config(&cfg->apd);
   init_sandbox_config(&cfg->opd);
@@ -322,6 +324,14 @@ int hs_load_config(const char* fn, hs_config* cfg)
   init_config(cfg);
 
   int ret = luaL_dofile(L, fn);
+  if (ret) goto cleanup;
+
+  ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_max_message_size,
+                         &cfg->max_message_size);
+  if (cfg->max_message_size < 1024) {
+    lua_pushfstring(L, "%s must be > 1023", cfg_max_message_size);
+    ret = 1;
+  }
   if (ret) goto cleanup;
 
   ret = get_string_item(L, LUA_GLOBALSINDEX, cfg_output_path,

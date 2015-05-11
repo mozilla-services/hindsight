@@ -25,6 +25,7 @@ static char* test_load_default_config()
   mu_assert(ret == 0, "hindsight_load_config: %d", ret);
   mu_assert(strcmp(cfg.output_path, "output_path") == 0, "received %s",
             cfg.output_path);
+  mu_assert(cfg.max_message_size == 1024 * 64, "received %d", cfg.max_message_size);
   mu_assert(cfg.output_size == 1024 * 1024 * 64, "received %d",
             cfg.output_size);
   mu_assert(strcmp(cfg.run_path, "run") == 0, "received %s",

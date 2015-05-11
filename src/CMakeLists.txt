@@ -9,6 +9,7 @@ hs_checkpoint_reader.c
 hs_checkpoint_writer.c
 hs_config.c
 hs_heka_message.c
+hs_heka_stream_reader.c
 hs_input.c
 hs_input_plugins.c
 hs_logger.c
