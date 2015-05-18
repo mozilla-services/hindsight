@@ -94,3 +94,15 @@ hs_read_varint(unsigned const char* p, unsigned const char* e, long long* vi)
   }
   return p + i + 1;
 }
+
+
+double hs_timespec_delta(const struct timespec* s, const struct timespec* e)
+{
+  double delta;
+  if (e->tv_nsec - s->tv_nsec < 0) {
+    delta = e->tv_sec - s->tv_sec - 1 + (e->tv_nsec - s->tv_nsec) / -1e9;
+  } else {
+    delta = e->tv_sec - s->tv_sec + (e->tv_nsec - s->tv_nsec) / 1e9;
+  }
+  return delta;
+}

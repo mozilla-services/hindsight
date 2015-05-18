@@ -22,6 +22,23 @@
 
 static const char g_module[] = "checkpoint_writer";
 
+void emit_heartbeat(hs_output* hso, unsigned long long ts)
+{
+  static const char type_logger[22] = "\x1a\x09heartbeat\x22\x09hindsight";
+  static char header_uuid[23] = "\x1e\x02\x08\x00\x1f\x0a\x10"
+    "\x00\x00\x00\x00\x00\x00\x40\x00\xA0\x00\x00\x00\x00\x00\x00\x00";
+  static char vts[11] = "\x10\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
+  int ts_len = hs_write_varint(vts + 1, ts) + 1;
+  int len = sizeof(header_uuid) + ts_len + sizeof(type_logger);
+
+  header_uuid[3] = len - 5;
+  fwrite(header_uuid, sizeof(header_uuid), 1, hso->fh);
+  fwrite(vts, ts_len, 1, hso->fh);
+  fwrite(type_logger, sizeof(type_logger), 1, hso->fh);
+  hso->offset += len;
+}
+
+
 void hs_init_checkpoint_writer(hs_checkpoint_writer* cpw,
                                hs_input_plugins* ip,
                                hs_analysis_plugins* ap,
@@ -44,6 +61,18 @@ void hs_init_checkpoint_writer(hs_checkpoint_writer* cpw,
     hs_log(g_module, 0, "%s: %s", fqfn, strerror(errno));
     exit(EXIT_FAILURE);
   }
+
+  if (!hs_get_fqfn(path, "hindsight.tsv", fqfn, sizeof(fqfn))) {
+    hs_log(g_module, 0, "tsv name exceeds the max length: %d",
+           sizeof(fqfn));
+    exit(EXIT_FAILURE);
+  }
+  cpw->tsv_path = malloc(strlen(fqfn) + 1);
+  if (!cpw->tsv_path) {
+    hs_log(g_module, 0, "tsv_path malloc failed");
+    exit(EXIT_FAILURE);
+  }
+  strcpy(cpw->tsv_path, fqfn);
 }
 
 
@@ -54,11 +83,30 @@ void hs_free_checkpoint_writer(hs_checkpoint_writer* cpw)
   cpw->analysis_plugins = NULL;
   cpw->input_plugins = NULL;
   cpw->output_plugins = NULL;
+  free(cpw->tsv_path);
+  cpw->tsv_path = NULL;
 }
 
 
 void hs_write_checkpoints(hs_checkpoint_writer* cpw, hs_checkpoint_reader* cpr)
 {
+  static int cnt = 0;
+
+  FILE* tsv = NULL;
+  bool sample = (cnt % 6 == 0); // sample performance 10 times a minute
+  if (cnt == 0) { // write the stats once a minute just after the load
+    tsv = fopen(cpw->tsv_path, "wb");
+    if (tsv) {
+      fprintf(tsv, "Plugin\t"
+              "Inject Message Count\tInject Message Bytes\t"
+              "Process Message Count\tProcess Message Failures\t"
+              "Current Memory\t"
+              "Max Memory\tMax Output\tMax Instructions\t"
+              "Message Matcher Avg (s)\tMessage Matcher SD (s)\t"
+              "Process Message Avg (s)\tProcess Message SD (s)\t"
+              "Timer Event Avg (s)\tTimer Event SD (s)\n");
+    }
+  }
   cpw->fh = freopen(NULL, "wb", cpw->fh);
   if (!cpw->fh) {
     hs_log(g_module, 1, "checkpoint_writer freopen() error: %d",
@@ -74,6 +122,26 @@ void hs_write_checkpoints(hs_checkpoint_writer* cpw, hs_checkpoint_reader* cpr)
         pthread_mutex_lock(&p->cp.lock);
         hs_update_checkpoint(cpr, p->sb->filename, &p->cp);
         pthread_mutex_unlock(&p->cp.lock);
+
+        if (tsv) {
+          pthread_mutex_lock(&cpw->input_plugins->output.lock);
+          fprintf(tsv, "%s\t"
+                  "%zu\t%zu\t"
+                  "%zu\t%zu\t"
+                  "%u\t"
+                  "%u\t%u\t%u\t"
+                  "0\t0\t"
+                  "0\t0\t"
+                  "0\t0\t\n",
+                  p->sb->filename,
+                  p->sb->stats.im_cnt, p->sb->stats.im_bytes,
+                  p->sb->stats.pm_cnt, p->sb->stats.pm_failures,
+                  p->sb->stats.cur_memory,
+                  p->sb->stats.max_memory,
+                  p->sb->stats.max_output,
+                  p->sb->stats.max_instructions);
+          pthread_mutex_unlock(&cpw->input_plugins->output.lock);
+        }
       }
     }
     pthread_mutex_unlock(&cpw->input_plugins->list_lock);
@@ -81,6 +149,8 @@ void hs_write_checkpoints(hs_checkpoint_writer* cpw, hs_checkpoint_reader* cpr)
     pthread_mutex_lock(&cpw->input_plugins->output.lock);
     hs_update_id_checkpoint(cpr, "last_output_id_input",
                             cpw->input_plugins->output.id);
+    if (tsv) emit_heartbeat(&cpw->input_plugins->output,
+                            time(NULL) * 1000000000ULL);
     fflush(cpw->input_plugins->output.fh);
     pthread_mutex_unlock(&cpw->input_plugins->output.lock);
   }
@@ -95,32 +165,92 @@ void hs_write_checkpoints(hs_checkpoint_writer* cpw, hs_checkpoint_reader* cpr)
     hs_update_input_checkpoint(cpr, hs_analysis_dir, hs_input_dir, id, offset);
 
     pthread_mutex_lock(&cpw->analysis_plugins->output.lock);
+    cpw->analysis_plugins->sample = sample;
     hs_update_id_checkpoint(cpr, "last_output_id_analysis",
                             cpw->analysis_plugins->output.id);
     fflush(cpw->analysis_plugins->output.fh);
     pthread_mutex_unlock(&cpw->analysis_plugins->output.lock);
+
+    if (tsv) {
+      for (int i = 0; i <= cpw->analysis_plugins->thread_cnt; ++i) {
+        hs_analysis_thread* at = &cpw->analysis_plugins->list[i];
+        hs_analysis_plugin* p;
+        pthread_mutex_lock(&at->list_lock);
+        for (int i = 0; i < at->list_cap; ++i) {
+          p = at->list[i];
+          if (!p) continue;
+          fprintf(tsv, "%s\t"
+                  "%zu\t%zu\t"
+                  "%zu\t%zu\t"
+                  "%u\t"
+                  "%u\t%u\t%u\t"
+                  "%g\t%g\t"
+                  "%g\t%g\t"
+                  "%g\t%g\t\n",
+                  p->sb->filename,
+                  p->sb->stats.im_cnt, p->sb->stats.im_bytes,
+                  p->sb->stats.pm_cnt, p->sb->stats.pm_failures,
+                  // the sandbox is not in use here, it is safe to grab the
+                  // values directly
+                  lsb_usage(p->sb->lsb, LSB_UT_MEMORY, LSB_US_CURRENT),
+                  lsb_usage(p->sb->lsb, LSB_UT_MEMORY, LSB_US_MAXIMUM),
+                  lsb_usage(p->sb->lsb, LSB_UT_OUTPUT, LSB_US_MAXIMUM),
+                  lsb_usage(p->sb->lsb, LSB_UT_INSTRUCTION, LSB_US_MAXIMUM),
+                  p->sb->stats.mm.mean, hs_sd_running_stats(&p->sb->stats.mm),
+                  p->sb->stats.pm.mean, hs_sd_running_stats(&p->sb->stats.pm),
+                  p->sb->stats.te.mean, hs_sd_running_stats(&p->sb->stats.te));
+        }
+        pthread_mutex_unlock(&at->list_lock);
+      }
+    }
   }
 
   if (cpw->output_plugins) {
     pthread_mutex_lock(&cpw->output_plugins->list_lock);
     for (int i = 0; i < cpw->output_plugins->list_cap; ++i) {
-      if (cpw->output_plugins->list[i]) {
-        pthread_mutex_lock(&cpw->output_plugins->list[i]->cp_lock);
-        hs_update_input_checkpoint(cpr,
-                                   cpw->output_plugins->list[i]->sb->filename,
-                                   hs_input_dir,
-                                   cpw->output_plugins->list[i]->cp_id[0],
-                                   cpw->output_plugins->list[i]->cp_offset[0]);
-        hs_update_input_checkpoint(cpr,
-                                   cpw->output_plugins->list[i]->sb->filename,
-                                   hs_analysis_dir,
-                                   cpw->output_plugins->list[i]->cp_id[1],
-                                   cpw->output_plugins->list[i]->cp_offset[1]);
-        pthread_mutex_unlock(&cpw->output_plugins->list[i]->cp_lock);
+      hs_output_plugin* p = cpw->output_plugins->list[i];
+      if (!p) continue;
+
+      pthread_mutex_lock(&p->cp_lock);
+      p->sample = sample;
+      hs_update_input_checkpoint(cpr,
+                                 p->sb->filename,
+                                 hs_input_dir,
+                                 p->cp_id[0],
+                                 p->cp_offset[0]);
+      hs_update_input_checkpoint(cpr,
+                                 p->sb->filename,
+                                 hs_analysis_dir,
+                                 p->cp_id[1],
+                                 p->cp_offset[1]);
+
+      if (tsv) {
+        fprintf(tsv, "%s\t"
+                "%zu\t%zu\t"
+                "%zu\t%zu\t"
+                "%u\t"
+                "%u\t%u\t%u\t"
+                "%g\t%g\t"
+                "%g\t%g\t"
+                "%g\t%g\t\n",
+                p->sb->filename,
+                p->sb->stats.im_cnt, p->sb->stats.im_bytes,
+                p->sb->stats.pm_cnt, p->sb->stats.pm_failures,
+                p->sb->stats.cur_memory,
+                p->sb->stats.max_memory,
+                p->sb->stats.max_output,
+                p->sb->stats.max_instructions,
+                p->sb->stats.mm.mean, hs_sd_running_stats(&p->sb->stats.mm),
+                p->sb->stats.pm.mean, hs_sd_running_stats(&p->sb->stats.pm),
+                p->sb->stats.te.mean, hs_sd_running_stats(&p->sb->stats.te));
       }
+
+      pthread_mutex_unlock(&p->cp_lock);
     }
     pthread_mutex_unlock(&cpw->output_plugins->list_lock);
   }
   hs_output_checkpoints(cpr, cpw->fh);
   fflush(cpw->fh);
+  if (tsv) fclose(tsv);
+  if (++cnt == 60) cnt = 0;
 }

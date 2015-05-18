@@ -132,23 +132,6 @@ static int process_message(lua_sandbox* lsb, hs_input_plugin* p)
 }
 
 
-static int write_varint(char* buf, unsigned long long i)
-{
-  int pos = 0;
-  if (i == 0) {
-    buf[pos] = 0;
-    return 1;
-  }
-
-  while (i) {
-    buf[pos++] = (i & 0x7F) | 0x80;
-    i >>= 7;
-  }
-  buf[pos - 1] &= 0x7F; // end the varint
-  return pos;
-}
-
-
 static int inject_message(lua_State* L)
 {
   static size_t bytes_written = 0;
@@ -183,17 +166,27 @@ static int inject_message(lua_State* L)
   if (!hs_load_checkpoint(L, 2, &p->cp)) {
     return luaL_error(L, "inject_message() only accepts numeric"
                       " or string checkpoints < %d", HS_MAX_IP_CHECKPOINT);
-
   }
+
+  p->sb->stats.cur_memory = lsb_usage(lsb, LSB_UT_MEMORY, LSB_US_CURRENT);
+  p->sb->stats.max_memory = lsb_usage(lsb, LSB_UT_MEMORY, LSB_US_MAXIMUM);
+  p->sb->stats.max_output = lsb_usage(lsb, LSB_UT_OUTPUT, LSB_US_MAXIMUM);
+  p->sb->stats.max_instructions = lsb_usage(lsb, LSB_UT_INSTRUCTION,
+                                         LSB_US_MAXIMUM);
+
   pthread_mutex_lock(&p->plugins->output.lock);
-  int len = write_varint(header + 3, output_len);
+  int len = hs_write_varint(header + 3, output_len);
+  int tlen = 4 + len + output_len;
+  ++p->sb->stats.im_cnt;
+  p->sb->stats.im_bytes += tlen;
+
   header[0] = 0x1e;
   header[1] = (char)(len + 1);
   header[2] = 0x08;
   header[3 + len] = 0x1f;
   fwrite(header, 4 + len, 1, p->plugins->output.fh);
   fwrite(output, output_len, 1, p->plugins->output.fh);
-  bytes_written += 4 + len + output_len;
+  bytes_written += tlen;
   if (bytes_written > BUFSIZ) {
     p->plugins->output.offset += bytes_written;
     bytes_written = 0;

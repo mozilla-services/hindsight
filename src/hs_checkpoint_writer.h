@@ -22,6 +22,7 @@ typedef struct hs_checkpoint_writer {
   hs_analysis_plugins* analysis_plugins;
   hs_input_plugins* input_plugins;
   hs_output_plugins* output_plugins;
+  char* tsv_path;
 } hs_checkpoint_writer;
 
 void hs_init_checkpoint_writer(hs_checkpoint_writer* cpw,

@@ -15,6 +15,34 @@
 #include "hs_config.h"
 #include "hs_message_matcher.h"
 
+
+typedef struct hs_running_stats
+{
+  double count;
+  double mean;
+  double sum;
+} hs_running_stats;
+
+
+typedef struct hs_sandbox_stats
+{
+  size_t im_cnt;
+  size_t im_bytes;
+
+  size_t pm_cnt;
+  size_t pm_failures;
+
+  unsigned  cur_memory;
+  unsigned  max_memory;
+  unsigned  max_output;
+  unsigned  max_instructions;
+
+  hs_running_stats mm;
+  hs_running_stats pm;
+  hs_running_stats te;
+} hs_sandbox_stats;
+
+
 typedef struct hs_sandbox
 {
   lua_sandbox* lsb;
@@ -23,6 +51,7 @@ typedef struct hs_sandbox
   hs_message_matcher* mm;
   int ticker_interval;
   time_t next_timer_event;
+  hs_sandbox_stats stats;
 } hs_sandbox;
 
 hs_sandbox* hs_create_sandbox(void* parent,
@@ -36,5 +65,7 @@ void hs_free_sandbox(hs_sandbox* p);
 
 int hs_process_message(lua_sandbox* lsb);
 int hs_timer_event(lua_sandbox* lsb, time_t t);
+void hs_update_running_stats(hs_running_stats* s, double d);
+double hs_sd_running_stats(hs_running_stats* s);
 
 #endif

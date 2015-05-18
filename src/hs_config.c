@@ -127,17 +127,20 @@ static int get_string_item(lua_State* L, int idx, const char* name, char** val,
 }
 
 
-static int get_numeric_item(lua_State* L, int idx, const char* name, int* val)
+static int get_numeric_item(lua_State* L, int idx, const char* name,
+                            unsigned* val)
 {
   lua_getfield(L, idx, name);
   int t = lua_type(L, -1);
+  double d;
   switch (t) {
   case LUA_TNUMBER:
-    *val = lua_tonumber(L, -1);
-    if (*val < 0) {
+    d = lua_tonumber(L, -1);
+    if (d < 0) {
       lua_pushfstring(L, "%s must be set to a positive number", name);
       return 1;
     }
+    *val = (unsigned)d;
     break;
   case LUA_TNIL:
     break; // use the default

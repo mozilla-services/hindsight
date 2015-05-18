@@ -9,6 +9,7 @@
 #include "hs_sandbox.h"
 
 #include <ctype.h>
+#include <math.h>
 #include <luasandbox/lauxlib.h>
 #include <stdlib.h>
 
@@ -101,8 +102,11 @@ hs_sandbox* hs_create_sandbox(void* parent,
   if (!p) return NULL;
 
   p->ticker_interval = sbc->ticker_interval;
+  int stagger = sbc->ticker_interval > 60 ? 60 : sbc->ticker_interval;
   // distribute when the timer_events will fire
-  p->next_timer_event = time(NULL) + rand() % 60;
+  if (stagger) {
+    p->next_timer_event = time(NULL) + rand() % stagger;
+  }
 
   p->lsb = lsb_create_custom(parent, file, lsb_config);
   if (!p->lsb) {
@@ -233,3 +237,25 @@ int hs_timer_event(lua_sandbox* lsb, time_t t)
   lua_gc(lua, LUA_GCCOLLECT, 0);
   return 0;
 }
+
+
+void hs_update_running_stats(hs_running_stats* s, double d)
+{
+  double old_mean = s->mean;
+  double old_sum = s->sum;
+
+  if (++s->count == 1) {
+    s->mean = d;
+  } else {
+    s->mean = old_mean + (d - old_mean) / s->count;
+    s->sum = old_sum + (d - old_mean) * (d - s->mean);
+  }
+}
+
+
+double hs_sd_running_stats(hs_running_stats* s)
+{
+  if (s->count < 2) return 0;
+  return sqrt(s->sum / (s->count - 1));
+}
+

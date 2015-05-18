@@ -113,7 +113,7 @@ int main(int argc, char* argv[])
       break; // shutting down
     }
     hs_write_checkpoints(&cpw, &cfg.cp_reader);
-    if (++cnt == 60) {
+    if (++cnt == 59) { // scan just before emitting the stats
       hs_log(g_module, 7, "todo scan and move the load directories");
       cnt = 0;
     }

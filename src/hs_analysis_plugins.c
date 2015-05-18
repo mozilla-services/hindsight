@@ -18,6 +18,7 @@
 #include <semaphore.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "hs_input.h"
@@ -50,13 +51,13 @@ static int read_message(lua_State* lua)
     luaL_error(lua, "read_message() invalid lightuserdata");
   }
   lua_sandbox* lsb = (lua_sandbox*)luserdata;
-  hs_analysis_plugins* p = (hs_analysis_plugins*)lsb_get_parent(lsb);
+  hs_analysis_plugin* p = (hs_analysis_plugin*)lsb_get_parent(lsb);
 
-  if (!p->matched || !p->msg) {
+  if (!p->plugins->matched || !p->plugins->msg) {
     lua_pushnil(lua);
     return 1;
   }
-  return hs_read_message(lua, p->msg);
+  return hs_read_message(lua, p->plugins->msg);
 }
 
 
@@ -68,7 +69,7 @@ static int inject_message(lua_State* L)
     luaL_error(L, "inject_message() invalid lightuserdata");
   }
   lua_sandbox* lsb = (lua_sandbox*)luserdata;
-  hs_analysis_plugins* p = (hs_analysis_plugins*)lsb_get_parent(lsb);
+  hs_analysis_plugin* p = (hs_analysis_plugin*)lsb_get_parent(lsb);
 
   if (lsb_output_protobuf(lsb, 1, 0) != 0) {
     luaL_error(L, "inject_message() could not encode protobuf - %s",
@@ -78,20 +79,24 @@ static int inject_message(lua_State* L)
   size_t output_len = 0;
   const char* output = lsb_get_output(lsb, &output_len);
 
-  pthread_mutex_lock(&p->output.lock);
+  pthread_mutex_lock(&p->plugins->output.lock);
   int len = hs_write_varint(header + 3, output_len);
+  int tlen = 4 + len + output_len;
+  ++p->sb->stats.im_cnt;
+  p->sb->stats.im_bytes += tlen;
+
   header[0] = 0x1e;
   header[1] = (char)(len + 1);
   header[2] = 0x08;
   header[3 + len] = 0x1f;
-  fwrite(header, 4 + len, 1, p->output.fh);
-  fwrite(output, output_len, 1, p->output.fh);
-  p->output.offset += 4 + len + output_len;
-  if (p->output.offset >= (size_t)p->cfg->output_size) {
-    ++p->output.id;
-    hs_open_output_file(&p->output);
+  fwrite(header, 4 + len, 1, p->plugins->output.fh);
+  fwrite(output, output_len, 1, p->plugins->output.fh);
+  p->plugins->output.offset += tlen;
+  if (p->plugins->output.offset >= (size_t)p->plugins->cfg->output_size) {
+    ++p->plugins->output.id;
+    hs_open_output_file(&p->plugins->output);
   }
-  pthread_mutex_unlock(&p->output.lock);
+  pthread_mutex_unlock(&p->plugins->output.lock);
   return 0;
 }
 
@@ -170,7 +175,7 @@ static int inject_payload(lua_State* lua)
 
 static void add_to_analysis_plugins(const hs_sandbox_config* cfg,
                                     hs_analysis_plugins* plugins,
-                                    hs_sandbox* sb)
+                                    hs_analysis_plugin* p)
 {
   int thread = 0;
   if (plugins->cfg->analysis_threads) {
@@ -181,22 +186,22 @@ static void add_to_analysis_plugins(const hs_sandbox_config* cfg,
 
   pthread_mutex_lock(&at->list_lock);
   // todo shrink it down if there are a lot of empty slots
-  if (at->plugin_cnt < at->list_size) { // add to an empty slot
-    for (int i = 0; i < at->list_size; ++i) {
+  if (at->list_cnt < at->list_cap) { // add to an empty slot
+    for (int i = 0; i < at->list_cap; ++i) {
       if (!at->list[i]) {
-        at->list[i] = sb;
-        ++at->plugin_cnt;
+        at->list[i] = p;
+        ++at->list_cnt;
       }
     }
   } else { // expand the list
-    ++at->list_size;
+    ++at->list_cap;
     // todo probably don't want to grow it by 1
-    hs_sandbox** tmp = realloc(at->list,
-                               sizeof(hs_sandbox) * at->list_size);
+    hs_analysis_plugin** tmp = realloc(at->list,
+                                       sizeof(hs_analysis_plugin) * at->list_cap);
     if (tmp) {
       at->list = tmp;
-      at->list[at->list_size - 1] = sb;
-      ++at->plugin_cnt;
+      at->list[at->list_cap - 1] = p;
+      ++at->list_cnt;
     } else {
       hs_log(g_module, 0, "plugins realloc failed");
       exit(EXIT_FAILURE);
@@ -211,8 +216,8 @@ static void init_analysis_thread(hs_analysis_plugins* plugins, int tid)
   hs_analysis_thread* at = &plugins->list[tid];
   at->plugins = plugins;
   at->list = NULL;
-  at->list_size = 0;
-  at->plugin_cnt = 0;
+  at->list_cap = 0;
+  at->list_cnt = 0;
   at->tid = tid;
   if (sem_init(&at->start, 0, 1)) {
     perror("start sem_init failed");
@@ -229,19 +234,32 @@ static void init_analysis_thread(hs_analysis_plugins* plugins, int tid)
 }
 
 
+static void free_analysis_plugin(hs_analysis_plugin* p)
+{
+  if (!p->sb) return;
+
+  hs_free_sandbox(p->sb);
+  free(p->sb);
+  p->sb = NULL;
+  p->plugins = NULL;
+}
+
+
 static void free_analysis_thread(hs_analysis_thread* at)
 {
   pthread_mutex_destroy(&at->list_lock);
   sem_destroy(&at->start);
   at->plugins = NULL;
-  for (int i = 0; i < at->plugin_cnt; ++i) {
-    hs_free_sandbox(at->list[i]);
+  for (int i = 0; i < at->list_cap; ++i) {
+    if (!at->list[i]) continue;
+    free_analysis_plugin(at->list[i]);
     free(at->list[i]);
+    at->list[i] = NULL;
   }
   free(at->list);
   at->list = NULL;
-  at->list_size = 0;
-  at->plugin_cnt = 0;
+  at->list_cap = 0;
+  at->list_cnt = 0;
   at->tid = 0;
 }
 
@@ -271,12 +289,12 @@ static int init_sandbox(hs_sandbox* sb)
 
 static void terminate_sandbox(hs_analysis_thread* at, int i)
 {
-  hs_log(g_module, 3, "terminated: %s msg: %s", at->list[i]->filename,
-         lsb_get_error(at->list[i]->lsb));
-  hs_free_sandbox(at->list[i]);
+  hs_log(g_module, 3, "terminated: %s msg: %s", at->list[i]->sb->filename,
+         lsb_get_error(at->list[i]->sb->lsb));
+  free_analysis_plugin(at->list[i]);
   free(at->list[i]);
   at->list[i] = NULL;
-  --at->plugin_cnt;
+  --at->list_cnt;
 }
 
 
@@ -284,31 +302,42 @@ bool analyze_message(hs_analysis_thread* at)
 {
   if (at->plugins->msg) {
     hs_sandbox* sb = NULL;
+    bool sample = at->plugins->sample;
     int ret;
 
     pthread_mutex_lock(&at->list_lock);
-    for (int i = 0; i < at->plugin_cnt; ++i) {
-      sb = at->list[i];
-      if (!sb) continue;
+    for (int i = 0; i < at->list_cap; ++i) {
+      if (!at->list[i]) continue;
+      sb = at->list[i]->sb;
 
-      at->plugins->matched = false;
       ret = 0;
-      if (hs_eval_message_matcher(sb->mm, at->plugins->msg)) {
-        at->plugins->matched = true;
+      struct timespec ts, ts1;
+      if (sample) clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
+      at->plugins->matched = hs_eval_message_matcher(sb->mm, at->plugins->msg);
+      if (sample) {
+        clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts1);
+        hs_update_running_stats(&sb->stats.mm, hs_timespec_delta(&ts, &ts1));
+      }
+      if (at->plugins->matched) {
         ret = hs_process_message(sb->lsb);
-        if (ret == 0) {
-          // todo increment process message count
-        } else if (ret < 0) {
-          // todo increment process message failure count
+        if (sample) {
+          clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
+          hs_update_running_stats(&sb->stats.pm, hs_timespec_delta(&ts1, &ts));
+        }
+
+        ++sb->stats.pm_cnt;
+        if (ret < 0) {
+          ++sb->stats.pm_failures;
         }
       }
 
       if (ret <= 0 && sb->ticker_interval
           && at->plugins->current_t >= sb->next_timer_event) {
-        hs_log(g_module, 7, "tid: %d plugin: %d running timer_event",
-               at->tid, i); // todo remove
+        clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
         ret = hs_timer_event(sb->lsb, at->plugins->current_t);
-        sb->next_timer_event += sb->ticker_interval;
+        clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts1);
+        hs_update_running_stats(&sb->stats.te, hs_timespec_delta(&ts, &ts1));
+        sb->next_timer_event = at->plugins->current_t + sb->ticker_interval;
       }
 
       if (ret > 0) terminate_sandbox(at, i);
@@ -316,10 +345,10 @@ bool analyze_message(hs_analysis_thread* at)
     pthread_mutex_unlock(&at->list_lock);
   } else {
     pthread_mutex_lock(&at->list_lock);
-    for (int i = 0; i < at->plugin_cnt; ++i) {
+    for (int i = 0; i < at->list_cap; ++i) {
       if (!at->list[i]) continue;
 
-      if (hs_timer_event(at->list[i]->lsb, at->plugins->current_t)) {
+      if (hs_timer_event(at->list[i]->sb->lsb, at->plugins->current_t)) {
         terminate_sandbox(at, i);
       }
     }
@@ -354,6 +383,36 @@ static void* analysis_thread_function(void* arg)
   }
   hs_log(g_module, 6, "exiting thread [%d]", at->tid);
   pthread_exit(NULL);
+}
+
+
+static hs_analysis_plugin* create_analysis_plugin(const char* file,
+                                                  const hs_config* cfg,
+                                                  const hs_sandbox_config* sbc,
+                                                  lua_State* env)
+{
+  hs_analysis_plugin* p = calloc(1, sizeof(hs_analysis_plugin));
+  if (!p) return NULL;
+
+  char lsb_config[1024 * 2];
+  int ret = snprintf(lsb_config, sizeof(lsb_config), g_sb_template,
+                     sbc->memory_limit,
+                     sbc->instruction_limit,
+                     sbc->output_limit,
+                     cfg->io_lua_path,
+                     cfg->io_lua_cpath);
+  if (ret < 0 || ret > (int)sizeof(lsb_config) - 1) {
+    return NULL;
+  }
+
+  p->sb = hs_create_sandbox(p, file, lsb_config, sbc, env);
+  if (!p->sb) {
+    free(p);
+    hs_log(g_module, 3, "lsb_create_custom failed: %s", file);
+    return NULL;
+  }
+
+  return p;
 }
 
 
@@ -401,6 +460,7 @@ static void* input_thread(void* arg)
         }
         // advance the checkpoint
         pthread_mutex_lock(&plugins->cp_lock);
+        plugins->sample = false;
         plugins->cp_id = plugins->input.ib.id;
         plugins->cp_offset = plugins->input.ib.offset -
           (plugins->input.ib.readpos - plugins->input.ib.scanpos);
@@ -457,6 +517,7 @@ void hs_init_analysis_plugins(hs_analysis_plugins* plugins,
   plugins->cfg = cfg;
   plugins->stop = false;
   plugins->matched = false;
+  plugins->sample = false;
   plugins->msg = NULL;
   plugins->mmb = mmb;
   plugins->cp_id = 0;
@@ -474,7 +535,7 @@ void hs_init_analysis_plugins(hs_analysis_plugins* plugins,
 
   if (cfg->analysis_threads) {
     plugins->list = malloc(sizeof(hs_analysis_thread) * cfg->analysis_threads);
-    for (int i = 0; i < cfg->analysis_threads; ++i) {
+    for (unsigned i = 0; i < cfg->analysis_threads; ++i) {
       if (sem_wait(&plugins->finished)) {
         perror("finished sem_wait failed");
         exit(EXIT_FAILURE);
@@ -565,35 +626,37 @@ void hs_load_analysis_plugins(hs_analysis_plugins* plugins,
         hs_free_sandbox_config(&sbc);
         continue;
       }
+      hs_analysis_plugin* p = create_analysis_plugin(fqfn, cfg, &sbc, L);
+      if (p) {
+        p->plugins = plugins;
 
-      hs_sandbox* sb = hs_create_sandbox(plugins, fqfn, lsb_config, &sbc, L);
-
-      if (sb) {
-        size_t len = strlen(entry->d_name);
-        sb->filename = malloc(len + 1);
-        memcpy(sb->filename, entry->d_name, len + 1);
+        size_t len = strlen(entry->d_name) + strlen(hs_analysis_dir) + 2;
+        p->sb->filename = malloc(len);
+        snprintf(p->sb->filename, len, "%s/%s", hs_analysis_dir, entry->d_name);
 
         if (sbc.preserve_data) {
           len = strlen(fqfn);
-          sb->state = malloc(len + 1);
-          memcpy(sb->state, fqfn, len + 1);
-          memcpy(sb->state + len - 3, "dat", 3);
+          p->sb->state = malloc(len + 1);
+          memcpy(p->sb->state, fqfn, len + 1);
+          memcpy(p->sb->state + len - 3, "dat", 3);
         }
 
-        sb->mm = hs_create_message_matcher(plugins->mmb, sbc.message_matcher);
-        if (!sb->mm || init_sandbox(sb)) {
-          if (!sb->mm) {
-            hs_log(g_module, 3, "%s invalid message_matcher: %s", sb->filename,
+        p->sb->mm = hs_create_message_matcher(plugins->mmb,
+                                              sbc.message_matcher);
+        if (!p->sb->mm || init_sandbox(p->sb)) {
+          if (!p->sb->mm) {
+            hs_log(g_module, 3, "%s invalid message_matcher: %s",
+                   p->sb->filename,
                    sbc.message_matcher);
           }
-          hs_free_sandbox(sb);
-          free(sb);
-          sb = NULL;
+          free_analysis_plugin(p);
+          free(p);
+          p = NULL;
           lua_close(L);
           hs_free_sandbox_config(&sbc);
           continue;
         }
-        add_to_analysis_plugins(&sbc, plugins, sb);
+        add_to_analysis_plugins(&sbc, plugins, p);
       }
       lua_close(L);
     }

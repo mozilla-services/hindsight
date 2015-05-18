@@ -30,12 +30,12 @@ typedef struct hs_sandbox_config
   char* filename;
   char* message_matcher; // analysis/output sandbox only
 
-  int thread; // analysis sandbox only
-  int output_limit;
-  int memory_limit;
-  int instruction_limit;
+  unsigned thread; // analysis sandbox only
+  unsigned output_limit;
+  unsigned memory_limit;
+  unsigned instruction_limit;
+  unsigned ticker_interval;
   bool preserve_data;
-  int ticker_interval;
 } hs_sandbox_config;
 
 typedef struct hs_config
@@ -47,10 +47,10 @@ typedef struct hs_config
   char* io_lua_cpath;
   char* analysis_lua_path;
   char* analysis_lua_cpath;
+  unsigned max_message_size;
+  unsigned output_size;
+  unsigned analysis_threads;
   hs_checkpoint_reader cp_reader;
-  int max_message_size;
-  int output_size;
-  int analysis_threads;
   hs_sandbox_config ipd; // input plugin defaults
   hs_sandbox_config apd; // analysis plugin defaults
   hs_sandbox_config opd; // output plugin defaults

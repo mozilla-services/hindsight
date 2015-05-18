@@ -25,6 +25,12 @@
 typedef struct hs_analysis_plugins hs_analysis_plugins;
 typedef struct hs_analysis_thread hs_analysis_thread;
 
+typedef struct hs_analysis_plugin
+{
+  hs_sandbox* sb;
+  hs_analysis_plugins* plugins;
+} hs_analysis_plugin;
+
 struct hs_analysis_plugins
 {
   hs_analysis_thread* list;
@@ -40,6 +46,7 @@ struct hs_analysis_plugins
   time_t current_t;
   bool stop;
   bool matched;
+  bool sample;
 
   pthread_mutex_t cp_lock;
   size_t cp_id;
@@ -51,13 +58,13 @@ struct hs_analysis_plugins
 struct hs_analysis_thread
 {
   hs_analysis_plugins* plugins;
-  hs_sandbox** list;
+  hs_analysis_plugin** list;
 
   pthread_mutex_t list_lock;
   sem_t start;
 
-  int list_size;
-  int plugin_cnt;
+  int list_cap;
+  int list_cnt;
   int tid;
 };
 

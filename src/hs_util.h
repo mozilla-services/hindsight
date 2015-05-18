@@ -11,6 +11,7 @@
 
 #include <stdbool.h>
 #include <stdio.h>
+#include <time.h>
 
 /**
  * Test a file exists and can be opened for reading.
@@ -46,4 +47,5 @@ hs_read_varint(unsigned const char* p, unsigned const char* e, long long* vi);
 
 size_t hs_find_first_id(const char* path);
 
+double hs_timespec_delta(const struct timespec* s, const struct timespec* e);
 #endif

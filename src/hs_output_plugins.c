@@ -115,42 +115,96 @@ static void free_output_plugin(hs_output_plugin* p)
 static bool output_message(hs_output_plugin* p)
 {
   if (p->msg) {
-    int ret;
+    int ret = 0;
+    bool sample = p->sample;
     p->matched = false;
-    ret = 0;
-    if (hs_eval_message_matcher(p->sb->mm, p->msg)) {
-      p->matched = true;
+
+    struct timespec ts, ts1;
+    double mmdelta = 0, delta = 0;
+    if (sample) clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
+    p->matched = hs_eval_message_matcher(p->sb->mm, p->msg);
+    if (sample) {
+      clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts1);
+      mmdelta = hs_timespec_delta(&ts, &ts1);
+    }
+    if (p->matched) {
       ret = hs_process_message(p->sb->lsb);
+      if (sample) {
+        clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
+        delta = hs_timespec_delta(&ts1, &ts);
+      }
       if (ret <= 0) {
+        pthread_mutex_lock(&p->cp_lock);
+        ++p->sb->stats.pm_cnt;
         switch (ret) {
         case 0:
-          // todo increment process message count
+          p->batching = false;
           break;
         case -1:
-          // todo increment process message failure count
+          ++p->sb->stats.pm_failures;
+          break;
+        case -3:
+          p->batching = true;
           break;
           // default ignore
         }
+
         // advance the checkpoint
-        pthread_mutex_lock(&p->cp_lock);
-        p->cp_id[0] = p->cur_id[0];
-        p->cp_offset[0] = p->cur_offset[0];
-        p->cp_id[1] = p->cur_id[1];
-        p->cp_offset[1] = p->cur_offset[1];
+        if (!p->batching) {
+          p->cp_id[0] = p->cur_id[0];
+          p->cp_offset[0] = p->cur_offset[0];
+          p->cp_id[1] = p->cur_id[1];
+          p->cp_offset[1] = p->cur_offset[1];
+        }
+
+        // update the stats
+        if (sample) {
+          hs_update_running_stats(&p->sb->stats.mm, mmdelta);
+          hs_update_running_stats(&p->sb->stats.pm, delta);
+          p->sample = false;
+          mmdelta = 0;
+        }
+        p->sb->stats.cur_memory = lsb_usage(p->sb->lsb, LSB_UT_MEMORY,
+                                            LSB_US_CURRENT);
+        p->sb->stats.max_memory = lsb_usage(p->sb->lsb, LSB_UT_MEMORY,
+                                            LSB_US_MAXIMUM);
+        p->sb->stats.max_output = lsb_usage(p->sb->lsb, LSB_UT_OUTPUT,
+                                            LSB_US_MAXIMUM);
+        p->sb->stats.max_instructions = lsb_usage(p->sb->lsb,
+                                                  LSB_UT_INSTRUCTION,
+                                                  LSB_US_MAXIMUM);
         pthread_mutex_unlock(&p->cp_lock);
       }
-    } else {
+    }
+
+    if (mmdelta) {
+      pthread_mutex_lock(&p->cp_lock);
+      hs_update_running_stats(&p->sb->stats.mm, mmdelta);
+      p->sample = false;
+      pthread_mutex_unlock(&p->cp_lock);
+    }
+
+    if (ret <= 0 && p->sb->ticker_interval
+        && p->current_t >= p->sb->next_timer_event) {
+      clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
+      ret = hs_timer_event(p->sb->lsb, p->current_t);
+      clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts1);
+
+      delta = hs_timespec_delta(&ts, &ts1);
+      pthread_mutex_lock(&p->cp_lock);
+      hs_update_running_stats(&p->sb->stats.te, delta);
+      pthread_mutex_unlock(&p->cp_lock);
+
+      p->sb->next_timer_event = p->current_t + p->sb->ticker_interval;
+    }
+
+    if (ret > 0) {
       hs_log(g_module, 3, "terminated: %s msg: %s", p->sb->filename,
              lsb_get_error(p->sb->lsb));
       return false;
     }
-
-    if (p->sb->ticker_interval && p->current_t >= p->sb->next_timer_event) {
-      ret = hs_timer_event(p->sb->lsb, p->current_t);
-      p->sb->next_timer_event += p->sb->ticker_interval;
-    }
   } else {
-    if (p->sb) {
+    if (lsb_get_state(p->sb->lsb) != LSB_TERMINATED) {
       if (hs_timer_event(p->sb->lsb, p->current_t)) {
         hs_log(g_module, 3, "terminated: %s msg: %s", p->sb->filename,
                lsb_get_error(p->sb->lsb));

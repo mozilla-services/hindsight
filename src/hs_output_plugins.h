@@ -50,6 +50,7 @@ struct hs_output_plugin
   time_t current_t;
   int list_index;
   bool matched;
+  bool sample;
   bool batching;
 
   hs_input input;
