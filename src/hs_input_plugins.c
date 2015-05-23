@@ -135,7 +135,7 @@ static int process_message(lua_sandbox* lsb, hs_input_plugin* p)
 static int inject_message(lua_State* L)
 {
   static size_t bytes_written = 0;
-  static char header[14];
+  static unsigned char header[14];
   void* luserdata = lua_touserdata(L, lua_upvalueindex(1));
   if (NULL == luserdata) {
     luaL_error(L, "inject_message() invalid lightuserdata");

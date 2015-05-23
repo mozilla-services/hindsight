@@ -62,7 +62,7 @@ void hs_output_lua_string(FILE* fh, const char* s)
 }
 
 
-int hs_write_varint(char* buf, unsigned long long i)
+int hs_write_varint(unsigned char* buf, unsigned long long i)
 {
   int pos = 0;
   if (i == 0) {
@@ -85,7 +85,7 @@ hs_read_varint(unsigned const char* p, unsigned const char* e, long long* vi)
   *vi = 0;
   unsigned i, shift = 0;
   for (i = 0; p != e && i < MAX_VARINT_BYTES; i++) {
-    *vi |= (p[i] & 0x7f) << shift;
+    *vi |= ((unsigned long long)p[i] & 0x7f) << shift;
     shift += 7;
     if ((p[i] & 0x80) == 0) break;
   }

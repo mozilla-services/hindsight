@@ -45,23 +45,6 @@ read_length(unsigned const char* p, unsigned const char* e, size_t* vi)
 
 
 static unsigned const char*
-read_varint(unsigned const char* p, unsigned const char* e, long long* vi)
-{
-  *vi = 0;
-  unsigned i, shift = 0;
-  for (i = 0; p != e && i < MAX_VARINT_BYTES; i++) {
-    *vi |= ((unsigned long long)p[i] & 0x7f) << shift;
-    shift += 7;
-    if ((p[i] & 0x80) == 0) break;
-  }
-  if (i == MAX_VARINT_BYTES) {
-    return NULL;
-  }
-  return p + i + 1;
-}
-
-
-static unsigned const char*
 read_string(int wiretype,
             unsigned const char* p,
             unsigned const char* e,
@@ -93,7 +76,7 @@ process_varint(int wiretype,
     return NULL;
   }
   *val = 0;
-  p = read_varint(p, e, val);
+  p = hs_read_varint(p, e, val);
   if (!p) {
     return NULL;
   }
@@ -223,7 +206,7 @@ read_integer_value(const unsigned char* p, const unsigned char* e, int ai,
   int acnt = 0;
   long long ll = 0;
   while (p && p < e) {
-    p = read_varint(p, e, &ll);
+    p = hs_read_varint(p, e, &ll);
     if (p) {
       if (ai == acnt++) {
         val->type = HS_READ_NUMERIC;
@@ -611,6 +594,19 @@ int hs_read_message(lua_State* lua, hs_heka_message* m)
     }
   } else if (strcmp(field, "raw") == 0) {
     lua_pushlstring(lua, (const char*)m->msg, m->msg_len);
+  } else if (strcmp(field, "framed") == 0) {
+    {
+      unsigned char header[14] = "\x1e\x00\x08"; // up to 10 varint bytes
+                                                 // and a \x1f
+      int hlen = hs_write_varint(header + 3, m->msg_len) + 1;
+      header[1] = (char)hlen;
+      header[hlen + 2] = '\x1f';
+      luaL_Buffer b;
+      luaL_buffinit(lua, &b);
+      luaL_addlstring(&b, (char*)header, hlen + 3);
+      luaL_addlstring(&b, (const char*)m->msg, m->msg_len);
+      luaL_pushresult(&b);
+    }
   } else {
     if (field_len >= 8
         && memcmp(field, "Fields[", 7) == 0

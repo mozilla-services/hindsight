@@ -63,7 +63,7 @@ static int read_message(lua_State* lua)
 
 static int inject_message(lua_State* L)
 {
-  static char header[14];
+  static unsigned char header[14];
   void* luserdata = lua_touserdata(L, lua_upvalueindex(1));
   if (NULL == luserdata) {
     luaL_error(L, "inject_message() invalid lightuserdata");

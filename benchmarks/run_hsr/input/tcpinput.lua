@@ -25,6 +25,7 @@ local function handle_client(client)
 
     local hsr = heka_stream_reader.new(
         string.format("%s:%d -> %s:%d", caddr, cport, address, port))
+    client:settimeout(0)
     while client do
         local buf, err, partial = client:receive(need)
         if partial then buf = partial end
@@ -36,7 +37,7 @@ local function handle_client(client)
             buf = nil
         until not found
 
-        if err then break end
+        if err == "closed" then break end
 
         coroutine.yield()
     end

@@ -40,7 +40,7 @@ bool hs_get_fqfn(const char* path,
 
 void hs_output_lua_string(FILE* fh, const char* s);
 
-int hs_write_varint(char* buf, unsigned long long i);
+int hs_write_varint(unsigned char* buf, unsigned long long i);
 
 unsigned const char*
 hs_read_varint(unsigned const char* p, unsigned const char* e, long long* vi);

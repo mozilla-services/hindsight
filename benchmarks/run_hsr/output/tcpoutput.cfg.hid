@@ -1,0 +1,3 @@
+filename = "tcpoutput.lua"
+message_matcher = "Type == 'heartbeat'"
+port = 5566

@@ -112,10 +112,10 @@ static void free_output_plugin(hs_output_plugin* p)
 }
 
 
-static bool output_message(hs_output_plugin* p)
+static int output_message(hs_output_plugin* p)
 {
+  int ret = 0;
   if (p->msg) {
-    int ret = 0;
     bool sample = p->sample;
     p->matched = false;
 
@@ -137,16 +137,20 @@ static bool output_message(hs_output_plugin* p)
         pthread_mutex_lock(&p->cp_lock);
         ++p->sb->stats.pm_cnt;
         switch (ret) {
-        case 0:
+        case 0: // sent
           p->batching = false;
           break;
-        case -1:
+        case -1: // failure
           ++p->sb->stats.pm_failures;
           break;
-        case -3:
+//        case -2: // skip
+//          break
+        case -3: // batching
           p->batching = true;
           break;
-          // default ignore
+        case -4: // retry
+          --p->sb->stats.pm_cnt;
+          break;
         }
 
         // advance the checkpoint
@@ -201,7 +205,7 @@ static bool output_message(hs_output_plugin* p)
     if (ret > 0) {
       hs_log(g_module, 3, "terminated: %s msg: %s", p->sb->filename,
              lsb_get_error(p->sb->lsb));
-      return false;
+      return ret;
     }
   } else {
     if (lsb_get_state(p->sb->lsb) != LSB_TERMINATED) {
@@ -210,9 +214,9 @@ static bool output_message(hs_output_plugin* p)
                lsb_get_error(p->sb->lsb));
       }
     }
-    return false;
+    return 1;
   }
-  return true;
+  return ret;
 }
 
 
@@ -285,7 +289,17 @@ static void* input_thread(void* arg)
           (p->analysis.ib.readpos - p->analysis.ib.scanpos);
       }
       p->current_t = time(NULL);
-      if (!output_message(p)) break; // fatal error
+      int ret = output_message(p);
+      if (ret == -4) {
+        while (!p->plugins->stop && ret == -4) {
+          sleep(1);
+          p->current_t = time(NULL);
+          ret = output_message(p);
+        }
+      }
+      if (ret > 0) {
+        break; // fatal error
+      }
       p->msg = NULL;
     } else if (!bytes_read[0] && !bytes_read[1]) {
       sleep(1);

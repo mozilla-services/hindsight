@@ -24,10 +24,12 @@ static const char g_module[] = "checkpoint_writer";
 
 void emit_heartbeat(hs_output* hso, unsigned long long ts)
 {
-  static const char type_logger[22] = "\x1a\x09heartbeat\x22\x09hindsight";
-  static char header_uuid[23] = "\x1e\x02\x08\x00\x1f\x0a\x10"
+  static unsigned const char type_logger[22] = "\x1a\x09heartbeat"
+    "\x22\x09hindsight";
+  static unsigned char header_uuid[23] = "\x1e\x02\x08\x00\x1f\x0a\x10"
     "\x00\x00\x00\x00\x00\x00\x40\x00\xA0\x00\x00\x00\x00\x00\x00\x00";
-  static char vts[11] = "\x10\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
+  static unsigned char vts[11] = "\x10\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
+
   int ts_len = hs_write_varint(vts + 1, ts) + 1;
   int len = sizeof(header_uuid) + ts_len + sizeof(type_logger);
 
