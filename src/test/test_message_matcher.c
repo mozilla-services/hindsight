@@ -31,6 +31,7 @@ static char* test_true_matcher()
     , "Timestamp > 1.428773420000e+18"
     , "Timestamp < 1.428773426999e18"
     , "Timestamp == 1428773426113040228"
+    , "Timestamp > '2015-04-11T17:30:26Z'"
     , "(Severity == 7 || Payload == 'Test Payload') && Type == 'TEST'"
     , "EnvVersion == \"0.8\""
     , "EnvVersion == '0.8'"
@@ -75,17 +76,16 @@ static char* test_true_matcher()
     , "Fields[int][0][1] != NIL"
     , "Fields[int][0][2] == NIL"
     , "Fields[missing] == NIL"
-// todo implement regex
-//    , "Type =~ /TEST/"
-//    , "Type !~ /bogus/"
-//    , "Type =~ /TEST/ && Payload =~ /Payload/"
-//    , "Fields[foo][1] =~ /alt/"
-//    , "Fields[Payload] =~ /name=\\w+/"
-//    , "Type =~ /(ST)/"
-//    , "Type =~ /^TE/"
-//    , "Type =~ /ST$/"
-//    , "Type !~ /^te/"
-//    , "Type !~ /st$/"
+    , "Type =~ 'TEST'"
+    , "Type !~ 'bogus'"
+    , "Type =~ 'TEST' && Payload =~ 'Payload'"
+    , "Fields[foo][1] =~ 'alt'"
+    , "Fields[Payload] =~ 'name=%w+'"
+    , "Type =~ 'ST'"
+    , "Type =~ '^TE'"
+    , "Type =~ 'ST$'"
+    , "Type !~ '^te'"
+    , "Type !~ 'st$'"
     , NULL };
 
   hs_heka_message m;
@@ -95,7 +95,7 @@ static char* test_true_matcher()
   hs_init_message_match_builder(&mmb, TEST_LUA_PATH, TEST_LUA_CPATH);
   for (int i = 0; tests[i]; ++i) {
     hs_message_matcher* mm = hs_create_message_matcher(&mmb, tests[i]);
-    mu_assert(mm, "failed to create the matcher");
+    mu_assert(mm, "failed to create the matcher %s", tests[i]);
     mu_assert(hs_eval_message_matcher(mm, &m), "%s", tests[i]);
     hs_free_message_matcher(mm);
     free(mm);
@@ -111,6 +111,7 @@ static char* test_false_matcher()
   char* tests[] = {
     "FALSE"
     , "Timestamp == 1e9"
+    , "Timestamp > '2015-04-11T17:30:27Z'"
     , "Type == 'test'&&(Severity==7||Payload=='Test Payload')"
     , "EnvVersion == '0.9'"
     , "EnvVersion != '0.8'"
@@ -131,22 +132,22 @@ static char* test_false_matcher()
     , "Fields[foo] > 'bara'"
     , "Fields[foo] >= 'bara'"
     , "Fields[foo] == 'bara'"
-    , "Type =~ /Test/"
-    , "Type !~ /TEST/"
-    , "Payload =~ /^Payload/"
+    , "Type =~ 'Test'"
+    , "Type !~ 'TEST'"
+    , "Payload =~ '^Payload'"
     , "Type == \"te'st\""
     , "Type == 'te\"st'"
-    , "Fields[int] =~ /999/"
+    , "Fields[int] =~ '999'"
     , "Fields[zero] == \"0\""
     , "Fields[string] == 43"
     , "Fields[int] == NIL"
     , "Fields[int][0][1] == NIL"
     , "Fields[missing] != NIL"
-    , "Type =~ /^te/"
-    , "Type =~ /st$/"
-    , "Type !~ /^TE/"
-    , "Type !~ /ST$/"
-    , "Logger =~ /./ && Type =~ /^anything/"
+    , "Type =~ '^te'"
+    , "Type =~ 'st$'"
+    , "Type !~ '^TE'"
+    , "Type !~ 'ST$'"
+    , "Logger =~ '.' && Type =~ '^anything'"
     , NULL };
 
   hs_heka_message m;
@@ -156,7 +157,7 @@ static char* test_false_matcher()
   hs_init_message_match_builder(&mmb, TEST_LUA_PATH, TEST_LUA_CPATH);
   for (int i = 0; tests[i]; ++i) {
     hs_message_matcher* mm = hs_create_message_matcher(&mmb, tests[i]);
-    mu_assert(mm, "failed to create the matcher");
+    mu_assert(mm, "failed to create the matcher %s", tests[i]);
     mu_assert(hs_eval_message_matcher(mm, &m) == false, "%s", tests[i]);
     hs_free_message_matcher(mm);
     free(mm);
@@ -183,18 +184,16 @@ static char* test_malformed_matcher()
     , "Fields[test][0][a]"                                          // non numeric array index
     , "Fields[test][0][0][]"                                        // extra index dimension
     , "Fields[test][xxxx"                                           // unmatched bracket
-    , "Pid =~ /6/"                                                  // regex not allowed on numeric
-    , "Pid !~ /6/"                                                  // regex not allowed on numeric
-    , "Type =~ /test"                                               // unmatched slash
-    , "Type == /test/"                                              // incorrect operator
-    , "Type =~ 'test'"                                              // string instead of regexp
-    , "Type =~ /\\ytest/"                                           // invalid escape character
+    , "Pid =~ '6'"                                                  // string match not allowed on numeric
+    , "Pid !~ '6'"                                                  // string match not allowed on numeric
+    , "Type =~ 'test"                                               // unmatched quote
     , "Type != 'test\""                                             // mis matched quote types
-    , "Pid =~ 6"                                                    // number instead of regexp
+    , "Pid =~ 6"                                                    // incorrect type for the operator
     , "NIL"                                                         // invalid use of constant
     , "Type == NIL"                                                 // existence check only works on fields
     , "Fields[test] > NIL"                                          // existence check only works with equals and not equals
     , "TRUE FALSE"                                                  // missing operator
+    , "Timestamp == '20150411T173026'"                              // non rfc3339 timestamp
     , NULL };
 
   hs_heka_message m;
@@ -228,7 +227,7 @@ static char* benchmark_matcher_create()
     free(mm);
   }
   t = clock() - t;
-  hs_log("benchmark", 7, "benchmark_matcher_create: %g", ((float)t)
+  hs_log("benchmark", 7, "benchmark_matcher_create: %g", ((double)t)
          / CLOCKS_PER_SEC / iter);
   return NULL;
 }
@@ -243,6 +242,9 @@ static char* benchmark_match()
     , "Fields[number] == 64 && Severity == 6"
     , "Fields[missing] == NIL"
     , "Fields[int] != NIL"
+    , "Type =~ '^[Tt]EST' && Severity == 6"
+    , "Payload =~ '^Test'"
+    , "Payload =~ 'load$'"
     , NULL };
 
   hs_heka_message m;
@@ -262,7 +264,7 @@ static char* benchmark_match()
     t = clock() - t;
     hs_free_message_matcher(mm);
     free(mm);
-    hs_log("benchmark", 7, "matcher: '%s': %g", tests[i], ((float)t)
+    hs_log("benchmark", 7, "matcher: '%s': %g", tests[i], ((double)t)
            / CLOCKS_PER_SEC / iter);
   }
   hs_free_message_match_builder(&mmb);
