@@ -9,7 +9,7 @@
 #ifndef hs_message_matcher_h_
 #define hs_message_matcher_h_
 
-#include <lua.h>
+#include <luasandbox/lua.h>
 #include <stdbool.h>
 
 #include "hs_heka_message.h"

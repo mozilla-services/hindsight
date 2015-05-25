@@ -9,7 +9,7 @@
 #ifndef hs_output_h_
 #define hs_output_h_
 
-#include <lua.h>
+#include <luasandbox/lua.h>
 #include <pthread.h>
 #include <stdio.h>
 

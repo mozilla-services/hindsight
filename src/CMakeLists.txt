@@ -21,8 +21,10 @@ hs_string_matcher.c
 hs_util.c
 )
 
-set ( CMAKE_SKIP_BUILD_RPATH FALSE CACHE STRING "" FORCE )
-set ( CMAKE_BUILD_WITH_INSTALL_RPATH FALSE CACHE STRING "" FORCE )
+set(CMAKE_SKIP_BUILD_RPATH FALSE CACHE STRING "" FORCE)
+set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE CACHE STRING "" FORCE)
+set(CPACK_RPM_PACKAGE_LICENSE "MPLv2.0")
+set(CPACK_STRIP_FILES TRUE)
 
 add_executable(hindsight ${HINDSIGHT_SRC})
 set(HINDSIGHT_LIBS
@@ -32,8 +34,5 @@ ${UNIX_LIBRARIES})
 target_link_libraries(hindsight ${HINDSIGHT_LIBS})
 
 install(TARGETS hindsight DESTINATION bin)
-install(DIRECTORY "${PROJECT_PATH}/lib/"  DESTINATION lib  PATTERN "lua" EXCLUDE)
-install(DIRECTORY "${PROJECT_PATH}/lib/lua/" DESTINATION modules PATTERN "strict.lua" EXCLUDE)
-install(DIRECTORY "${PROJECT_PATH}/include/" DESTINATION include)
 
 add_subdirectory(test)

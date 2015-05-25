@@ -9,8 +9,8 @@
 #ifndef hs_heka_message_h_
 #define hs_heka_message_h_
 
-#include <lauxlib.h>
-#include <lua.h>
+#include <luasandbox/lauxlib.h>
+#include <luasandbox/lua.h>
 #include <stdbool.h>
 #include <stddef.h>
 

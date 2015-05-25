@@ -9,7 +9,7 @@
 #ifndef hs_config_h_
 #define hs_config_h_
 
-#include <lua.h>
+#include <luasandbox/lua.h>
 #include <stdbool.h>
 
 #include "hs_checkpoint_reader.h"
