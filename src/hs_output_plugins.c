@@ -38,7 +38,7 @@ static const char* g_sb_template = "{"
   "path = [[%s]],"
   "cpath = [[%s]],"
   "remove_entries = {"
-  "[''] = {'dofile','load','loadfile','loadstring','newproxy'},"
+  "[''] = {'dofile','load','loadfile','loadstring','newproxy','print'},"
   "os = {'getenv','exit','setlocale'}"
   "}"
   "}";
@@ -115,78 +115,83 @@ static void free_output_plugin(hs_output_plugin* p)
 static int output_message(hs_output_plugin* p)
 {
   int ret = 0;
-  if (p->msg) {
+  if (p->msg) { // NULL pointer signals shutting down
     bool sample = p->sample;
     p->matched = false;
 
     struct timespec ts, ts1;
-    double mmdelta = 0, delta = 0;
-    if (sample) clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
-    p->matched = hs_eval_message_matcher(p->sb->mm, p->msg);
-    if (sample) {
-      clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts1);
-      mmdelta = hs_timespec_delta(&ts, &ts1);
-    }
-    if (p->matched) {
-      ret = hs_process_message(p->sb->lsb);
+    double delta = 0;
+
+    if (p->msg->msg) { // non idle/empty message
+      double mmdelta = 0;
+      if (sample) clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
+      p->matched = hs_eval_message_matcher(p->sb->mm, p->msg);
       if (sample) {
-        clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
-        delta = hs_timespec_delta(&ts1, &ts);
+        clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts1);
+        mmdelta = hs_timespec_delta(&ts, &ts1);
       }
-      if (ret <= 0) {
-        pthread_mutex_lock(&p->cp_lock);
-        ++p->sb->stats.pm_cnt;
-        switch (ret) {
-        case 0: // sent
-          p->batching = false;
-          break;
-        case -1: // failure
-          ++p->sb->stats.pm_failures;
-          break;
+      if (p->matched) {
+        ret = hs_process_message(p->sb->lsb);
+        if (sample) {
+          clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
+          delta = hs_timespec_delta(&ts1, &ts);
+        }
+        if (ret <= 0) {
+          pthread_mutex_lock(&p->cp_lock);
+          ++p->sb->stats.pm_cnt;
+          switch (ret) {
+          case 0: // sent
+            p->batching = false;
+            break;
+          case -1: // failure
+            ++p->sb->stats.pm_failures;
+            break;
 //        case -2: // skip
 //          break
-        case -3: // batching
-          p->batching = true;
-          break;
-        case -4: // retry
-          --p->sb->stats.pm_cnt;
-          break;
-        }
+          case -3: // batching
+            p->batching = true;
+            break;
+          case -4: // retry
+            --p->sb->stats.pm_cnt;
+            break;
+          }
 
-        // advance the checkpoint
-        if (!p->batching) {
-          p->cp_id[0] = p->cur_id[0];
-          p->cp_offset[0] = p->cur_offset[0];
-          p->cp_id[1] = p->cur_id[1];
-          p->cp_offset[1] = p->cur_offset[1];
-        }
+          // advance the checkpoint
+          if (!p->batching) {
+            p->cp_id[0] = p->cur_id[0];
+            p->cp_offset[0] = p->cur_offset[0];
+            p->cp_id[1] = p->cur_id[1];
+            p->cp_offset[1] = p->cur_offset[1];
+          }
 
-        // update the stats
-        if (sample) {
-          hs_update_running_stats(&p->sb->stats.mm, mmdelta);
-          hs_update_running_stats(&p->sb->stats.pm, delta);
-          p->sample = false;
-          mmdelta = 0;
+          // update the stats
+          if (sample) {
+            hs_update_running_stats(&p->sb->stats.mm, mmdelta);
+            hs_update_running_stats(&p->sb->stats.pm, delta);
+            p->sample = false;
+            mmdelta = 0;
+          }
+          p->sb->stats.cur_memory = lsb_usage(p->sb->lsb, LSB_UT_MEMORY,
+                                              LSB_US_CURRENT);
+          p->sb->stats.max_memory = lsb_usage(p->sb->lsb, LSB_UT_MEMORY,
+                                              LSB_US_MAXIMUM);
+          p->sb->stats.max_output = lsb_usage(p->sb->lsb, LSB_UT_OUTPUT,
+                                              LSB_US_MAXIMUM);
+          p->sb->stats.max_instructions = lsb_usage(p->sb->lsb,
+                                                    LSB_UT_INSTRUCTION,
+                                                    LSB_US_MAXIMUM);
+          pthread_mutex_unlock(&p->cp_lock);
         }
-        p->sb->stats.cur_memory = lsb_usage(p->sb->lsb, LSB_UT_MEMORY,
-                                            LSB_US_CURRENT);
-        p->sb->stats.max_memory = lsb_usage(p->sb->lsb, LSB_UT_MEMORY,
-                                            LSB_US_MAXIMUM);
-        p->sb->stats.max_output = lsb_usage(p->sb->lsb, LSB_UT_OUTPUT,
-                                            LSB_US_MAXIMUM);
-        p->sb->stats.max_instructions = lsb_usage(p->sb->lsb,
-                                                  LSB_UT_INSTRUCTION,
-                                                  LSB_US_MAXIMUM);
+      }
+
+      if (mmdelta) {
+        pthread_mutex_lock(&p->cp_lock);
+        hs_update_running_stats(&p->sb->stats.mm, mmdelta);
+        p->sample = false;
         pthread_mutex_unlock(&p->cp_lock);
       }
     }
 
-    if (mmdelta) {
-      pthread_mutex_lock(&p->cp_lock);
-      hs_update_running_stats(&p->sb->stats.mm, mmdelta);
-      p->sample = false;
-      pthread_mutex_unlock(&p->cp_lock);
-    }
 
     if (ret <= 0 && p->sb->ticker_interval
         && p->current_t >= p->sb->next_timer_event) {
@@ -302,6 +307,12 @@ static void* input_thread(void* arg)
       }
       p->msg = NULL;
     } else if (!bytes_read[0] && !bytes_read[1]) {
+      // trigger any pending timer events
+      hs_clear_heka_message(&im); // create an idle/empty message
+      p->msg = &im;
+      p->current_t = time(NULL);
+      output_message(p);
+      p->msg = NULL;
       sleep(1);
     }
   }

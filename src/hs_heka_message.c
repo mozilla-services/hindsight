@@ -111,7 +111,7 @@ process_fields(hs_heka_field* f,
       p = read_string(wiretype, p, e, &s, &sl);
       if (p) {
         f->name = s;
-        f->name_len = (int)sl;
+        f->name_len = (unsigned)sl;
       }
       break;
 
@@ -126,7 +126,7 @@ process_fields(hs_heka_field* f,
       p = read_string(wiretype, p, e, &s, &sl);
       if (p) {
         f->representation = s;
-        f->representation_len = (int)sl;
+        f->representation_len = (unsigned)sl;
       }
       break;
 
@@ -141,7 +141,7 @@ process_fields(hs_heka_field* f,
         break;
       }
       f->value = p - 1;
-      f->value_len = (int)(e - f->value);
+      f->value_len = (unsigned)(e - f->value);
       p = e;
       break;
     case 6: // value_integer
@@ -164,7 +164,7 @@ process_fields(hs_heka_field* f,
         }
       }
       f->value = p;
-      f->value_len = (int)(e - f->value);
+      f->value_len = (unsigned)(e - f->value);
       p = e;
       break;
     default:
@@ -260,7 +260,7 @@ bool hs_find_message(hs_heka_message* m, hs_input_buffer* hsib)
     if (p != hsib->buf + hsib->scanpos) {
       hs_log(g_module, 4, "discarded bytes\tname:%s\toffset:%zu\tbytes:%zu",
              hsib->name,
-             hsib->offset - (p - hsib->buf - hsib->scanpos),
+             hsib->offset - hsib->readpos + hsib->scanpos,
              p - hsib->buf - hsib->scanpos);
     }
     hsib->scanpos = p - hsib->buf;
@@ -272,7 +272,13 @@ bool hs_find_message(hs_heka_message* m, hs_input_buffer* hsib)
     size_t hlen = hsib->buf[hsib->scanpos + 1];
     size_t hend = hsib->scanpos + hlen + 3;
     if (hend > hsib->readpos) return false; // header is not in buf
-    if (hsib->buf[hend - 1] != 0x1f) return false; // invalid header termination
+    if (hsib->buf[hend - 1] != 0x1f) {
+      hs_log(g_module, 4, "invalid header length\tname:%s\toffset:%zu",
+             hsib->name,
+             hsib->offset - hsib->readpos + hsib->scanpos + 1);
+      ++hsib->scanpos;
+      return hs_find_message(m, hsib);
+    }
 
     if (!hsib->msglen) {
       hsib->msglen = decode_header(&hsib->buf[hsib->scanpos + 2], hlen,
@@ -290,22 +296,23 @@ bool hs_find_message(hs_heka_message* m, hs_input_buffer* hsib)
       } else {
         hs_log(g_module, 4, "decode failure\tname:%s\toffset:%zu",
                hsib->name,
-               hsib->offset - (hsib->readpos - hend));
+               hsib->offset - hsib->readpos + hend);
         ++hsib->scanpos;
+        hsib->msglen = 0;
         return hs_find_message(m, hsib);
       }
     } else {
       hs_log(g_module, 4,
              "header decode failure\tname:%s\toffset:%zu",
              hsib->name,
-             hsib->offset - (hsib->readpos - hsib->scanpos));
+             hsib->offset - hsib->readpos + hsib->scanpos);
       ++hsib->scanpos;
       return hs_find_message(m, hsib);
     }
   } else {
     hs_log(g_module, 4, "discarded bytes\tname:%s\toffset:%zu\tbytes:%zu",
            hsib->name,
-           hsib->offset - (hsib->readpos - hsib->scanpos),
+           hsib->offset - hsib->readpos + hsib->scanpos,
            hsib->readpos - hsib->scanpos);
     hsib->scanpos = hsib->readpos = 0;
   }
@@ -353,7 +360,7 @@ bool hs_decode_heka_message(hs_heka_message* m,
       cp = read_string(wiretype, cp, ep, &s, &sl);
       if (cp) {
         m->type = s;
-        m->type_len = (int)sl;
+        m->type_len = (unsigned)sl;
       }
       break;
 
@@ -361,14 +368,14 @@ bool hs_decode_heka_message(hs_heka_message* m,
       cp = read_string(wiretype, cp, ep, &s, &sl);
       if (cp) {
         m->logger = s;
-        m->logger_len = (int)sl;
+        m->logger_len = (unsigned)sl;
       }
       break;
 
     case HS_HEKA_SEVERITY:
       cp = process_varint(wiretype, cp, ep, &val);
       if (cp) {
-        m->severity = (int32_t)val;
+        m->severity = (int)val;
       }
       break;
 
@@ -376,7 +383,7 @@ bool hs_decode_heka_message(hs_heka_message* m,
       cp = read_string(wiretype, cp, ep, &s, &sl);
       if (cp) {
         m->payload = s;
-        m->payload_len = (int)sl;
+        m->payload_len = (unsigned)sl;
       }
       break;
 
@@ -384,14 +391,14 @@ bool hs_decode_heka_message(hs_heka_message* m,
       cp = read_string(wiretype, cp, ep, &s, &sl);
       if (cp) {
         m->env_version = s;
-        m->env_version_len = (int)sl;
+        m->env_version_len = (unsigned)sl;
       }
       break;
 
     case HS_HEKA_PID:
       cp = process_varint(wiretype, cp, ep, &val);
       if (cp) {
-        m->pid = (int32_t)val;
+        m->pid = (int)val;
       }
       break;
 
@@ -399,7 +406,7 @@ bool hs_decode_heka_message(hs_heka_message* m,
       cp = read_string(wiretype, cp, ep, &s, &sl);
       if (cp) {
         m->hostname = s;
-        m->hostname_len = (int)sl;
+        m->hostname_len = (unsigned)sl;
       }
       break;
 
@@ -431,7 +438,7 @@ bool hs_decode_heka_message(hs_heka_message* m,
   while (cp && cp < ep);
 
   if (!cp) {
-    hs_log(g_module, 4, "decode message\ttag:%d\twiretype:%d\toffset:%d", tag,
+    hs_log(g_module, 4, "decode message\ttag:%d\twiretype:%d\tposition:%d", tag,
            wiretype, lp - buf);
     return false;
   }
@@ -447,7 +454,7 @@ bool hs_decode_heka_message(hs_heka_message* m,
   }
 
   m->msg = buf;
-  m->msg_len = (int)len;
+  m->msg_len = (unsigned)len;
   return true;
 }
 
@@ -505,7 +512,7 @@ bool hs_read_message_field(hs_heka_message* m, const char* name, size_t nlen,
   const unsigned char* p, *e;
   val->type = HS_READ_NIL;
 
-  for (int i = 0; i < m->fields_len; ++i) {
+  for (unsigned i = 0; i < m->fields_len; ++i) {
     if (nlen == (size_t)m->fields[i].name_len
         && strncmp(name, m->fields[i].name, m->fields[i].name_len) == 0) {
       if (fi == fcnt++) {

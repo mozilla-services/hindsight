@@ -22,24 +22,6 @@
 
 static const char g_module[] = "checkpoint_writer";
 
-void emit_heartbeat(hs_output* hso, unsigned long long ts)
-{
-  static unsigned const char type_logger[22] = "\x1a\x09heartbeat"
-    "\x22\x09hindsight";
-  static unsigned char header_uuid[23] = "\x1e\x02\x08\x00\x1f\x0a\x10"
-    "\x00\x00\x00\x00\x00\x00\x40\x00\xA0\x00\x00\x00\x00\x00\x00\x00";
-  static unsigned char vts[11] = "\x10\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
-
-  int ts_len = hs_write_varint(vts + 1, ts) + 1;
-  int len = sizeof(header_uuid) + ts_len + sizeof(type_logger);
-
-  header_uuid[3] = len - 5;
-  fwrite(header_uuid, sizeof(header_uuid), 1, hso->fh);
-  fwrite(vts, ts_len, 1, hso->fh);
-  fwrite(type_logger, sizeof(type_logger), 1, hso->fh);
-  hso->offset += len;
-}
-
 
 void hs_init_checkpoint_writer(hs_checkpoint_writer* cpw,
                                hs_input_plugins* ip,
@@ -151,8 +133,6 @@ void hs_write_checkpoints(hs_checkpoint_writer* cpw, hs_checkpoint_reader* cpr)
     pthread_mutex_lock(&cpw->input_plugins->output.lock);
     hs_update_id_checkpoint(cpr, "last_output_id_input",
                             cpw->input_plugins->output.id);
-    if (tsv) emit_heartbeat(&cpw->input_plugins->output,
-                            time(NULL) * 1000000000ULL);
     fflush(cpw->input_plugins->output.fh);
     pthread_mutex_unlock(&cpw->input_plugins->output.lock);
   }

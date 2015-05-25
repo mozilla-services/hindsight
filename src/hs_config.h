@@ -47,9 +47,11 @@ typedef struct hs_config
   char* io_lua_cpath;
   char* analysis_lua_path;
   char* analysis_lua_cpath;
+  char* hostname;
   unsigned max_message_size;
   unsigned output_size;
   unsigned analysis_threads;
+  int pid;
   hs_checkpoint_reader cp_reader;
   hs_sandbox_config ipd; // input plugin defaults
   hs_sandbox_config apd; // analysis plugin defaults

@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "hs_logger.h"
 
@@ -31,11 +32,12 @@ static const char* cfg_analysis_lua_cpath = "analysis_lua_cpath";
 static const char* cfg_io_lua_path = "io_lua_path";
 static const char* cfg_io_lua_cpath = "io_lua_cpath";
 static const char* cfg_max_message_size = "max_message_size";
+static const char* cfg_hostname = "hostname";
 
 static const char* cfg_sb_ipd = "input_defaults";
 static const char* cfg_sb_apd = "analysis_defaults";
 static const char* cfg_sb_opd = "output_defaults";
-static const char* cfg_sb_output= "output_limit";
+static const char* cfg_sb_output = "output_limit";
 static const char* cfg_sb_memory = "memory_limit";
 static const char* cfg_sb_instruction = "instruction_limit";
 static const char* cfg_sb_preserve = "preserve_data";
@@ -66,9 +68,11 @@ static void init_config(hs_config* cfg)
   cfg->io_lua_cpath = NULL;
   cfg->analysis_lua_path = NULL;
   cfg->analysis_lua_cpath = NULL;
+  cfg->hostname = NULL;
   cfg->output_size = 1024 * 1024 * 64;
   cfg->analysis_threads = 0;
   cfg->max_message_size = 1024 * 64;
+  cfg->pid = (int)getpid();
   init_sandbox_config(&cfg->ipd);
   init_sandbox_config(&cfg->apd);
   init_sandbox_config(&cfg->opd);
@@ -235,6 +239,9 @@ void hs_free_config(hs_config* cfg)
   free(cfg->analysis_lua_cpath);
   cfg->analysis_lua_cpath = NULL;
 
+  free(cfg->hostname);
+  cfg->hostname = NULL;
+
   hs_free_sandbox_config(&cfg->ipd);
   hs_free_sandbox_config(&cfg->apd);
   hs_free_sandbox_config(&cfg->opd);
@@ -368,6 +375,22 @@ int hs_load_config(const char* fn, hs_config* cfg)
   ret = get_string_item(L, LUA_GLOBALSINDEX, cfg_analysis_lua_cpath,
                         &cfg->analysis_lua_cpath, NULL);
   if (ret) goto cleanup;
+
+  char hostname[65] = { 0 };
+  if (gethostname(hostname, sizeof(hostname))) {
+    hostname[sizeof(hostname) - 1] = 0;
+    hs_log(g_module, 4, "the system hostname was trucated to: %s", hostname);
+  }
+
+  ret = get_string_item(L, LUA_GLOBALSINDEX, cfg_hostname,
+                        &cfg->hostname, hostname);
+  if (ret) goto cleanup;
+
+  if (strlen(cfg->hostname) > sizeof(hostname) - 1) {
+    cfg->hostname[sizeof(hostname) - 1] = 0;
+    hs_log(g_module, 4, "the configured hostname was trucated to: %s",
+           cfg->hostname);
+  }
 
   ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_threads,
                          &cfg->analysis_threads);

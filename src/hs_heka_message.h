@@ -13,7 +13,6 @@
 #include <lua.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include <stdint.h>
 
 #include "hs_input.h"
 
@@ -46,9 +45,9 @@ typedef struct hs_heka_field
   const char* representation;
   const unsigned char* value;
 
-  int name_len;
-  int representation_len;
-  int value_len;
+  unsigned name_len;
+  unsigned representation_len;
+  unsigned value_len;
   hs_field_value_type value_type;
 } hs_heka_field;
 
@@ -64,18 +63,18 @@ typedef struct hs_heka_message
   const char* hostname;
   hs_heka_field* fields;
 
-  int64_t timestamp;
-  int32_t severity;
-  int32_t pid;
+  long long timestamp;
+  int severity;
+  int pid;
 
-  int msg_len;
-  int type_len;
-  int logger_len;
-  int payload_len;
-  int env_version_len;
-  int hostname_len;
-  int fields_len;
-  int fields_size;
+  unsigned msg_len;
+  unsigned type_len;
+  unsigned logger_len;
+  unsigned payload_len;
+  unsigned env_version_len;
+  unsigned hostname_len;
+  unsigned fields_len;
+  unsigned fields_size;
 } hs_heka_message;
 
 

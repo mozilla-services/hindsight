@@ -71,6 +71,15 @@ static int inject_message(lua_State* L)
   lua_sandbox* lsb = (lua_sandbox*)luserdata;
   hs_analysis_plugin* p = (hs_analysis_plugin*)lsb_get_parent(lsb);
 
+  if (lua_type(L, 1) == LUA_TTABLE) {
+    lua_pushstring(L, p->sb->filename);
+    lua_setfield(L, 1, "Logger");
+    lua_pushstring(L, p->plugins->cfg->hostname);
+    lua_setfield(L, 1, "Hostname");
+    lua_pushinteger(L, p->plugins->cfg->pid);
+    lua_setfield(L, 1, "Pid");
+  }
+
   if (lsb_output_protobuf(lsb, 1, 0) != 0) {
     luaL_error(L, "inject_message() could not encode protobuf - %s",
                lsb_get_error(lsb));
@@ -149,7 +158,6 @@ static int inject_payload(lua_State* lua)
     }
   }
 
-  // TODO set logger
   // build up a heka message table and then inject it
   lua_createtable(lua, 0, 2); // message
   lua_createtable(lua, 0, 2); // Fields
@@ -165,6 +173,8 @@ static int inject_payload(lua_State* lua)
     lua_setfield(lua, -2, "payload_name");
   }
   lua_setfield(lua, -2, "Fields");
+  lua_pushstring(lua, "inject_payload");
+  lua_setfield(lua, -2, "Type");
   lua_pushlstring(lua, output, len);
   lua_setfield(lua, -2, "Payload");
   lua_replace(lua, 1);
@@ -300,10 +310,11 @@ static void terminate_sandbox(hs_analysis_thread* at, int i)
 
 bool analyze_message(hs_analysis_thread* at)
 {
-  if (at->plugins->msg) {
+  if (at->plugins->msg) { // NULL pointer signals shutting down
     hs_sandbox* sb = NULL;
     bool sample = at->plugins->sample;
     int ret;
+    at->plugins->matched = false;
 
     pthread_mutex_lock(&at->list_lock);
     for (int i = 0; i < at->list_cap; ++i) {
@@ -312,22 +323,27 @@ bool analyze_message(hs_analysis_thread* at)
 
       ret = 0;
       struct timespec ts, ts1;
-      if (sample) clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
-      at->plugins->matched = hs_eval_message_matcher(sb->mm, at->plugins->msg);
-      if (sample) {
-        clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts1);
-        hs_update_running_stats(&sb->stats.mm, hs_timespec_delta(&ts, &ts1));
-      }
-      if (at->plugins->matched) {
-        ret = hs_process_message(sb->lsb);
-        if (sample) {
-          clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
-          hs_update_running_stats(&sb->stats.pm, hs_timespec_delta(&ts1, &ts));
-        }
 
-        ++sb->stats.pm_cnt;
-        if (ret < 0) {
-          ++sb->stats.pm_failures;
+      if (at->plugins->msg->msg) { // non idle/empty message
+        if (sample) clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
+        at->plugins->matched = hs_eval_message_matcher(sb->mm,
+                                                       at->plugins->msg);
+        if (sample) {
+          clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts1);
+          hs_update_running_stats(&sb->stats.mm, hs_timespec_delta(&ts, &ts1));
+        }
+        if (at->plugins->matched) {
+          ret = hs_process_message(sb->lsb);
+          if (sample) {
+            clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
+            hs_update_running_stats(&sb->stats.pm, hs_timespec_delta(&ts1,
+                                                                     &ts));
+          }
+
+          ++sb->stats.pm_cnt;
+          if (ret < 0) {
+            ++sb->stats.pm_failures;
+          }
         }
       }
 
@@ -480,6 +496,22 @@ static void* input_thread(void* arg)
     if (bytes_read || plugins->msg) {
       plugins->msg = NULL;
     } else {
+      // trigger any pending timer events
+      hs_clear_heka_message(&msg); // create an idle/empty message
+      plugins->msg = &msg;
+      plugins->current_t = time(NULL);
+
+      if (plugins->thread_cnt) {
+        for (int i = 0; i < plugins->thread_cnt; ++i) {
+          sem_post(&plugins->list[i].start);
+        }
+        for (int i = 0; i < plugins->thread_cnt; ++i) {
+          sem_wait(&plugins->finished);
+        }
+      } else {
+        analyze_message(&plugins->list[0]);
+      }
+      plugins->msg = NULL;
       sleep(1);
     }
   }
