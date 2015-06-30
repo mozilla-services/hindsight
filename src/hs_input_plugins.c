@@ -190,7 +190,7 @@ static int inject_message(lua_State* L)
   if (bytes_written > BUFSIZ) {
     p->plugins->output.offset += bytes_written;
     bytes_written = 0;
-    if (p->plugins->output.offset >= (size_t)p->plugins->cfg->output_size) {
+    if (p->plugins->output.offset >= p->plugins->cfg->output_size) {
       ++p->plugins->output.id;
       hs_open_output_file(&p->plugins->output);
     }

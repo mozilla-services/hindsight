@@ -117,6 +117,11 @@ int main(int argc, char* argv[])
       hs_log(g_module, 7, "todo scan and move the load directories");
       cnt = 0;
     }
+#ifdef HINDSIGHT_CLI
+    if (ips.list_cnt == 0) {
+      break; // when all the inputs are done, exit
+    }
+#endif
   }
   aps.stop = true;
   ops.stop = true;

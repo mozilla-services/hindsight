@@ -33,6 +33,15 @@ ${UNIX_LIBRARIES})
 
 target_link_libraries(hindsight ${HINDSIGHT_LIBS})
 
+add_executable(hindsight_cli ${HINDSIGHT_SRC})
+set(HINDSIGHT_LIBS
+${LUASANDBOX_LIBRARIES}
+${UNIX_LIBRARIES})
+
+target_compile_definitions(hindsight_cli PUBLIC "-DHINDSIGHT_CLI")
+target_link_libraries(hindsight_cli ${HINDSIGHT_LIBS})
+
 install(TARGETS hindsight DESTINATION bin)
+install(TARGETS hindsight_cli DESTINATION bin)
 
 add_subdirectory(test)

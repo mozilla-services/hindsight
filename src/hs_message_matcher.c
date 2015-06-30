@@ -43,7 +43,7 @@ static const char* grammar =
   "local string_test   = l.Ct(string_vars * sp * (relational * sp * string_value + string_match * sp * string_value))\n"
   "\n"
   "local sign          = l.S'+-'^-1\n"
-  "local number        = (l.P'0' + l.R'19' * l.digit^0)\n"
+  "local number        = l.P'0' + l.R'19' * l.digit^0\n"
   "local decimal       = (l.P'.'^-1 * l.digit^1)^-1\n"
   "local exponent      = (l.S'eE' * sign * l.digit^1)^-1\n"
   "local numeric_value = l.Cg((sign * number * decimal * exponent) / tonumber, 'value')\n"

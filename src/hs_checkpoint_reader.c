@@ -102,6 +102,7 @@ bool hs_load_checkpoint(lua_State* L, int idx, hs_ip_checkpoint* cp)
   size_t len;
   switch (lua_type(L, idx)) {
   case LUA_TSTRING:
+    pthread_mutex_lock(&cp->lock);
     if (cp->type == HS_CP_NUMERIC) cp->value.s = NULL;
     cp->type = HS_CP_STRING;
 
@@ -116,16 +117,20 @@ bool hs_load_checkpoint(lua_State* L, int idx, hs_ip_checkpoint* cp)
           cp->len = 0;
           cp->cap = 0;
           hs_log(g_module, 0, "malloc failed");
+          pthread_mutex_unlock(&cp->lock);
           return false;
         }
         cp->cap = len;
       }
       memcpy(cp->value.s, tmp, len);
     } else {
+      pthread_mutex_unlock(&cp->lock);
       return false;
     }
+    pthread_mutex_unlock(&cp->lock);
     break;
   case LUA_TNUMBER:
+    pthread_mutex_lock(&cp->lock);
     if (cp->type == HS_CP_STRING) {
       free(cp->value.s);
       cp->value.s = NULL;
@@ -134,6 +139,7 @@ bool hs_load_checkpoint(lua_State* L, int idx, hs_ip_checkpoint* cp)
     }
     cp->type = HS_CP_NUMERIC;
     cp->value.d = lua_tonumber(L, idx);
+    pthread_mutex_unlock(&cp->lock);
     break;
   case LUA_TNONE:
   case LUA_TNIL:
