@@ -154,7 +154,10 @@ void hs_write_checkpoints(hs_checkpoint_writer* cpw, hs_checkpoint_reader* cpr)
     pthread_mutex_unlock(&cpw->analysis_plugins->output.lock);
 
     if (tsv) {
-      for (int i = 0; i <= cpw->analysis_plugins->thread_cnt; ++i) {
+      int cnt = cpw->analysis_plugins->thread_cnt;
+      if (!cnt) cnt = 1; // special case no threads (one list is still used)
+
+      for (int i = 0; i < cnt; ++i) {
         hs_analysis_thread* at = &cpw->analysis_plugins->list[i];
         hs_analysis_plugin* p;
         pthread_mutex_lock(&at->list_lock);

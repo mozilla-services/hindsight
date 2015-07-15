@@ -37,7 +37,7 @@ struct hs_analysis_plugins
   pthread_t* threads;
   hs_config* cfg;
   hs_message_match_builder* mmb;
-  hs_heka_message *msg;
+  hs_heka_message* msg;
 
   sem_t finished;
   hs_input input;
@@ -81,4 +81,11 @@ void hs_load_analysis_plugins(hs_analysis_plugins* plugins,
 
 void hs_start_analysis_input(hs_analysis_plugins* plugins, pthread_t* t);
 void hs_wait_analysis_plugins(hs_analysis_plugins* plugins);
+
+hs_sandbox* hs_create_analysis_sandbox(void* parent,
+                                       const char* file,
+                                       const hs_config* cfg,
+                                       const hs_sandbox_config* sbc,
+                                       lua_State* env);
+int hs_init_analysis_sandbox(hs_sandbox* sb);
 #endif

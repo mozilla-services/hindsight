@@ -48,7 +48,7 @@ static int read_message(lua_State* lua)
 {
   void* luserdata = lua_touserdata(lua, lua_upvalueindex(1));
   if (NULL == luserdata) {
-    luaL_error(lua, "read_message() invalid lightuserdata");
+    return luaL_error(lua, "read_message() invalid lightuserdata");
   }
   lua_sandbox* lsb = (lua_sandbox*)luserdata;
   hs_analysis_plugin* p = (hs_analysis_plugin*)lsb_get_parent(lsb);
@@ -66,7 +66,7 @@ static int inject_message(lua_State* L)
   static unsigned char header[14];
   void* luserdata = lua_touserdata(L, lua_upvalueindex(1));
   if (NULL == luserdata) {
-    luaL_error(L, "inject_message() invalid lightuserdata");
+    return luaL_error(L, "inject_message() invalid lightuserdata");
   }
   lua_sandbox* lsb = (lua_sandbox*)luserdata;
   hs_analysis_plugin* p = (hs_analysis_plugin*)lsb_get_parent(lsb);
@@ -81,8 +81,8 @@ static int inject_message(lua_State* L)
   }
 
   if (lsb_output_protobuf(lsb, 1, 0) != 0) {
-    luaL_error(L, "inject_message() could not encode protobuf - %s",
-               lsb_get_error(lsb));
+    return luaL_error(L, "inject_message() could not encode protobuf - %s",
+                      lsb_get_error(lsb));
   }
 
   size_t output_len = 0;
@@ -117,7 +117,7 @@ static int inject_payload(lua_State* lua)
 
   void* luserdata = lua_touserdata(lua, lua_upvalueindex(1));
   if (NULL == luserdata) {
-    luaL_error(lua, "%s invalid lightuserdata", func_name);
+    return luaL_error(lua, "%s invalid lightuserdata", func_name);
   }
   lua_sandbox* lsb = (lua_sandbox*)luserdata;
 
@@ -132,33 +132,19 @@ static int inject_payload(lua_State* lua)
 
   if (n > 0) {
     if (lua_type(lua, 1) != LUA_TSTRING) {
-      char err[LSB_ERROR_SIZE];
-      size_t len = snprintf(err, LSB_ERROR_SIZE,
-                            "%s() payload_type argument must be a string",
-                            func_name);
-      if (len >= LSB_ERROR_SIZE) {
-        err[LSB_ERROR_SIZE - 1] = 0;
-      }
-      lsb_terminate(lsb, err);
-      return 1;
+      return luaL_error(lua, "%s() payload_type argument must be a string",
+                        func_name);
     }
   }
 
   if (n > 1) {
     if (lua_type(lua, 2) != LUA_TSTRING) {
-      char err[LSB_ERROR_SIZE];
-      size_t len = snprintf(err, LSB_ERROR_SIZE,
-                            "%s() payload_name argument must be a string",
-                            func_name);
-      if (len >= LSB_ERROR_SIZE) {
-        err[LSB_ERROR_SIZE - 1] = 0;
-      }
-      lsb_terminate(lsb, err);
-      return 1;
+      return luaL_error(lua, "%s() payload_name argument must be a string",
+                        func_name);
     }
   }
 
-  // build up a heka message table and then inject it
+  // build up a heka message table
   lua_createtable(lua, 0, 2); // message
   lua_createtable(lua, 0, 2); // Fields
   if (n > 0) {
@@ -178,7 +164,17 @@ static int inject_payload(lua_State* lua)
   lua_pushlstring(lua, output, len);
   lua_setfield(lua, -2, "Payload");
   lua_replace(lua, 1);
-  inject_message(lua);
+
+  // use inject_message to actually deliver it
+  lua_getglobal(lua, "inject_message");
+  lua_CFunction fp = lua_tocfunction(lua, -1);
+  lua_pop(lua, 1); // remove function pointer
+  if (fp) {
+    fp(lua);
+  } else {
+    return luaL_error(lua, "%s() failed to call inject_message",
+                      func_name);
+  }
   return 0;
 }
 
@@ -207,7 +203,7 @@ static void add_to_analysis_plugins(const hs_sandbox_config* cfg,
     ++at->list_cap;
     // todo probably don't want to grow it by 1
     hs_analysis_plugin** tmp = realloc(at->list,
-                                       sizeof(hs_analysis_plugin) * at->list_cap);
+                                      sizeof(hs_analysis_plugin) * at->list_cap);
     if (tmp) {
       at->list = tmp;
       at->list[at->list_cap - 1] = p;
@@ -274,18 +270,16 @@ static void free_analysis_thread(hs_analysis_thread* at)
 }
 
 
-static int init_sandbox(hs_sandbox* sb)
+int hs_init_analysis_sandbox(hs_sandbox* sb)
 {
+  if (!sb->im_fp) return -1;
+
   lsb_add_function(sb->lsb, &read_message, "read_message");
-  lsb_add_function(sb->lsb, &inject_message, "inject_message");
+  lsb_add_function(sb->lsb, sb->im_fp, "inject_message");
   lsb_add_function(sb->lsb, &inject_payload, "inject_payload");
 
   int ret = lsb_init(sb->lsb, sb->state);
-  if (ret) {
-    hs_log(g_module, 3, "lsb_init: %s received: %d %s", sb->filename, ret,
-           lsb_get_error(sb->lsb));
-    return ret;
-  }
+  if (ret) return ret;
 
   lua_State* lua = lsb_get_lua(sb->lsb);
   // rename output to add_to_payload
@@ -314,7 +308,6 @@ bool analyze_message(hs_analysis_thread* at)
     hs_sandbox* sb = NULL;
     bool sample = at->plugins->sample;
     int ret;
-    at->plugins->matched = false;
 
     pthread_mutex_lock(&at->list_lock);
     for (int i = 0; i < at->list_cap; ++i) {
@@ -410,18 +403,7 @@ static hs_analysis_plugin* create_analysis_plugin(const char* file,
   hs_analysis_plugin* p = calloc(1, sizeof(hs_analysis_plugin));
   if (!p) return NULL;
 
-  char lsb_config[1024 * 2];
-  int ret = snprintf(lsb_config, sizeof(lsb_config), g_sb_template,
-                     sbc->memory_limit,
-                     sbc->instruction_limit,
-                     sbc->output_limit,
-                     cfg->io_lua_path,
-                     cfg->io_lua_cpath);
-  if (ret < 0 || ret > (int)sizeof(lsb_config) - 1) {
-    return NULL;
-  }
-
-  p->sb = hs_create_sandbox(p, file, lsb_config, sbc, env);
+  p->sb = hs_create_analysis_sandbox(p, file, cfg, sbc, env);
   if (!p->sb) {
     free(p);
     hs_log(g_module, 3, "lsb_create_custom failed: %s", file);
@@ -653,6 +635,7 @@ void hs_load_analysis_plugins(hs_analysis_plugins* plugins,
       hs_analysis_plugin* p = create_analysis_plugin(fqfn, cfg, &sbc, L);
       if (p) {
         p->plugins = plugins;
+        p->sb->im_fp = &inject_message;
 
         size_t len = strlen(entry->d_name) + strlen(hs_analysis_dir) + 2;
         p->sb->filename = malloc(len);
@@ -667,11 +650,15 @@ void hs_load_analysis_plugins(hs_analysis_plugins* plugins,
 
         p->sb->mm = hs_create_message_matcher(plugins->mmb,
                                               sbc.message_matcher);
-        if (!p->sb->mm || init_sandbox(p->sb)) {
+        int ret = hs_init_analysis_sandbox(p->sb);
+        if (!p->sb->mm || ret) {
           if (!p->sb->mm) {
             hs_log(g_module, 3, "%s invalid message_matcher: %s",
                    p->sb->filename,
                    sbc.message_matcher);
+          } else {
+            hs_log(g_module, 3, "lsb_init: %s received: %d %s",
+                   p->sb->filename, ret, lsb_get_error(p->sb->lsb));
           }
           free_analysis_plugin(p);
           free(p);
@@ -743,4 +730,26 @@ void hs_start_analysis_threads(hs_analysis_plugins* plugins)
       exit(EXIT_FAILURE);
     }
   }
+}
+
+
+hs_sandbox* hs_create_analysis_sandbox(void* parent,
+                                       const char* file,
+                                       const hs_config* cfg,
+                                       const hs_sandbox_config* sbc,
+                                       lua_State* env)
+{
+  char lsb_config[1024 * 2];
+  int ret = snprintf(lsb_config, sizeof(lsb_config), g_sb_template,
+                     sbc->memory_limit,
+                     sbc->instruction_limit,
+                     sbc->output_limit,
+                     cfg->io_lua_path,
+                     cfg->io_lua_cpath);
+
+  if (ret < 0 || ret > (int)sizeof(lsb_config) - 1) {
+    return NULL;
+  }
+
+  return hs_create_sandbox(parent, file, lsb_config, sbc, env);
 }

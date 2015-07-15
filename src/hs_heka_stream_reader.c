@@ -38,7 +38,7 @@ static int hsr_new(lua_State* lua)
   hsr->buf.name = malloc(len + 1);
   if (!hsr->buf.name) {
     free(hsr);
-    luaL_error(lua, "memory allocation failed");
+    return luaL_error(lua, "memory allocation failed");
   }
   strcpy(hsr->buf.name, name);
 
@@ -128,7 +128,7 @@ static int hsr_read_message(lua_State* lua)
 {
   int n = lua_gettop(lua);
   if (n < 1 || n > 4) {
-    luaL_error(lua, "read_message() incorrect number of arguments");
+    return luaL_error(lua, "read_message() incorrect number of arguments");
   }
   heka_stream_reader* hsr = check_hsr(lua, n);
   lua_remove(lua, 1); // remove the hsr user data

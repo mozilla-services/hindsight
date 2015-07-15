@@ -49,6 +49,7 @@ typedef struct hs_sandbox
   char* filename;
   char* state;
   hs_message_matcher* mm;
+  lua_CFunction im_fp;
   int ticker_interval;
   time_t next_timer_event;
   hs_sandbox_stats stats;

@@ -48,7 +48,7 @@ static int read_message(lua_State* lua)
 {
   void* luserdata = lua_touserdata(lua, lua_upvalueindex(1));
   if (NULL == luserdata) {
-    luaL_error(lua, "read_message() invalid lightuserdata");
+    return luaL_error(lua, "read_message() invalid lightuserdata");
   }
   lua_sandbox* lsb = (lua_sandbox*)luserdata;
   hs_output_plugin* p = (hs_output_plugin*)lsb_get_parent(lsb);
@@ -70,18 +70,6 @@ static hs_output_plugin* create_output_plugin(const char* file,
   if (!p) return NULL;
   p->list_index = -1;
 
-  char lsb_config[1024 * 2];
-  int ret = snprintf(lsb_config, sizeof(lsb_config), g_sb_template,
-                     sbc->memory_limit,
-                     sbc->instruction_limit,
-                     sbc->output_limit,
-                     cfg->io_lua_path,
-                     cfg->io_lua_cpath);
-
-  if (ret < 0 || ret > (int)sizeof(lsb_config) - 1) {
-    return NULL;
-  }
-
   if (pthread_mutex_init(&p->cp_lock, NULL)) {
     perror("cp_lock pthread_mutex_init failed");
     exit(EXIT_FAILURE);
@@ -90,7 +78,7 @@ static hs_output_plugin* create_output_plugin(const char* file,
   hs_init_input(&p->input, cfg->max_message_size, cfg->output_path);
   hs_init_input(&p->analysis, cfg->max_message_size, cfg->output_path);
 
-  p->sb = hs_create_sandbox(p, file, lsb_config, sbc, env);
+  p->sb = hs_create_output_sandbox(p, file, cfg, sbc, env);
   if (!p->sb) {
     free(p);
     hs_log(g_module, 3, "lsb_create_custom failed: %s", file);
@@ -413,16 +401,12 @@ static void add_to_output_plugins(hs_output_plugins* plugins,
 }
 
 
-static int init_sandbox(hs_sandbox* sb)
+int hs_init_output_sandbox(hs_sandbox* sb)
 {
   lsb_add_function(sb->lsb, &read_message, "read_message");
 
   int ret = lsb_init(sb->lsb, sb->state);
-  if (ret) {
-    hs_log(g_module, 3, "lsb_init() file: %s received: %d %s", sb->filename,
-           ret, lsb_get_error(sb->lsb));
-    return ret;
-  }
+  if (ret) return ret;
 
   lua_State* lua = lsb_get_lua(sb->lsb);
   // remove output function
@@ -528,10 +512,16 @@ void hs_load_output_plugins(hs_output_plugins* plugins,
 
         p->sb->mm = hs_create_message_matcher(plugins->mmb,
                                               sbc.message_matcher);
-        if (!p->sb->mm || init_sandbox(p->sb)) {
+        int ret = hs_init_output_sandbox(p->sb);
+        if (!p->sb->mm || ret) {
           if (!p->sb->mm) {
             hs_log(g_module, 3, "file: %s invalid message_matcher: %s",
                    p->sb->filename, sbc.message_matcher);
+          } else {
+            hs_log(g_module, 3, "lsb_init() file: %s received: %d %s",
+                   p->sb->filename,
+                   ret,
+                   lsb_get_error(p->sb->lsb));
           }
           free_output_plugin(p);
           free(p);
@@ -547,4 +537,26 @@ void hs_load_output_plugins(hs_output_plugins* plugins,
     hs_free_sandbox_config(&sbc);
   }
   closedir(dp);
+}
+
+
+hs_sandbox* hs_create_output_sandbox(void* parent,
+                                    const char* file,
+                                    const hs_config* cfg,
+                                    const hs_sandbox_config* sbc,
+                                    lua_State* env)
+{
+  char lsb_config[1024 * 2];
+  int ret = snprintf(lsb_config, sizeof(lsb_config), g_sb_template,
+                     sbc->memory_limit,
+                     sbc->instruction_limit,
+                     sbc->output_limit,
+                     cfg->io_lua_path,
+                     cfg->io_lua_cpath);
+
+  if (ret < 0 || ret > (int)sizeof(lsb_config) - 1) {
+    return NULL;
+  }
+
+  return hs_create_sandbox(parent, file, lsb_config, sbc, env);
 }

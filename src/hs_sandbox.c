@@ -33,43 +33,45 @@ static void populate_environment(lua_State* sb,
   lua_newtable(sb);
 
   // load the user provided configuration variables
-  lua_pushnil(env);
-  while (lua_next(env, LUA_GLOBALSINDEX) != 0) {
-    int kt = lua_type(env, -2);
-    int vt = lua_type(env, -1);
-    switch (kt) {
-    case LUA_TSTRING:
-      switch (vt) {
+  if (env) {
+    lua_pushnil(env);
+    while (lua_next(env, LUA_GLOBALSINDEX) != 0) {
+      int kt = lua_type(env, -2);
+      int vt = lua_type(env, -1);
+      switch (kt) {
       case LUA_TSTRING:
-        {
-          size_t len;
-          const char* tmp = lua_tolstring(env, -1, &len);
-          if (tmp) {
-            lua_pushlstring(sb, tmp, len);
-            lua_setfield(sb, -2, lua_tostring(env, -2));
+        switch (vt) {
+        case LUA_TSTRING:
+          {
+            size_t len;
+            const char* tmp = lua_tolstring(env, -1, &len);
+            if (tmp) {
+              lua_pushlstring(sb, tmp, len);
+              lua_setfield(sb, -2, lua_tostring(env, -2));
+            }
           }
+          break;
+        case LUA_TNUMBER:
+          lua_pushnumber(sb, lua_tonumber(env, -1));
+          lua_setfield(sb, -2, lua_tostring(env, -2));
+          break;
+        case LUA_TBOOLEAN:
+          lua_pushboolean(sb, lua_tonumber(env, -1));
+          lua_setfield(sb, -2, lua_tostring(env, -2));
+          break;
+        default:
+          hs_log(sbc->filename, 4, "skipping config value type: %s",
+                 lua_typename(env, vt));
+          break;
         }
         break;
-      case LUA_TNUMBER:
-        lua_pushnumber(sb, lua_tonumber(env, -1));
-        lua_setfield(sb, -2, lua_tostring(env, -2));
-        break;
-      case LUA_TBOOLEAN:
-        lua_pushboolean(sb, lua_tonumber(env, -1));
-        lua_setfield(sb, -2, lua_tostring(env, -2));
-        break;
       default:
-        hs_log(sbc->filename, 4, "skipping config value type: %s",
-               lua_typename(env, vt));
+        hs_log(sbc->filename, 4, "skipping config key type: %s",
+               lua_typename(env, kt));
         break;
       }
-      break;
-    default:
-      hs_log(sbc->filename, 4, "skipping config key type: %s",
-             lua_typename(env, kt));
-      break;
+      lua_pop(env, 1);
     }
-    lua_pop(env, 1);
   }
 
   // load the known configuration variables
@@ -98,49 +100,49 @@ hs_sandbox* hs_create_sandbox(void* parent,
                               const hs_sandbox_config* sbc,
                               lua_State* env)
 {
-  hs_sandbox* p = calloc(1, sizeof(hs_sandbox));
-  if (!p) return NULL;
+  hs_sandbox* sb = calloc(1, sizeof(hs_sandbox));
+  if (!sb) return NULL;
 
-  p->ticker_interval = sbc->ticker_interval;
+  sb->ticker_interval = sbc->ticker_interval;
   int stagger = sbc->ticker_interval > 60 ? 60 : sbc->ticker_interval;
   // distribute when the timer_events will fire
   if (stagger) {
-    p->next_timer_event = time(NULL) + rand() % stagger;
+    sb->next_timer_event = time(NULL) + rand() % stagger;
   }
 
-  p->lsb = lsb_create_custom(parent, file, lsb_config);
-  if (!p->lsb) {
-    free(p);
+  sb->lsb = lsb_create_custom(parent, file, lsb_config);
+  if (!sb->lsb) {
+    free(sb);
     hs_log(file, 3, "lsb_create_custom failed");
     return NULL;
   }
-  populate_environment(lsb_get_lua(p->lsb), env, sbc);
-  p->mm = NULL;
-  return p;
+  populate_environment(lsb_get_lua(sb->lsb), env, sbc);
+  sb->mm = NULL;
+  return sb;
 }
 
 
-void hs_free_sandbox(hs_sandbox* p)
+void hs_free_sandbox(hs_sandbox* sb)
 {
-  if (!p) return;
+  if (!sb) return;
 
-  char* e = lsb_destroy(p->lsb, NULL);
+  char* e = lsb_destroy(sb->lsb, sb->state);
   if (e) {
-    hs_log(p->filename, 3, "lsb_destroy() received: %s", e);
+    hs_log(sb->filename, 3, "lsb_destroy() received: %s", e);
     free(e);
   }
-  p->lsb = NULL;
+  sb->lsb = NULL;
 
-  free(p->filename);
-  p->filename = NULL;
+  free(sb->filename);
+  sb->filename = NULL;
 
-  free(p->state);
-  p->state = NULL;
+  free(sb->state);
+  sb->state = NULL;
 
-  if (p->mm) {
-    hs_free_message_matcher(p->mm);
-    free(p->mm);
-    p->mm = NULL;
+  if (sb->mm) {
+    hs_free_message_matcher(sb->mm);
+    free(sb->mm);
+    sb->mm = NULL;
   }
 }
 

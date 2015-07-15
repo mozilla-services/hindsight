@@ -546,7 +546,7 @@ int hs_read_message(lua_State* lua, hs_heka_message* m)
 {
   int n = lua_gettop(lua);
   if (n < 1 || n > 3) {
-    luaL_error(lua, "read_message() incorrect number of arguments");
+    return luaL_error(lua, "read_message() incorrect number of arguments");
   }
   size_t field_len;
   const char* field = luaL_checklstring(lua, 1, &field_len);

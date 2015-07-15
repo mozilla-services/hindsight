@@ -138,7 +138,7 @@ static int inject_message(lua_State* L)
   static unsigned char header[14];
   void* luserdata = lua_touserdata(L, lua_upvalueindex(1));
   if (NULL == luserdata) {
-    luaL_error(L, "inject_message() invalid lightuserdata");
+    return luaL_error(L, "inject_message() invalid lightuserdata");
   }
   lua_sandbox* lsb = (lua_sandbox*)luserdata;
   hs_input_plugin* p = (hs_input_plugin*)lsb_get_parent(lsb);
@@ -158,7 +158,7 @@ static int inject_message(lua_State* L)
   } else {
     if (lsb_output_protobuf(lsb, 1, 0) != 0) {
       return luaL_error(L, "inject_message() could not encode protobuf - %s",
-                 lsb_get_error(lsb));
+                        lsb_get_error(lsb));
     }
     output_len = 0;
     output = lsb_get_output(lsb, &output_len);
@@ -172,7 +172,7 @@ static int inject_message(lua_State* L)
   p->sb->stats.max_memory = lsb_usage(lsb, LSB_UT_MEMORY, LSB_US_MAXIMUM);
   p->sb->stats.max_output = lsb_usage(lsb, LSB_UT_OUTPUT, LSB_US_MAXIMUM);
   p->sb->stats.max_instructions = lsb_usage(lsb, LSB_UT_INSTRUCTION,
-                                         LSB_US_MAXIMUM);
+                                            LSB_US_MAXIMUM);
 
   pthread_mutex_lock(&p->plugins->output.lock);
   int len = hs_write_varint(header + 3, output_len);
@@ -233,20 +233,7 @@ static hs_input_plugin* create_input_plugin(const char* file,
   if (!p) return NULL;
   p->list_index = -1;
 
-  char lsb_config[1024 * 2];
-  int ret = snprintf(lsb_config, sizeof(lsb_config), g_sb_template,
-                     sbc->memory_limit,
-                     sbc->instruction_limit,
-                     sbc->output_limit,
-                     cfg->io_lua_path,
-                     cfg->io_lua_cpath,
-                     cfg->max_message_size);
-
-  if (ret < 0 || ret > (int)sizeof(lsb_config) - 1) {
-    return NULL;
-  }
-
-  p->sb = hs_create_sandbox(p, file, lsb_config, sbc, env);
+  p->sb = hs_create_input_sandbox(p, file, cfg, sbc, env);
   if (!p->sb) {
     free(p);
     hs_log(g_module, 3, "lsb_create_custom failed: %s", file);
@@ -276,17 +263,12 @@ static void free_input_plugin(hs_input_plugin* p)
 }
 
 
-static int init_input_plugin(hs_input_plugin* p)
+int hs_init_input_plugin(hs_sandbox* sb)
 {
-  lsb_add_function(p->sb->lsb, &inject_message, "inject_message");
+  if (!sb->im_fp) return -1;
 
-  int ret = lsb_init(p->sb->lsb, p->sb->state);
-  if (ret) {
-    hs_log(g_module, 3, "lsb_init() file: %s received: %d %s",
-           p->sb->filename, ret, lsb_get_error(p->sb->lsb));
-    return ret;
-  }
-  return 0;
+  lsb_add_function(sb->lsb, sb->im_fp, "inject_message");
+  return lsb_init(sb->lsb, sb->state);
 }
 
 
@@ -468,6 +450,7 @@ void hs_load_input_plugins(hs_input_plugins* plugins, const hs_config* cfg,
       hs_input_plugin* p = create_input_plugin(fqfn, cfg, &sbc, L);
       if (p) {
         p->plugins = plugins;
+        p->sb->im_fp = &inject_message;
 
         size_t len = strlen(entry->d_name) + strlen(hs_input_dir) + 2;
         p->sb->filename = malloc(len);
@@ -480,7 +463,12 @@ void hs_load_input_plugins(hs_input_plugins* plugins, const hs_config* cfg,
           memcpy(p->sb->state + len - 3, "dat", 3);
         }
 
-        if (init_input_plugin(p)) {
+        int ret = hs_init_input_plugin(p->sb);
+        if (ret) {
+          hs_log(g_module, 3, "lsb_init() file: %s received: %d %s",
+                 p->sb->filename,
+                 ret,
+                 lsb_get_error(p->sb->lsb));
           free_input_plugin(p);
           free(p);
           p = NULL;
@@ -508,4 +496,37 @@ void hs_stop_input_plugins(hs_input_plugins* plugins)
     }
   }
   pthread_mutex_unlock(&plugins->list_lock);
+}
+
+
+hs_sandbox* hs_create_input_sandbox(void* parent,
+                                    const char* file,
+                                    const hs_config* cfg,
+                                    const hs_sandbox_config* sbc,
+                                    lua_State* env)
+{
+  char lsb_config[1024 * 2];
+  int ret = snprintf(lsb_config, sizeof(lsb_config), g_sb_template,
+                     sbc->memory_limit,
+                     sbc->instruction_limit,
+                     sbc->output_limit,
+                     cfg->io_lua_path,
+                     cfg->io_lua_cpath,
+                     cfg->max_message_size);
+
+  if (ret < 0 || ret > (int)sizeof(lsb_config) - 1) {
+    return NULL;
+  }
+
+  hs_sandbox* sb = hs_create_sandbox(parent, file, lsb_config, sbc, env);
+  if (!sb) return NULL;
+
+  // preload the Heka stream reader module
+  lua_State* L = lsb_get_lua(sb->lsb);
+  luaL_findtable(L, LUA_REGISTRYINDEX, "_PRELOADED", 1);
+  lua_pushstring(L, "heka_stream_reader");
+  lua_pushcfunction(L, luaopen_heka_stream_reader);
+  lua_rawset(L, -3);
+  lua_pop(L, 1); // remove the preloaded table
+  return sb;
 }

@@ -39,7 +39,10 @@ void hs_log(const char* plugin, int severity, const char* fmt, ...)
 
   struct timespec ts;
   if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
-    fprintf(stderr, "hs_log - clock_gettime failed\n");
+    ts.tv_sec = time(NULL);
+    fprintf(stderr, "%lld [error] hs_log clock_gettime failed\n",
+            ts.tv_sec * 1000000000LL);
+    ts.tv_nsec = 0;
   }
 
   const char* level;
@@ -76,10 +79,10 @@ void hs_log(const char* plugin, int severity, const char* fmt, ...)
   va_list args;
   va_start(args, fmt);
   pthread_mutex_lock(&g_logger);
-  fprintf(stdout, "%lld [%s] %s ", ts.tv_sec * 1000000000LL + ts.tv_nsec, level,
-          plugin);
-  vfprintf(stdout, fmt, args);
-  fwrite("\n", 1, 1, stdout);
+  fprintf(stderr, "%lld [%s] %s ", ts.tv_sec * 1000000000LL + ts.tv_nsec, level,
+          plugin ? plugin : "unnamed");
+  vfprintf(stderr, fmt, args);
+  fwrite("\n", 1, 1, stderr);
   pthread_mutex_unlock(&g_logger);
   va_end(args);
 }

@@ -72,4 +72,12 @@ void hs_load_output_plugins(hs_output_plugins* plugins,
                             const hs_config* cfg,
                             const char* path);
 void hs_wait_output_plugins(hs_output_plugins* plugins);
+
+hs_sandbox* hs_create_output_sandbox(void* parent,
+                                     const char* file,
+                                     const hs_config* cfg,
+                                     const hs_sandbox_config* sbc,
+                                     lua_State* env);
+
+int hs_init_output_sandbox(hs_sandbox* sb);
 #endif

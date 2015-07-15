@@ -54,4 +54,13 @@ void hs_load_input_plugins(hs_input_plugins* plugins, const hs_config* cfg,
 
 void hs_stop_input_plugins(hs_input_plugins* plugins);
 void hs_wait_input_plugins(hs_input_plugins* plugins);
+
+hs_sandbox* hs_create_input_sandbox(void* parent,
+                                    const char* file,
+                                    const hs_config* cfg,
+                                    const hs_sandbox_config* sbc,
+                                    lua_State* env);
+
+int hs_init_input_plugin(hs_sandbox* sb);
+
 #endif
