@@ -144,14 +144,6 @@ static int output_message(hs_output_plugin* p)
             break;
           }
 
-          // advance the checkpoint
-          if (!p->batching) {
-            p->cp_id[0] = p->cur_id[0];
-            p->cp_offset[0] = p->cur_offset[0];
-            p->cp_id[1] = p->cur_id[1];
-            p->cp_offset[1] = p->cur_offset[1];
-          }
-
           // update the stats
           if (sample) {
             hs_update_running_stats(&p->sb->stats.mm, mmdelta);
@@ -170,6 +162,14 @@ static int output_message(hs_output_plugin* p)
                                                     LSB_US_MAXIMUM);
           pthread_mutex_unlock(&p->cp_lock);
         }
+      }
+
+      // advance the checkpoint
+      if (!p->batching) {
+        p->cp_id[0] = p->cur_id[0];
+        p->cp_offset[0] = p->cur_offset[0];
+        p->cp_id[1] = p->cur_id[1];
+        p->cp_offset[1] = p->cur_offset[1];
       }
 
       if (mmdelta) {
