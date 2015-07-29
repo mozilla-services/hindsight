@@ -8,6 +8,8 @@
 
 #include "hs_output.h"
 
+#include <ctype.h>
+#include <dirent.h>
 #include <errno.h>
 #include <luasandbox/lauxlib.h>
 #include <stdlib.h>
@@ -20,10 +22,41 @@
 static const char g_module[] = "output";
 
 
+static bool extract_id(const char* fn, size_t* id)
+{
+  size_t l = strlen(fn);
+  size_t i = 0;
+  for (; i < l && isdigit(fn[i]); ++i);
+  if (i > 0 && i + 4 == l && strncmp(fn + i, ".log", 4) == 0) {
+    *id = (size_t)strtoull(fn, NULL, 10);
+    return true;
+  }
+  return false;
+}
+
+
+static size_t find_last_id(const char* path)
+{
+  size_t file_id = 0, current_id = 0;
+  struct dirent* entry;
+  DIR* dp = opendir(path);
+  if (dp == NULL) return file_id;
+
+  while ((entry = readdir(dp))) {
+    if (extract_id(entry->d_name, &current_id)) {
+      if (current_id > file_id) {
+        file_id = current_id;
+      }
+    }
+  }
+  closedir(dp);
+  return file_id;
+}
+
+
 void hs_init_output(hs_output* output, const char* path, const char* subdir)
 {
   output->fh = NULL;
-  output->id = 0;
   output->offset = 0;
   size_t len = strlen(path) + strlen(subdir) + 2;
   output->path = malloc(len);
@@ -32,6 +65,7 @@ void hs_init_output(hs_output* output, const char* path, const char* subdir)
     exit(EXIT_FAILURE);
   }
   snprintf(output->path, len, "%s/%s", path, subdir);
+  output->id = find_last_id(output->path);
 
   int ret = mkdir(path, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP);
   if (ret && errno != EEXIST) {

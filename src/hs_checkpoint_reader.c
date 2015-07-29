@@ -35,7 +35,7 @@ static bool extract_id(const char* fn, size_t* id)
 }
 
 
-size_t find_first_id(const char* path)
+static size_t find_first_id(const char* path)
 {
   struct dirent* entry;
   DIR* dp = opendir(path);
@@ -230,17 +230,6 @@ void hs_update_input_checkpoint(hs_checkpoint_reader* cpr,
   lua_pushfstring(cpr->values, "%s->%s", subdir, key);
   lua_pushfstring(cpr->values, "%d:%d", id, offset);
   lua_settable(cpr->values, LUA_GLOBALSINDEX);
-  pthread_mutex_unlock(&cpr->lock);
-}
-
-
-void hs_update_id_checkpoint(hs_checkpoint_reader* cpr,
-                             const char* key,
-                             size_t id)
-{
-  pthread_mutex_lock(&cpr->lock);
-  lua_pushinteger(cpr->values, id);
-  lua_setglobal(cpr->values, key);
   pthread_mutex_unlock(&cpr->lock);
 }
 

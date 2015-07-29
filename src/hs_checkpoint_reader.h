@@ -65,10 +65,6 @@ void hs_update_input_checkpoint(hs_checkpoint_reader* cpr,
                                 size_t id,
                                 size_t offset);
 
-void hs_update_id_checkpoint(hs_checkpoint_reader* cpr,
-                             const char* key,
-                             size_t id);
-
 void hs_output_checkpoints(hs_checkpoint_reader* cpr, FILE* fh);
 
 #endif

@@ -131,8 +131,6 @@ void hs_write_checkpoints(hs_checkpoint_writer* cpw, hs_checkpoint_reader* cpr)
     pthread_mutex_unlock(&cpw->input_plugins->list_lock);
 
     pthread_mutex_lock(&cpw->input_plugins->output.lock);
-    hs_update_id_checkpoint(cpr, "last_output_id_input",
-                            cpw->input_plugins->output.id);
     fflush(cpw->input_plugins->output.fh);
     pthread_mutex_unlock(&cpw->input_plugins->output.lock);
   }
@@ -148,8 +146,6 @@ void hs_write_checkpoints(hs_checkpoint_writer* cpw, hs_checkpoint_reader* cpr)
 
     pthread_mutex_lock(&cpw->analysis_plugins->output.lock);
     cpw->analysis_plugins->sample = sample;
-    hs_update_id_checkpoint(cpr, "last_output_id_analysis",
-                            cpw->analysis_plugins->output.id);
     fflush(cpw->analysis_plugins->output.fh);
     pthread_mutex_unlock(&cpw->analysis_plugins->output.lock);
 
@@ -167,8 +163,7 @@ void hs_write_checkpoints(hs_checkpoint_writer* cpw, hs_checkpoint_reader* cpr)
           fprintf(tsv, "%s\t"
                   "%zu\t%zu\t"
                   "%zu\t%zu\t"
-                  "%u\t"
-                  "%u\t%u\t%u\t"
+                  "%zu\t%zu\t%zu\t%zu\t"
                   "%g\t%g\t"
                   "%g\t%g\t"
                   "%g\t%g\t\n",
