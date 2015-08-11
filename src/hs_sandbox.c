@@ -117,6 +117,7 @@ hs_sandbox* hs_create_sandbox(void* parent,
     return NULL;
   }
   populate_environment(lsb_get_lua(sb->lsb), env, sbc);
+  lsb_add_function(sb->lsb, lsb_decode_protobuf, "decode_message");
   sb->mm = NULL;
   return sb;
 }

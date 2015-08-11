@@ -268,7 +268,17 @@ int hs_init_input_plugin(hs_sandbox* sb)
   if (!sb->im_fp) return -1;
 
   lsb_add_function(sb->lsb, sb->im_fp, "inject_message");
-  return lsb_init(sb->lsb, sb->state);
+  // inject_payload is intentionally excluded from input plugins
+  // you can construct whatever you need with inject_message
+  int ret = lsb_init(sb->lsb, sb->state);
+  if (ret) return ret;
+
+  lua_State* lua = lsb_get_lua(sb->lsb);
+  // remove output function
+  lua_pushnil(lua);
+  lua_setglobal(lua, "output");
+
+  return 0;
 }
 
 
