@@ -123,11 +123,20 @@ int main(int argc, char* argv[])
     }
 #endif
   }
+#ifndef HINDSIGHT_CLI // non CLI mode should shut everything down immediately
   aps.stop = true;
   ops.stop = true;
+#endif
+
   hs_stop_input_plugins(&ips);
   hs_wait_input_plugins(&ips);
+#ifdef HINDSIGHT_CLI
+  aps.stop = true;
+#endif
   hs_wait_analysis_plugins(&aps);
+#ifdef HINDSIGHT_CLI
+  ops.stop = true;
+#endif
   hs_wait_output_plugins(&ops);
 
   hs_write_checkpoints(&cpw, &cfg.cp_reader);
