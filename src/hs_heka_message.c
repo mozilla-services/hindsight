@@ -334,6 +334,7 @@ bool hs_decode_heka_message(hs_heka_message* m,
   long long val;
   int wiretype = 0;
   int tag = 0;
+  bool timestamp = false;
   hs_clear_heka_message(m);
 
   do {
@@ -353,6 +354,7 @@ bool hs_decode_heka_message(hs_heka_message* m,
       cp = process_varint(wiretype, cp, ep, &val);
       if (cp) {
         m->timestamp = val;
+        timestamp = true;
       }
       break;
 
@@ -448,7 +450,7 @@ bool hs_decode_heka_message(hs_heka_message* m,
     return false;
   }
 
-  if (!m->timestamp) {
+  if (!timestamp) {
     hs_log(g_module, 4, "decode message\tmissing timestamp");
     return false;
   }
