@@ -56,7 +56,7 @@ static void populate_environment(lua_State* sb,
           lua_setfield(sb, -2, lua_tostring(env, -2));
           break;
         case LUA_TBOOLEAN:
-          lua_pushboolean(sb, lua_tonumber(env, -1));
+          lua_pushboolean(sb, lua_toboolean(env, -1));
           lua_setfield(sb, -2, lua_tostring(env, -2));
           break;
         default:
