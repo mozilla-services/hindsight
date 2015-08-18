@@ -203,7 +203,7 @@ static void add_to_analysis_plugins(const hs_sandbox_config* cfg,
     ++at->list_cap;
     // todo probably don't want to grow it by 1
     hs_analysis_plugin** tmp = realloc(at->list,
-                                      sizeof(hs_analysis_plugin) * at->list_cap);
+                                       sizeof(hs_analysis_plugin) * at->list_cap);
     if (tmp) {
       at->list = tmp;
       at->list[at->list_cap - 1] = p;
@@ -435,7 +435,12 @@ static void* input_thread(void* arg)
   plugins->cp_offset = plugins->input.ib.offset;
 
   size_t bytes_read = 0;
+#ifdef HINDSIGHT_CLI
+  bool input_stop = false;
+  while (!(plugins->stop && input_stop)) {
+#else
   while (!plugins->stop) {
+#endif
     if (plugins->input.fh) {
       if (hs_find_message(&msg, &plugins->input.ib)) {
         plugins->msg = &msg;
@@ -468,11 +473,24 @@ static void* input_thread(void* arg)
       }
 
       if (!bytes_read) {
+#ifdef HINDSIGHT_CLI
+        size_t cid = plugins->input.ib.id;
+#endif
         // see if the next file is there yet
         hs_open_file(&plugins->input, hs_input_dir, plugins->input.ib.id + 1);
+#ifdef HINDSIGHT_CLI
+        if (cid == plugins->input.ib.id && plugins->stop) {
+          input_stop = true;
+        }
+#endif
       }
     } else { // still waiting on the first file
       hs_open_file(&plugins->input, hs_input_dir, plugins->input.ib.id);
+#ifdef HINDSIGHT_CLI
+      if (!plugins->input.fh && plugins->stop) {
+        input_stop = true;
+      }
+#endif
     }
 
     if (bytes_read || plugins->msg) {
@@ -498,7 +516,7 @@ static void* input_thread(void* arg)
     }
   }
 
-  // signal shutdown
+// signal shutdown
   plugins->msg = NULL;
   plugins->current_t = time(NULL);
 

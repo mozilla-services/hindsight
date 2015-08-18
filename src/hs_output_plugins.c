@@ -225,7 +225,12 @@ static void* input_thread(void* arg)
   hs_log(g_module, 6, "starting: %s", p->sb->filename);
 
   size_t bytes_read[2] = { 0 };
+#ifdef HINDSIGHT_CLI
+  bool input_stop = false, analysis_stop = false;
+  while (!(p->plugins->stop && input_stop && analysis_stop)) {
+#else
   while (!p->plugins->stop) {
+#endif
     if (p->input.fh && !pim) {
       if (hs_find_message(&im, &p->input.ib)) {
         pim = &im;
@@ -234,10 +239,24 @@ static void* input_thread(void* arg)
       }
 
       if (!bytes_read[0]) {
+#ifdef HINDSIGHT_CLI
+        size_t cid = p->input.ib.id;
+#endif
+        // see if the next file is there yet
         hs_open_file(&p->input, hs_input_dir, p->input.ib.id + 1);
+#ifdef HINDSIGHT_CLI
+        if (cid == p->input.ib.id && p->plugins->stop) {
+          input_stop = true;
+        }
+#endif
       }
     } else if (!p->input.fh) { // still waiting on the first file
       hs_open_file(&p->input, hs_input_dir, p->input.ib.id);
+#ifdef HINDSIGHT_CLI
+      if (!p->input.fh && p->plugins->stop) {
+        input_stop = true;
+      }
+#endif
     }
 
     if (p->analysis.fh && !pam) {
@@ -248,10 +267,24 @@ static void* input_thread(void* arg)
       }
 
       if (!bytes_read[1]) {
+#ifdef HINDSIGHT_CLI
+        size_t cid = p->analysis.ib.id;
+#endif
+        // see if the next file is there yet
         hs_open_file(&p->analysis, hs_analysis_dir, p->analysis.ib.id + 1);
+#ifdef HINDSIGHT_CLI
+        if (cid == p->analysis.ib.id && p->plugins->stop) {
+          analysis_stop = true;
+        }
+#endif
       }
     } else if (!p->analysis.fh) { // still waiting on the first file
       hs_open_file(&p->analysis, hs_analysis_dir, p->analysis.ib.id);
+#ifdef HINDSIGHT_CLI
+      if (!p->analysis.fh && p->plugins->stop) {
+        analysis_stop = true;
+      }
+#endif
     }
 
     // if we have one send the oldest first
@@ -541,10 +574,10 @@ void hs_load_output_plugins(hs_output_plugins* plugins,
 
 
 hs_sandbox* hs_create_output_sandbox(void* parent,
-                                    const char* file,
-                                    const hs_config* cfg,
-                                    const hs_sandbox_config* sbc,
-                                    lua_State* env)
+                                     const char* file,
+                                     const hs_config* cfg,
+                                     const hs_sandbox_config* sbc,
+                                     lua_State* env)
 {
   char lsb_config[1024 * 2];
   int ret = snprintf(lsb_config, sizeof(lsb_config), g_sb_template,
