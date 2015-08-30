@@ -70,7 +70,7 @@ static void init_config(hs_config* cfg)
   cfg->analysis_lua_cpath = NULL;
   cfg->hostname = NULL;
   cfg->output_size = 1024 * 1024 * 64;
-  cfg->analysis_threads = 0;
+  cfg->analysis_threads = 1;
   cfg->max_message_size = 1024 * 64;
   cfg->pid = (int)getpid();
   init_sandbox_config(&cfg->ipd);
@@ -394,6 +394,10 @@ int hs_load_config(const char* fn, hs_config* cfg)
 
   ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_threads,
                          &cfg->analysis_threads);
+  if (cfg->analysis_threads < 1 || cfg->analysis_threads > 64) {
+    lua_pushfstring(L, "%s must be 1-64", cfg_threads);
+    ret = 1;
+  }
   if (ret) goto cleanup;
 
   ret = load_sandbox_defaults(L, cfg_sb_ipd, &cfg->ipd);

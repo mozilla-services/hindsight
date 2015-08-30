@@ -37,11 +37,14 @@ typedef struct hs_input
 {
   FILE* fh;
   char* path;
+  char* name;
   hs_input_buffer ib;
 } hs_input;
 
 
-void hs_init_input(hs_input* hsi, size_t max_message_size, const char* path);
+void hs_init_input(hs_input* hsi, size_t max_message_size,
+                   const char* path,
+                   const char* name);
 void hs_free_input(hs_input* hsi);
 
 void hs_init_input_buffer(hs_input_buffer* b, size_t max_message_size);

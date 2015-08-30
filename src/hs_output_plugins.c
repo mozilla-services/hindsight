@@ -75,9 +75,6 @@ static hs_output_plugin* create_output_plugin(const char* file,
     exit(EXIT_FAILURE);
   }
 
-  hs_init_input(&p->input, cfg->max_message_size, cfg->output_path);
-  hs_init_input(&p->analysis, cfg->max_message_size, cfg->output_path);
-
   p->sb = hs_create_output_sandbox(p, file, cfg, sbc, env);
   if (!p->sb) {
     free(p);
@@ -349,14 +346,14 @@ static void* input_thread(void* arg)
 
   // hold the current checkpoints in memory incase we restart it
   hs_update_input_checkpoint(&p->plugins->cfg->cp_reader,
-                             p->sb->filename,
                              hs_input_dir,
+                             p->sb->filename,
                              p->cp_id[0],
                              p->cp_offset[0]);
 
   hs_update_input_checkpoint(&p->plugins->cfg->cp_reader,
-                             p->sb->filename,
                              hs_analysis_dir,
+                             p->sb->filename,
                              p->cp_id[1],
                              p->cp_offset[1]);
 
@@ -409,18 +406,18 @@ static void add_to_output_plugins(hs_output_plugins* plugins,
   // sync the output and read checkpoints
   // the read and output checkpoints can differ to allow for batching
   hs_lookup_input_checkpoint(&cfg->cp_reader,
+                             hs_input_dir,
                              p->sb->filename,
                              cfg->output_path,
-                             hs_input_dir,
                              &p->input.ib.id,
                              &p->input.ib.offset);
   p->cur_id[0] = p->cp_id[0] = p->input.ib.id;
   p->cur_offset[0] = p->cp_offset[0] = p->input.ib.offset;
 
   hs_lookup_input_checkpoint(&cfg->cp_reader,
+                             hs_analysis_dir,
                              p->sb->filename,
                              cfg->output_path,
-                             hs_analysis_dir,
                              &p->analysis.ib.id,
                              &p->analysis.ib.offset);
   p->cur_id[1] = p->cp_id[1] = p->analysis.ib.id;
@@ -535,6 +532,11 @@ void hs_load_output_plugins(hs_output_plugins* plugins,
         size_t len = strlen(entry->d_name) + sizeof(g_output) + 1;
         p->sb->filename = malloc(len);
         snprintf(p->sb->filename, len, "%s/%s", g_output, entry->d_name);
+
+        hs_init_input(&p->input, cfg->max_message_size, cfg->output_path,
+                      p->sb->filename);
+        hs_init_input(&p->analysis, cfg->max_message_size, cfg->output_path,
+                      p->sb->filename);
 
         if (sbc.preserve_data) {
           len = strlen(fqfn);

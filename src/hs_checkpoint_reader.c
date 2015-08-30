@@ -185,9 +185,9 @@ void hs_update_checkpoint(hs_checkpoint_reader* cpr,
 
 
 void hs_lookup_input_checkpoint(hs_checkpoint_reader* cpr,
+                                const char* subdir,
                                 const char* key,
                                 const char* path,
-                                const char* subdir,
                                 size_t* id,
                                 size_t* offset)
 {
@@ -221,8 +221,8 @@ void hs_lookup_input_checkpoint(hs_checkpoint_reader* cpr,
 
 
 void hs_update_input_checkpoint(hs_checkpoint_reader* cpr,
-                                const char* key,
                                 const char* subdir,
+                                const char* key,
                                 size_t id,
                                 size_t offset)
 {

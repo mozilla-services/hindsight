@@ -85,10 +85,8 @@ int main(int argc, char* argv[])
 
   hs_analysis_plugins aps;
   hs_init_analysis_plugins(&aps, &cfg, &mmb);
-  if (cfg.analysis_threads) {
-    hs_start_analysis_threads(&aps);
-  }
   hs_load_analysis_plugins(&aps, &cfg, cfg.run_path);
+  hs_start_analysis_threads(&aps);
 
   hs_output_plugins ops;
   hs_init_output_plugins(&ops, &cfg, &mmb);
@@ -96,10 +94,6 @@ int main(int argc, char* argv[])
 
   hs_checkpoint_writer cpw;
   hs_init_checkpoint_writer(&cpw, &ips, &aps, &ops, cfg.output_path);
-
-  sched_yield();
-  // the input uses the extra thread slot allocated at the end
-  hs_start_analysis_input(&aps, &aps.threads[cfg.analysis_threads]);
 
   struct timespec ts;
   int cnt = 0;
@@ -119,6 +113,8 @@ int main(int argc, char* argv[])
     }
 #ifdef HINDSIGHT_CLI
     if (ips.list_cnt == 0) {
+      hs_log(g_module, 6, "input plugins have exited; "
+                          "cascading shutdown initiated");
       break; // when all the inputs are done, exit
     }
 #endif

@@ -10,7 +10,6 @@
 #define hs_analysis_plugins_h_
 
 #include <pthread.h>
-#include <semaphore.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <time.h>
@@ -28,7 +27,7 @@ typedef struct hs_analysis_thread hs_analysis_thread;
 typedef struct hs_analysis_plugin
 {
   hs_sandbox* sb;
-  hs_analysis_plugins* plugins;
+  hs_analysis_thread* at;
 } hs_analysis_plugin;
 
 struct hs_analysis_plugins
@@ -37,20 +36,10 @@ struct hs_analysis_plugins
   pthread_t* threads;
   hs_config* cfg;
   hs_message_match_builder* mmb;
-  hs_heka_message* msg;
-
-  sem_t finished;
-  hs_input input;
 
   int thread_cnt;
-  time_t current_t;
   bool stop;
-  bool matched;
   bool sample;
-
-  pthread_mutex_t cp_lock;
-  size_t cp_id;
-  size_t cp_offset;
 
   hs_output output;
 };
@@ -59,13 +48,20 @@ struct hs_analysis_thread
 {
   hs_analysis_plugins* plugins;
   hs_analysis_plugin** list;
+  hs_heka_message* msg;
 
   pthread_mutex_t list_lock;
-  sem_t start;
+  pthread_mutex_t cp_lock;
+  size_t cp_id;
+  size_t cp_offset;
+  time_t current_t;
 
   int list_cap;
   int list_cnt;
   int tid;
+  bool matched;
+
+  hs_input input;
 };
 
 void hs_init_analysis_plugins(hs_analysis_plugins* plugins,

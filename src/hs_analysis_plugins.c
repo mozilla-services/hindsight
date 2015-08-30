@@ -15,7 +15,6 @@
 #include <luasandbox/lauxlib.h>
 #include <luasandbox_output.h>
 #include <pthread.h>
-#include <semaphore.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -53,11 +52,11 @@ static int read_message(lua_State* lua)
   lua_sandbox* lsb = (lua_sandbox*)luserdata;
   hs_analysis_plugin* p = (hs_analysis_plugin*)lsb_get_parent(lsb);
 
-  if (!p->plugins->matched || !p->plugins->msg) {
+  if (!p->at->matched || !p->at->msg) {
     lua_pushnil(lua);
     return 1;
   }
-  return hs_read_message(lua, p->plugins->msg);
+  return hs_read_message(lua, p->at->msg);
 }
 
 
@@ -74,9 +73,9 @@ static int inject_message(lua_State* L)
   if (lua_type(L, 1) == LUA_TTABLE) {
     lua_pushstring(L, p->sb->filename);
     lua_setfield(L, 1, "Logger");
-    lua_pushstring(L, p->plugins->cfg->hostname);
+    lua_pushstring(L, p->at->plugins->cfg->hostname);
     lua_setfield(L, 1, "Hostname");
-    lua_pushinteger(L, p->plugins->cfg->pid);
+    lua_pushinteger(L, p->at->plugins->cfg->pid);
     lua_setfield(L, 1, "Pid");
   }
 
@@ -88,7 +87,7 @@ static int inject_message(lua_State* L)
   size_t output_len = 0;
   const char* output = lsb_get_output(lsb, &output_len);
 
-  pthread_mutex_lock(&p->plugins->output.lock);
+  pthread_mutex_lock(&p->at->plugins->output.lock);
   int len = hs_write_varint(header + 3, output_len);
   int tlen = 4 + len + output_len;
   ++p->sb->stats.im_cnt;
@@ -98,14 +97,14 @@ static int inject_message(lua_State* L)
   header[1] = (char)(len + 1);
   header[2] = 0x08;
   header[3 + len] = 0x1f;
-  fwrite(header, 4 + len, 1, p->plugins->output.fh);
-  fwrite(output, output_len, 1, p->plugins->output.fh);
-  p->plugins->output.offset += tlen;
-  if (p->plugins->output.offset >= (size_t)p->plugins->cfg->output_size) {
-    ++p->plugins->output.id;
-    hs_open_output_file(&p->plugins->output);
+  fwrite(header, 4 + len, 1, p->at->plugins->output.fh);
+  fwrite(output, output_len, 1, p->at->plugins->output.fh);
+  p->at->plugins->output.offset += tlen;
+  if (p->at->plugins->output.offset >= (size_t)p->at->plugins->cfg->output_size) {
+    ++p->at->plugins->output.id;
+    hs_open_output_file(&p->at->plugins->output);
   }
-  pthread_mutex_unlock(&p->plugins->output.lock);
+  pthread_mutex_unlock(&p->at->plugins->output.lock);
   return 0;
 }
 
@@ -183,12 +182,9 @@ static void add_to_analysis_plugins(const hs_sandbox_config* cfg,
                                     hs_analysis_plugins* plugins,
                                     hs_analysis_plugin* p)
 {
-  int thread = 0;
-  if (plugins->cfg->analysis_threads) {
-    thread = cfg->thread % plugins->cfg->analysis_threads;
-  }
-
+  int thread = cfg->thread % plugins->cfg->analysis_threads;
   hs_analysis_thread* at = &plugins->list[thread];
+  p->at = at;
 
   pthread_mutex_lock(&at->list_lock);
   // todo shrink it down if there are a lot of empty slots
@@ -222,21 +218,33 @@ static void init_analysis_thread(hs_analysis_plugins* plugins, int tid)
   hs_analysis_thread* at = &plugins->list[tid];
   at->plugins = plugins;
   at->list = NULL;
-  at->list_cap = 0;
-  at->list_cnt = 0;
-  at->tid = tid;
-  if (sem_init(&at->start, 0, 1)) {
-    perror("start sem_init failed");
-    exit(EXIT_FAILURE);
-  }
-  if (sem_wait(&at->start)) {
-    perror("start sem_wait failed");
-    exit(EXIT_FAILURE);
-  }
+  at->msg = NULL;
   if (pthread_mutex_init(&at->list_lock, NULL)) {
     perror("list_lock pthread_mutex_init failed");
     exit(EXIT_FAILURE);
   }
+  if (pthread_mutex_init(&at->cp_lock, NULL)) {
+    perror("cp_lock pthread_mutex_init failed");
+    exit(EXIT_FAILURE);
+  }
+  at->cp_id = 0;
+  at->cp_offset = 0;
+  at->current_t = 0;
+  at->list_cap = 0;
+  at->list_cnt = 0;
+  at->tid = tid;
+  at->matched = false;
+
+  char name[255];
+  int n = snprintf(name, sizeof name, "%s%d", hs_analysis_dir, tid);
+  if (n < 0 || n >= (int)sizeof name) {
+    hs_log(g_module, 0, "name exceeded the buffer length: %s%d",
+           hs_analysis_dir, tid);
+    exit(EXIT_FAILURE);
+  }
+
+  hs_init_input(&at->input, plugins->cfg->max_message_size,
+                plugins->cfg->output_path, name);
 }
 
 
@@ -247,14 +255,14 @@ static void free_analysis_plugin(hs_analysis_plugin* p)
   hs_free_sandbox(p->sb);
   free(p->sb);
   p->sb = NULL;
-  p->plugins = NULL;
+  p->at = NULL;
 }
 
 
 static void free_analysis_thread(hs_analysis_thread* at)
 {
+  pthread_mutex_destroy(&at->cp_lock);
   pthread_mutex_destroy(&at->list_lock);
-  sem_destroy(&at->start);
   at->plugins = NULL;
   for (int i = 0; i < at->list_cap; ++i) {
     if (!at->list[i]) continue;
@@ -264,9 +272,16 @@ static void free_analysis_thread(hs_analysis_thread* at)
   }
   free(at->list);
   at->list = NULL;
+  at->msg = NULL;
+  at->cp_id = 0;
+  at->cp_offset = 0;
+  at->current_t = 0;
   at->list_cap = 0;
   at->list_cnt = 0;
   at->tid = 0;
+  at->matched = false;
+
+  hs_free_input(&at->input);
 }
 
 
@@ -302,96 +317,68 @@ static void terminate_sandbox(hs_analysis_thread* at, int i)
 }
 
 
-bool analyze_message(hs_analysis_thread* at)
+static void analyze_message(hs_analysis_thread* at)
 {
-  if (at->plugins->msg) { // NULL pointer signals shutting down
-    hs_sandbox* sb = NULL;
-    bool sample = at->plugins->sample;
-    int ret;
+  hs_sandbox* sb = NULL;
+  bool sample = at->plugins->sample;
+  int ret;
 
-    pthread_mutex_lock(&at->list_lock);
-    for (int i = 0; i < at->list_cap; ++i) {
-      if (!at->list[i]) continue;
-      sb = at->list[i]->sb;
+  pthread_mutex_lock(&at->list_lock);
+  for (int i = 0; i < at->list_cap; ++i) {
+    if (!at->list[i]) continue;
+    sb = at->list[i]->sb;
 
-      ret = 0;
-      struct timespec ts, ts1;
+    ret = 0;
+    struct timespec ts, ts1;
 
-      if (at->plugins->msg->msg) { // non idle/empty message
-        if (sample) clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
-        at->plugins->matched = hs_eval_message_matcher(sb->mm,
-                                                       at->plugins->msg);
-        if (sample) {
-          clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts1);
-          hs_update_running_stats(&sb->stats.mm, hs_timespec_delta(&ts, &ts1));
-        }
-        if (at->plugins->matched) {
-          ret = hs_process_message(sb->lsb);
-          if (sample) {
-            clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
-            hs_update_running_stats(&sb->stats.pm, hs_timespec_delta(&ts1,
-                                                                     &ts));
-          }
-
-          ++sb->stats.pm_cnt;
-          if (ret < 0) {
-            ++sb->stats.pm_failures;
-          }
-        }
-      }
-
-      if (ret <= 0 && sb->ticker_interval
-          && at->plugins->current_t >= sb->next_timer_event) {
-        clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
-        ret = hs_timer_event(sb->lsb, at->plugins->current_t);
+    if (at->msg->msg) { // non idle/empty message
+      if (sample) clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
+      at->matched = hs_eval_message_matcher(sb->mm, at->msg);
+      if (sample) {
         clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts1);
-        hs_update_running_stats(&sb->stats.te, hs_timespec_delta(&ts, &ts1));
-        sb->next_timer_event = at->plugins->current_t + sb->ticker_interval;
+        hs_update_running_stats(&sb->stats.mm, hs_timespec_delta(&ts, &ts1));
       }
+      if (at->matched) {
+        ret = hs_process_message(sb->lsb);
+        if (sample) {
+          clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
+          hs_update_running_stats(&sb->stats.pm, hs_timespec_delta(&ts1,
+                                                                   &ts));
+        }
 
-      if (ret > 0) terminate_sandbox(at, i);
-    }
-    pthread_mutex_unlock(&at->list_lock);
-  } else {
-    pthread_mutex_lock(&at->list_lock);
-    for (int i = 0; i < at->list_cap; ++i) {
-      if (!at->list[i]) continue;
-
-      if (hs_timer_event(at->list[i]->sb->lsb, at->plugins->current_t)) {
-        terminate_sandbox(at, i);
+        ++sb->stats.pm_cnt;
+        if (ret < 0) {
+          ++sb->stats.pm_failures;
+        }
       }
     }
-    pthread_mutex_unlock(&at->list_lock);
-    return false;
+
+    if (ret <= 0 && sb->ticker_interval
+        && at->current_t >= sb->next_timer_event) {
+      clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
+      ret = hs_timer_event(sb->lsb, at->current_t);
+      clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts1);
+      hs_update_running_stats(&sb->stats.te, hs_timespec_delta(&ts, &ts1));
+      sb->next_timer_event = at->current_t + sb->ticker_interval;
+    }
+
+    if (ret > 0) terminate_sandbox(at, i);
   }
-  return true;
+  pthread_mutex_unlock(&at->list_lock);
 }
 
 
-static void* analysis_thread_function(void* arg)
+static void shutdown_timer_event(hs_analysis_thread* at)
 {
-  hs_analysis_thread* at = (hs_analysis_thread*)arg;
+  pthread_mutex_lock(&at->list_lock);
+  for (int i = 0; i < at->list_cap; ++i) {
+    if (!at->list[i]) continue;
 
-  hs_log(g_module, 6, "starting thread [%d]", at->tid);
-  bool stop = false;
-
-  while (!stop) {
-    if (sem_wait(&at->start)) {
-      hs_log(g_module, 3, "thread [%d] sem_wait error: %s", at->tid,
-             strerror(errno));
-      break;
+    if (hs_timer_event(at->list[i]->sb->lsb, at->current_t)) {
+      terminate_sandbox(at, i);
     }
-
-    stop = !analyze_message(at);
-
-    if (sem_post(&at->plugins->finished)) {
-      hs_log(g_module, 3, "thread [%d] sem_post error: %s", at->tid,
-             strerror(errno));
-    }
-    sched_yield();
   }
-  hs_log(g_module, 6, "exiting thread [%d]", at->tid);
-  pthread_exit(NULL);
+  pthread_mutex_unlock(&at->list_lock);
 }
 
 
@@ -416,124 +403,82 @@ static hs_analysis_plugin* create_analysis_plugin(const char* file,
 
 static void* input_thread(void* arg)
 {
-  hs_log(g_module, 6, "starting input thread");
+  hs_analysis_thread* at = (hs_analysis_thread*)arg;
+  hs_log(g_module, 6, "starting input thread: %d", at->tid);
 
   hs_heka_message msg;
   hs_init_heka_message(&msg, 8);
 
-  hs_analysis_plugins* plugins = (hs_analysis_plugins*)arg;
-  plugins->msg = NULL;
-
-  hs_config* cfg = plugins->cfg;
+  hs_config* cfg = at->plugins->cfg;
   hs_lookup_input_checkpoint(&cfg->cp_reader,
-                             hs_analysis_dir,
-                             cfg->output_path,
                              hs_input_dir,
-                             &plugins->input.ib.id,
-                             &plugins->input.ib.offset);
-  plugins->cp_id = plugins->input.ib.id;
-  plugins->cp_offset = plugins->input.ib.offset;
+                             at->input.name,
+                             cfg->output_path,
+                             &at->input.ib.id,
+                             &at->input.ib.offset);
+  at->cp_id = at->input.ib.id;
+  at->cp_offset = at->input.ib.offset;
 
   size_t bytes_read = 0;
 #ifdef HINDSIGHT_CLI
   bool input_stop = false;
-  while (!(plugins->stop && input_stop)) {
+  while (!(at->plugins->stop && input_stop)) {
 #else
-  while (!plugins->stop) {
+  while (!at->plugins->stop) {
 #endif
-    if (plugins->input.fh) {
-      if (hs_find_message(&msg, &plugins->input.ib)) {
-        plugins->msg = &msg;
-        plugins->current_t = time(NULL);
+    if (at->input.fh) {
+      if (hs_find_message(&msg, &at->input.ib)) {
+        at->msg = &msg;
+        at->current_t = time(NULL);
+        analyze_message(at);
 
-        if (plugins->thread_cnt) {
-          for (int i = 0; i < plugins->thread_cnt; ++i) {
-            sem_post(&plugins->list[i].start);
-          }
-          sched_yield();
-          // the synchronization creates s a bottleneck of ~110-120K messages
-          // per second on my Thinkpad x230.  Threads should be used only
-          // when the amount of work done by each thread (>20us) outweighs the
-          // synchronization overhead.
-          for (int i = 0; i < plugins->thread_cnt; ++i) {
-            sem_wait(&plugins->finished);
-          }
-        } else {
-          analyze_message(&plugins->list[0]);
-        }
         // advance the checkpoint
-        pthread_mutex_lock(&plugins->cp_lock);
-        plugins->sample = false;
-        plugins->cp_id = plugins->input.ib.id;
-        plugins->cp_offset = plugins->input.ib.offset -
-          (plugins->input.ib.readpos - plugins->input.ib.scanpos);
-        pthread_mutex_unlock(&plugins->cp_lock);
+        pthread_mutex_lock(&at->cp_lock);
+        at->plugins->sample = false;
+        at->cp_id = at->input.ib.id;
+        at->cp_offset = at->input.ib.offset -
+          (at->input.ib.readpos - at->input.ib.scanpos);
+        pthread_mutex_unlock(&at->cp_lock);
       } else {
-        bytes_read = hs_read_file(&plugins->input);
+        bytes_read = hs_read_file(&at->input);
       }
 
       if (!bytes_read) {
 #ifdef HINDSIGHT_CLI
-        size_t cid = plugins->input.ib.id;
+        size_t cid = at->input.ib.id;
 #endif
         // see if the next file is there yet
-        hs_open_file(&plugins->input, hs_input_dir, plugins->input.ib.id + 1);
+        hs_open_file(&at->input, hs_input_dir, at->input.ib.id + 1);
 #ifdef HINDSIGHT_CLI
-        if (cid == plugins->input.ib.id && plugins->stop) {
+        if (cid == at->input.ib.id && at->plugins->stop) {
           input_stop = true;
         }
 #endif
       }
     } else { // still waiting on the first file
-      hs_open_file(&plugins->input, hs_input_dir, plugins->input.ib.id);
+      hs_open_file(&at->input, hs_input_dir, at->input.ib.id);
 #ifdef HINDSIGHT_CLI
-      if (!plugins->input.fh && plugins->stop) {
+      if (!at->input.fh && at->plugins->stop) {
         input_stop = true;
       }
 #endif
     }
 
-    if (bytes_read || plugins->msg) {
-      plugins->msg = NULL;
+    if (bytes_read || at->msg) {
+      at->msg = NULL;
     } else {
       // trigger any pending timer events
       hs_clear_heka_message(&msg); // create an idle/empty message
-      plugins->msg = &msg;
-      plugins->current_t = time(NULL);
-
-      if (plugins->thread_cnt) {
-        for (int i = 0; i < plugins->thread_cnt; ++i) {
-          sem_post(&plugins->list[i].start);
-        }
-        for (int i = 0; i < plugins->thread_cnt; ++i) {
-          sem_wait(&plugins->finished);
-        }
-      } else {
-        analyze_message(&plugins->list[0]);
-      }
-      plugins->msg = NULL;
+      at->msg = &msg;
+      at->current_t = time(NULL);
+      analyze_message(at);
+      at->msg = NULL;
       sleep(1);
     }
   }
-
-// signal shutdown
-  plugins->msg = NULL;
-  plugins->current_t = time(NULL);
-
-  if (plugins->thread_cnt) {
-    for (int i = 0; i < plugins->thread_cnt; ++i) {
-      sem_post(&plugins->list[i].start);
-    }
-    for (int i = 0; i < plugins->thread_cnt; ++i) {
-      sem_wait(&plugins->finished);
-    }
-  } else {
-    analyze_message(&plugins->list[0]);
-  }
-
+  shutdown_timer_event(at);
   hs_free_heka_message(&msg);
-
-  hs_log(g_module, 6, "exiting hs_analysis_read_input_thread");
+  hs_log(g_module, 6, "exiting input_thread: %d", at->tid);
   pthread_exit(NULL);
 }
 
@@ -543,52 +488,25 @@ void hs_init_analysis_plugins(hs_analysis_plugins* plugins,
                               hs_message_match_builder* mmb)
 {
   hs_init_output(&plugins->output, cfg->output_path, hs_analysis_dir);
-  hs_init_input(&plugins->input, cfg->max_message_size, cfg->output_path);
 
   plugins->thread_cnt = cfg->analysis_threads;
   plugins->cfg = cfg;
   plugins->stop = false;
-  plugins->matched = false;
   plugins->sample = false;
-  plugins->msg = NULL;
   plugins->mmb = mmb;
-  plugins->cp_id = 0;
-  plugins->cp_offset = 0;
 
-  if (sem_init(&plugins->finished, 0, cfg->analysis_threads)) {
-    perror("finished sem_init failed");
-    exit(EXIT_FAILURE);
+  plugins->list = malloc(sizeof(hs_analysis_thread) * cfg->analysis_threads);
+  for (unsigned i = 0; i < cfg->analysis_threads; ++i) {
+    init_analysis_thread(plugins, i);
   }
-
-  if (pthread_mutex_init(&plugins->cp_lock, NULL)) {
-    perror("cp_lock pthread_mutex_init failed");
-    exit(EXIT_FAILURE);
-  }
-
-  if (cfg->analysis_threads) {
-    plugins->list = malloc(sizeof(hs_analysis_thread) * cfg->analysis_threads);
-    for (unsigned i = 0; i < cfg->analysis_threads; ++i) {
-      if (sem_wait(&plugins->finished)) {
-        perror("finished sem_wait failed");
-        exit(EXIT_FAILURE);
-      }
-      init_analysis_thread(plugins, i);
-    }
-  } else {
-    plugins->list = malloc(sizeof(hs_analysis_thread));
-    init_analysis_thread(plugins, 0);
-  }
-
-  // extra thread for the reader is added at the end
-  plugins->threads = malloc(sizeof(pthread_t*) * (cfg->analysis_threads + 1));
+  plugins->threads = malloc(sizeof(pthread_t*) * (cfg->analysis_threads));
 }
 
 
 void hs_wait_analysis_plugins(hs_analysis_plugins* plugins)
 {
   void* thread_result;
-  // <= collects the plugins and the reader thread
-  for (int i = 0; i <= plugins->thread_cnt; ++i) {
+  for (int i = 0; i < plugins->thread_cnt; ++i) {
     int ret = pthread_join(plugins->threads[i], &thread_result);
     if (ret) {
       perror("pthread_join failed");
@@ -601,24 +519,17 @@ void hs_wait_analysis_plugins(hs_analysis_plugins* plugins)
 
 void hs_free_analysis_plugins(hs_analysis_plugins* plugins)
 {
-  if (plugins->thread_cnt == 0) {
-    free_analysis_thread(&plugins->list[0]);
-  } else {
-    for (int i = 0; i < plugins->thread_cnt; ++i) {
-      free_analysis_thread(&plugins->list[i]);
-    }
+  for (int i = 0; i < plugins->thread_cnt; ++i) {
+    free_analysis_thread(&plugins->list[i]);
   }
   free(plugins->list);
   plugins->list = NULL;
 
-  hs_free_input(&plugins->input);
   hs_free_output(&plugins->output);
 
-  pthread_mutex_destroy(&plugins->cp_lock);
-  sem_destroy(&plugins->finished);
   plugins->cfg = NULL;
-  plugins->msg = NULL;
   plugins->thread_cnt = 0;
+  plugins->sample = false;
 }
 
 
@@ -652,7 +563,6 @@ void hs_load_analysis_plugins(hs_analysis_plugins* plugins,
       }
       hs_analysis_plugin* p = create_analysis_plugin(fqfn, cfg, &sbc, L);
       if (p) {
-        p->plugins = plugins;
         p->sb->im_fp = &inject_message;
 
         size_t len = strlen(entry->d_name) + strlen(hs_analysis_dir) + 2;
@@ -695,33 +605,6 @@ void hs_load_analysis_plugins(hs_analysis_plugins* plugins,
 }
 
 
-void hs_start_analysis_input(hs_analysis_plugins* plugins, pthread_t* t)
-{
-  pthread_attr_t attr;
-  if (pthread_attr_init(&attr)) {
-    perror("hs_read_input pthread_attr_init failed");
-    exit(EXIT_FAILURE);
-  }
-
-  if (pthread_attr_setschedpolicy(&attr, SCHED_FIFO)) {
-    perror("hs_start_analysis_input pthread_attr_setschedpolicy failed");
-    exit(EXIT_FAILURE);
-  }
-
-  struct sched_param sp;
-  sp.sched_priority = sched_get_priority_min(SCHED_FIFO);
-  if (pthread_attr_setschedparam(&attr, &sp)) {
-    perror("hs_start_analysis_threads pthread_attr_setschedparam failed");
-    exit(EXIT_FAILURE);
-  }
-
-  if (pthread_create(t, &attr, input_thread, (void*)plugins)) {
-    perror("hs_read_input pthread_create failed");
-    exit(EXIT_FAILURE);
-  }
-}
-
-
 void hs_start_analysis_threads(hs_analysis_plugins* plugins)
 {
   pthread_attr_t attr;
@@ -742,7 +625,7 @@ void hs_start_analysis_threads(hs_analysis_plugins* plugins)
   }
 
   for (int i = 0; i < plugins->thread_cnt; ++i) {
-    if (pthread_create(&plugins->threads[i], &attr, analysis_thread_function,
+    if (pthread_create(&plugins->threads[i], &attr, input_thread,
                        (void*)&plugins->list[i])) {
       perror("hs_start_analysis_threads pthread_create failed");
       exit(EXIT_FAILURE);

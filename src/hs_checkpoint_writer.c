@@ -138,23 +138,21 @@ void hs_write_checkpoints(hs_checkpoint_writer* cpw, hs_checkpoint_reader* cpr)
   if (cpw->analysis_plugins) {
     long offset = 0;
     size_t id = 0;
-    pthread_mutex_lock(&cpw->analysis_plugins->cp_lock);
-    id = cpw->analysis_plugins->cp_id;
-    offset = cpw->analysis_plugins->cp_offset;
-    pthread_mutex_unlock(&cpw->analysis_plugins->cp_lock);
-    hs_update_input_checkpoint(cpr, hs_analysis_dir, hs_input_dir, id, offset);
 
-    pthread_mutex_lock(&cpw->analysis_plugins->output.lock);
-    cpw->analysis_plugins->sample = sample;
-    fflush(cpw->analysis_plugins->output.fh);
-    pthread_mutex_unlock(&cpw->analysis_plugins->output.lock);
+    for (int i = 0; i < cpw->analysis_plugins->thread_cnt; ++i) {
+      hs_analysis_thread* at = &cpw->analysis_plugins->list[i];
+      pthread_mutex_lock(&at->cp_lock);
+      id = at->cp_id;
+      offset = at->cp_offset;
+      pthread_mutex_unlock(&at->cp_lock);
+      hs_update_input_checkpoint(cpr, hs_input_dir, at->input.name, id, offset);
 
-    if (tsv) {
-      int cnt = cpw->analysis_plugins->thread_cnt;
-      if (!cnt) cnt = 1; // special case no threads (one list is still used)
+      pthread_mutex_lock(&cpw->analysis_plugins->output.lock);
+      cpw->analysis_plugins->sample = sample;
+      fflush(cpw->analysis_plugins->output.fh);
+      pthread_mutex_unlock(&cpw->analysis_plugins->output.lock);
 
-      for (int i = 0; i < cnt; ++i) {
-        hs_analysis_thread* at = &cpw->analysis_plugins->list[i];
+      if (tsv) {
         hs_analysis_plugin* p;
         pthread_mutex_lock(&at->list_lock);
         for (int i = 0; i < at->list_cap; ++i) {
@@ -194,13 +192,13 @@ void hs_write_checkpoints(hs_checkpoint_writer* cpw, hs_checkpoint_reader* cpr)
       pthread_mutex_lock(&p->cp_lock);
       p->sample = sample;
       hs_update_input_checkpoint(cpr,
-                                 p->sb->filename,
                                  hs_input_dir,
+                                 p->sb->filename,
                                  p->cp_id[0],
                                  p->cp_offset[0]);
       hs_update_input_checkpoint(cpr,
-                                 p->sb->filename,
                                  hs_analysis_dir,
+                                 p->sb->filename,
                                  p->cp_id[1],
                                  p->cp_offset[1]);
 
