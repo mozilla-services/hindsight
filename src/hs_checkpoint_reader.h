@@ -34,6 +34,17 @@ typedef struct hs_ip_checkpoint {
   } value;
 } hs_ip_checkpoint;
 
+typedef struct hs_checkpoint {
+  size_t id;
+  size_t offset;
+} hs_checkpoint;
+
+typedef struct hs_checkpoint_pair
+{
+  hs_checkpoint input;
+  hs_checkpoint analysis;
+} hs_checkpoint_pair;
+
 typedef struct hs_checkpoint_reader {
   lua_State* values;
   pthread_mutex_t lock;
@@ -56,14 +67,12 @@ void hs_lookup_input_checkpoint(hs_checkpoint_reader* cpr,
                                 const char* key,
                                 const char* path,
                                 const char* subdir,
-                                size_t* id,
-                                size_t* offset);
+                                hs_checkpoint* cp);
 
 void hs_update_input_checkpoint(hs_checkpoint_reader* cpr,
                                 const char* subdir,
                                 const char* key,
-                                size_t id,
-                                size_t offset);
+                                const hs_checkpoint* cp);
 
 void hs_output_checkpoints(hs_checkpoint_reader* cpr, FILE* fh);
 

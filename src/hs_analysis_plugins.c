@@ -227,8 +227,8 @@ static void init_analysis_thread(hs_analysis_plugins* plugins, int tid)
     perror("cp_lock pthread_mutex_init failed");
     exit(EXIT_FAILURE);
   }
-  at->cp_id = 0;
-  at->cp_offset = 0;
+  at->cp.id = 0;
+  at->cp.offset = 0;
   at->current_t = 0;
   at->list_cap = 0;
   at->list_cnt = 0;
@@ -273,8 +273,8 @@ static void free_analysis_thread(hs_analysis_thread* at)
   free(at->list);
   at->list = NULL;
   at->msg = NULL;
-  at->cp_id = 0;
-  at->cp_offset = 0;
+  at->cp.id = 0;
+  at->cp.offset = 0;
   at->current_t = 0;
   at->list_cap = 0;
   at->list_cnt = 0;
@@ -339,7 +339,7 @@ static void analyze_message(hs_analysis_thread* at)
         hs_update_running_stats(&sb->stats.mm, hs_timespec_delta(&ts, &ts1));
       }
       if (at->matched) {
-        ret = hs_process_message(sb->lsb);
+        ret = hs_process_message(sb->lsb, NULL);
         if (sample) {
           clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
           hs_update_running_stats(&sb->stats.pm, hs_timespec_delta(&ts1,
@@ -414,10 +414,9 @@ static void* input_thread(void* arg)
                              hs_input_dir,
                              at->input.name,
                              cfg->output_path,
-                             &at->input.ib.id,
-                             &at->input.ib.offset);
-  at->cp_id = at->input.ib.id;
-  at->cp_offset = at->input.ib.offset;
+                             &at->input.ib.cp);
+  at->cp.id = at->input.ib.cp.id;
+  at->cp.offset = at->input.ib.cp.offset;
 
   size_t bytes_read = 0;
 #ifdef HINDSIGHT_CLI
@@ -435,8 +434,8 @@ static void* input_thread(void* arg)
         // advance the checkpoint
         pthread_mutex_lock(&at->cp_lock);
         at->plugins->sample = false;
-        at->cp_id = at->input.ib.id;
-        at->cp_offset = at->input.ib.offset -
+        at->cp.id = at->input.ib.cp.id;
+        at->cp.offset = at->input.ib.cp.offset -
           (at->input.ib.readpos - at->input.ib.scanpos);
         pthread_mutex_unlock(&at->cp_lock);
       } else {
@@ -445,18 +444,18 @@ static void* input_thread(void* arg)
 
       if (!bytes_read) {
 #ifdef HINDSIGHT_CLI
-        size_t cid = at->input.ib.id;
+        size_t cid = at->input.ib.cp.id;
 #endif
         // see if the next file is there yet
-        hs_open_file(&at->input, hs_input_dir, at->input.ib.id + 1);
+        hs_open_file(&at->input, hs_input_dir, at->input.ib.cp.id + 1);
 #ifdef HINDSIGHT_CLI
-        if (cid == at->input.ib.id && at->plugins->stop) {
+        if (cid == at->input.ib.cp.id && at->plugins->stop) {
           input_stop = true;
         }
 #endif
       }
     } else { // still waiting on the first file
-      hs_open_file(&at->input, hs_input_dir, at->input.ib.id);
+      hs_open_file(&at->input, hs_input_dir, at->input.ib.cp.id);
 #ifdef HINDSIGHT_CLI
       if (!at->input.fh && at->plugins->stop) {
         input_stop = true;

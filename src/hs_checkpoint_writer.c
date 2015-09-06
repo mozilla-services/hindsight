@@ -136,16 +136,14 @@ void hs_write_checkpoints(hs_checkpoint_writer* cpw, hs_checkpoint_reader* cpr)
   }
 
   if (cpw->analysis_plugins) {
-    long offset = 0;
-    size_t id = 0;
+    hs_checkpoint cp;
 
     for (int i = 0; i < cpw->analysis_plugins->thread_cnt; ++i) {
       hs_analysis_thread* at = &cpw->analysis_plugins->list[i];
       pthread_mutex_lock(&at->cp_lock);
-      id = at->cp_id;
-      offset = at->cp_offset;
+      cp = at->cp;
       pthread_mutex_unlock(&at->cp_lock);
-      hs_update_input_checkpoint(cpr, hs_input_dir, at->input.name, id, offset);
+      hs_update_input_checkpoint(cpr, hs_input_dir, at->input.name, &cp);
 
       pthread_mutex_lock(&cpw->analysis_plugins->output.lock);
       cpw->analysis_plugins->sample = sample;
@@ -194,13 +192,11 @@ void hs_write_checkpoints(hs_checkpoint_writer* cpw, hs_checkpoint_reader* cpr)
       hs_update_input_checkpoint(cpr,
                                  hs_input_dir,
                                  p->sb->filename,
-                                 p->cp_id[0],
-                                 p->cp_offset[0]);
+                                 &p->cp.input);
       hs_update_input_checkpoint(cpr,
                                  hs_analysis_dir,
                                  p->sb->filename,
-                                 p->cp_id[1],
-                                 p->cp_offset[1]);
+                                 &p->cp.analysis);
 
       if (tsv) {
         fprintf(tsv, "%s\t"

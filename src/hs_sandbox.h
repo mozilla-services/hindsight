@@ -32,10 +32,10 @@ typedef struct hs_sandbox_stats
   size_t pm_cnt;
   size_t pm_failures;
 
-  unsigned  cur_memory;
-  unsigned  max_memory;
-  unsigned  max_output;
-  unsigned  max_instructions;
+  unsigned cur_memory;
+  unsigned max_memory;
+  unsigned max_output;
+  unsigned max_instructions;
 
   hs_running_stats mm;
   hs_running_stats pm;
@@ -64,7 +64,7 @@ hs_sandbox* hs_create_sandbox(void* parent,
 void hs_free_sandbox(hs_sandbox* p);
 
 
-int hs_process_message(lua_sandbox* lsb);
+int hs_process_message(lua_sandbox* lsb, void* sequence_id);
 int hs_timer_event(lua_sandbox* lsb, time_t t);
 void hs_update_running_stats(hs_running_stats* s, double d);
 double hs_sd_running_stats(hs_running_stats* s);

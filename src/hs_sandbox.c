@@ -87,6 +87,8 @@ static void populate_environment(lua_State* sb,
   lua_setfield(sb, -2, "filename");
   lua_pushinteger(sb, sbc->ticker_interval);
   lua_setfield(sb, -2, "ticker_interval");
+  lua_pushinteger(sb, sbc->async_buffer_size);
+  lua_setfield(sb, -2, "async_buffer_size");
 
   // add the table as the environment for the read_config function
   lua_setfenv(sb, -2);
@@ -148,7 +150,7 @@ void hs_free_sandbox(hs_sandbox* sb)
 }
 
 
-int hs_process_message(lua_sandbox* lsb)
+int hs_process_message(lua_sandbox* lsb, void* sequence_id)
 {
   static const char* func_name = "process_message";
   lua_State* lua = lsb_get_lua(lsb);
@@ -161,7 +163,13 @@ int hs_process_message(lua_sandbox* lsb)
     return 1;
   }
 
-  if (lua_pcall(lua, 0, 2, 0) != 0) {
+  int nargs = 0;
+  if (sequence_id) {
+    nargs = 1;
+    lua_pushlightuserdata(lua, sequence_id);
+  }
+
+  if (lua_pcall(lua, nargs, 2, 0) != 0) {
     char err[LSB_ERROR_SIZE];
     size_t len = snprintf(err, LSB_ERROR_SIZE, "%s() %s", func_name,
                           lua_tostring(lua, -1));

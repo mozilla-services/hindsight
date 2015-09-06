@@ -27,7 +27,7 @@ int hs_open_file(hs_input* hsi, const char* subdir, size_t id)
                      id);
   if (ret < 0 || ret > (int)sizeof(path) - 1) {
     hs_log(g_module, 0, "%s file: %zu.log: fully qualiifed path is"
-           " greater than %zu", hsi->name, hsi->ib.id, sizeof(path));
+           " greater than %zu", hsi->name, hsi->ib.cp.id, sizeof(path));
     exit(EXIT_FAILURE);
   }
   if (hsi->ib.name && strcmp(hsi->ib.name, path) == 0) return 0;
@@ -38,15 +38,15 @@ int hs_open_file(hs_input* hsi, const char* subdir, size_t id)
       exit(EXIT_FAILURE);
     }
 
-    if (hsi->ib.id == id && hsi->ib.offset) {
+    if (hsi->ib.cp.id == id && hsi->ib.cp.offset) {
       hs_log(g_module, 7, "%s opened file: %s offset: %zu", hsi->name,
              path,
-             hsi->ib.offset);
-      if (fseek(fh, hsi->ib.offset, SEEK_SET)) {
+             hsi->ib.cp.offset);
+      if (fseek(fh, hsi->ib.cp.offset, SEEK_SET)) {
         hs_log(g_module, 2, "%s file: %s invalid offset: %zu error: %d",
                hsi->name,
                path,
-               hsi->ib.offset,
+               hsi->ib.cp.offset,
                ferror(fh));
       }
     } else {
@@ -56,9 +56,9 @@ int hs_open_file(hs_input* hsi, const char* subdir, size_t id)
     if (hsi->fh) {
       fclose(hsi->fh);
     }
-    if (hsi->ib.id != id) {
-      hsi->ib.id = id;
-      hsi->ib.offset = 0;
+    if (hsi->ib.cp.id != id) {
+      hsi->ib.cp.id = id;
+      hsi->ib.cp.offset = 0;
     }
     if (ret >= (int)hsi->ib.namesize) {
       free(hsi->ib.name);
@@ -87,7 +87,7 @@ size_t hs_read_file(hs_input* hsi)
                        1,
                        hsi->ib.bufsize - hsi->ib.readpos,
                        hsi->fh);
-  hsi->ib.offset += nread;
+  hsi->ib.cp.offset += nread;
   hsi->ib.readpos += nread;
   return nread;
 }
@@ -145,8 +145,8 @@ void hs_init_input_buffer(hs_input_buffer* b, size_t max_message_size)
   } else {
     b->max_message_size = max_message_size;
   }
-  b->id = 0;
-  b->offset = 0;
+  b->cp.id = 0;
+  b->cp.offset = 0;
   b->readpos = 0;
   b->scanpos = 0;
   b->msglen = 0;
@@ -168,8 +168,8 @@ void hs_free_input_buffer(hs_input_buffer* b)
   b->name = NULL;
   b->namesize = 0;
 
-  b->id = 0;
-  b->offset = 0;
+  b->cp.id = 0;
+  b->cp.offset = 0;
   b->readpos = 0;
   b->scanpos = 0;
   b->msglen = 0;

@@ -87,7 +87,7 @@ static int hsr_find_message(lua_State* lua)
       return luaL_error(lua, "buffer reallocation failed\tname:%s", b->name);
     }
     memcpy(b->buf + b->readpos, s, len);
-    b->offset += len;
+    b->cp.offset += len;
     b->readpos += len;
   }
 

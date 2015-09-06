@@ -31,6 +31,8 @@ typedef struct hs_sandbox_config
   char* message_matcher; // analysis/output sandbox only
 
   unsigned thread; // analysis sandbox only
+  unsigned async_buffer_size; // output sandbox only
+
   unsigned output_limit;
   unsigned memory_limit;
   unsigned instruction_limit;

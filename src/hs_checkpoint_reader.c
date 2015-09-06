@@ -188,8 +188,7 @@ void hs_lookup_input_checkpoint(hs_checkpoint_reader* cpr,
                                 const char* subdir,
                                 const char* key,
                                 const char* path,
-                                size_t* id,
-                                size_t* offset)
+                                hs_checkpoint* cp)
 {
   const char* pos = NULL;
   pthread_mutex_lock(&cpr->lock);
@@ -200,8 +199,8 @@ void hs_lookup_input_checkpoint(hs_checkpoint_reader* cpr,
     if (tmp) {
       pos = strchr(tmp, ':');
       if (pos) {
-        *id = strtoul(tmp, NULL, 10);
-        *offset = strtoul(pos + 1, NULL, 10);
+        cp->id = strtoul(tmp, NULL, 10);
+        cp->offset = strtoul(pos + 1, NULL, 10);
       }
     }
   }
@@ -215,7 +214,7 @@ void hs_lookup_input_checkpoint(hs_checkpoint_reader* cpr,
              sizeof(fqfn));
       exit(EXIT_FAILURE);
     }
-    *id = find_first_id(fqfn);
+    cp->id = find_first_id(fqfn);
   }
 }
 
@@ -223,12 +222,12 @@ void hs_lookup_input_checkpoint(hs_checkpoint_reader* cpr,
 void hs_update_input_checkpoint(hs_checkpoint_reader* cpr,
                                 const char* subdir,
                                 const char* key,
-                                size_t id,
-                                size_t offset)
+                                const hs_checkpoint* cp)
 {
   pthread_mutex_lock(&cpr->lock);
   lua_pushfstring(cpr->values, "%s->%s", subdir, key);
-  lua_pushfstring(cpr->values, "%d:%d", id, offset);
+  lua_pushfstring(cpr->values, "%f:%f", (lua_Number)cp->id,
+                  (lua_Number)cp->offset);
   lua_settable(cpr->values, LUA_GLOBALSINDEX);
   pthread_mutex_unlock(&cpr->lock);
 }

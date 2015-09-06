@@ -52,8 +52,7 @@ struct hs_analysis_thread
 
   pthread_mutex_t list_lock;
   pthread_mutex_t cp_lock;
-  size_t cp_id;
-  size_t cp_offset;
+  hs_checkpoint cp;
   time_t current_t;
 
   int list_cap;

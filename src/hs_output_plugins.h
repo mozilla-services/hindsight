@@ -47,7 +47,6 @@ struct hs_output_plugin
   hs_heka_message* msg;
 
   pthread_t thread;
-  time_t current_t;
   int list_index;
   bool matched;
   bool sample;
@@ -57,10 +56,10 @@ struct hs_output_plugin
   hs_input analysis;
 
   pthread_mutex_t cp_lock;
-  size_t cp_id[2];
-  size_t cp_offset[2];
-  size_t cur_id[2];
-  size_t cur_offset[2];
+  hs_checkpoint_pair cp;
+  hs_checkpoint_pair cur;
+  hs_checkpoint_pair *async_cp;
+  int async_len;
 };
 
 

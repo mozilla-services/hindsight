@@ -260,7 +260,7 @@ bool hs_find_message(hs_heka_message* m, hs_input_buffer* hsib)
     if (p != hsib->buf + hsib->scanpos) {
       hs_log(g_module, 4, "discarded bytes\tname:%s\toffset:%zu\tbytes:%zu",
              hsib->name,
-             hsib->offset - hsib->readpos + hsib->scanpos,
+             hsib->cp.offset - hsib->readpos + hsib->scanpos,
              p - hsib->buf - hsib->scanpos);
     }
     hsib->scanpos = p - hsib->buf;
@@ -275,7 +275,7 @@ bool hs_find_message(hs_heka_message* m, hs_input_buffer* hsib)
     if (hsib->buf[hend - 1] != 0x1f) {
       hs_log(g_module, 4, "invalid header length\tname:%s\toffset:%zu",
              hsib->name,
-             hsib->offset - hsib->readpos + hsib->scanpos + 1);
+             hsib->cp.offset - hsib->readpos + hsib->scanpos + 1);
       ++hsib->scanpos;
       return hs_find_message(m, hsib);
     }
@@ -296,7 +296,7 @@ bool hs_find_message(hs_heka_message* m, hs_input_buffer* hsib)
       } else {
         hs_log(g_module, 4, "decode failure\tname:%s\toffset:%zu",
                hsib->name,
-               hsib->offset - hsib->readpos + hend);
+               hsib->cp.offset - hsib->readpos + hend);
         ++hsib->scanpos;
         hsib->msglen = 0;
         return hs_find_message(m, hsib);
@@ -305,14 +305,14 @@ bool hs_find_message(hs_heka_message* m, hs_input_buffer* hsib)
       hs_log(g_module, 4,
              "header decode failure\tname:%s\toffset:%zu",
              hsib->name,
-             hsib->offset - hsib->readpos + hsib->scanpos);
+             hsib->cp.offset - hsib->readpos + hsib->scanpos);
       ++hsib->scanpos;
       return hs_find_message(m, hsib);
     }
   } else {
     hs_log(g_module, 4, "discarded bytes\tname:%s\toffset:%zu\tbytes:%zu",
            hsib->name,
-           hsib->offset - hsib->readpos + hsib->scanpos,
+           hsib->cp.offset - hsib->readpos + hsib->scanpos,
            hsib->readpos - hsib->scanpos);
     hsib->scanpos = hsib->readpos = 0;
   }

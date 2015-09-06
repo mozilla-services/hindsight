@@ -25,12 +25,11 @@ typedef struct hs_input_buffer
   char* name;
   size_t namesize;
   size_t bufsize;
-  size_t id;
-  size_t offset;
   size_t readpos;
   size_t scanpos;
   size_t msglen;
   size_t max_message_size;
+  hs_checkpoint cp;
 } hs_input_buffer;
 
 typedef struct hs_input
