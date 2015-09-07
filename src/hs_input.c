@@ -176,6 +176,31 @@ void hs_free_input_buffer(hs_input_buffer* b)
 }
 
 
+/**
+ * Hacker's Delight - Henry S. Warren, Jr. page 48
+ *
+ * @param x
+ *
+ * @return size_t Least power of 2 greater than or equal to x
+ */
+static size_t clp2(size_t x)
+{
+  static const size_t size = sizeof(size_t);
+  x = x - 1;
+  x = x | (x >> 1);
+  x = x | (x >> 2);
+  x = x | (x >> 4);
+  x = x | (x >> 8);
+  if (size > 2) {
+    x = x | (x >> 16);
+  }
+  if (size > 4) {
+    x = x | (x >> 32);
+  }
+  return x + 1;
+}
+
+
 bool hs_expand_input_buffer(hs_input_buffer* b, size_t len)
 {
   if (b->scanpos != 0) { // shift the message left
@@ -197,9 +222,12 @@ bool hs_expand_input_buffer(hs_input_buffer* b, size_t len)
       newsize = b->readpos + len;
     }
 
-    if (newsize > b->max_message_size + HS_MAX_HDR_SIZE) {
-      return false;
-    }
+    size_t max_buffer = b->max_message_size + HS_MAX_HDR_SIZE;
+    if (newsize > max_buffer) return false;
+
+    newsize = clp2(newsize);
+    if (newsize > max_buffer) newsize = max_buffer;
+
     hs_log("input_buffer", 7, "expand buffer\tname:%s\tfrom:%zu\tto:%zu",
            b->name,
            b->bufsize,
