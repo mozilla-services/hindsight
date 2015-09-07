@@ -104,7 +104,7 @@ void hs_write_checkpoints(hs_checkpoint_writer* cpw, hs_checkpoint_reader* cpr)
       p = cpw->input_plugins->list[i];
       if (p) {
         pthread_mutex_lock(&p->cp.lock);
-        hs_update_checkpoint(cpr, p->sb->filename, &p->cp);
+        hs_update_checkpoint(cpr, p->sb->name, &p->cp);
         pthread_mutex_unlock(&p->cp.lock);
 
         if (tsv) {
@@ -117,7 +117,7 @@ void hs_write_checkpoints(hs_checkpoint_writer* cpw, hs_checkpoint_reader* cpr)
                   "0\t0\t"
                   "0\t0\t"
                   "0\t0\t\n",
-                  p->sb->filename,
+                  p->sb->name,
                   p->sb->stats.im_cnt, p->sb->stats.im_bytes,
                   p->sb->stats.pm_cnt, p->sb->stats.pm_failures,
                   p->sb->stats.cur_memory,
@@ -163,7 +163,7 @@ void hs_write_checkpoints(hs_checkpoint_writer* cpw, hs_checkpoint_reader* cpr)
                   "%g\t%g\t"
                   "%g\t%g\t"
                   "%g\t%g\t\n",
-                  p->sb->filename,
+                  p->sb->name,
                   p->sb->stats.im_cnt, p->sb->stats.im_bytes,
                   p->sb->stats.pm_cnt, p->sb->stats.pm_failures,
                   // the sandbox is not in use here, it is safe to grab the
@@ -191,11 +191,11 @@ void hs_write_checkpoints(hs_checkpoint_writer* cpw, hs_checkpoint_reader* cpr)
       p->sample = sample;
       hs_update_input_checkpoint(cpr,
                                  hs_input_dir,
-                                 p->sb->filename,
+                                 p->sb->name,
                                  &p->cp.input);
       hs_update_input_checkpoint(cpr,
                                  hs_analysis_dir,
-                                 p->sb->filename,
+                                 p->sb->name,
                                  &p->cp.analysis);
 
       if (tsv) {
@@ -207,7 +207,7 @@ void hs_write_checkpoints(hs_checkpoint_writer* cpw, hs_checkpoint_reader* cpr)
                 "%g\t%g\t"
                 "%g\t%g\t"
                 "%g\t%g\t\n",
-                p->sb->filename,
+                p->sb->name,
                 p->sb->stats.im_cnt, p->sb->stats.im_bytes,
                 p->sb->stats.pm_cnt, p->sb->stats.pm_failures,
                 p->sb->stats.cur_memory,

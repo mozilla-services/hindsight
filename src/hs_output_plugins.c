@@ -92,10 +92,8 @@ static int async_checkpoint_update(lua_State* lua)
 }
 
 
-static hs_output_plugin* create_output_plugin(const char* file,
-                                              const hs_config* cfg,
-                                              const hs_sandbox_config* sbc,
-                                              lua_State* env)
+static hs_output_plugin* create_output_plugin(const hs_config* cfg,
+                                              hs_sandbox_config* sbc)
 {
   hs_output_plugin* p = calloc(1, sizeof(hs_output_plugin));
   if (!p) return NULL;
@@ -106,10 +104,11 @@ static hs_output_plugin* create_output_plugin(const char* file,
     exit(EXIT_FAILURE);
   }
 
-  p->sb = hs_create_output_sandbox(p, file, cfg, sbc, env);
+  p->sb = hs_create_output_sandbox(p, cfg, sbc);
   if (!p->sb) {
     free(p);
-    hs_log(g_module, 3, "lsb_create_custom failed: %s", file);
+    hs_log(g_module, 3, "lsb_create_custom failed: %s/%s", sbc->dir,
+           sbc->filename);
     return NULL;
   }
 
@@ -150,7 +149,7 @@ static void shutdown_timer_event(hs_output_plugin* p)
 {
   if (lsb_get_state(p->sb->lsb) != LSB_TERMINATED) {
     if (hs_timer_event(p->sb->lsb, time(NULL))) {
-      hs_log(g_module, 3, "terminated: %s msg: %s", p->sb->filename,
+      hs_log(g_module, 3, "terminated: %s msg: %s", p->sb->name,
              lsb_get_error(p->sb->lsb));
     }
   }
@@ -276,7 +275,7 @@ static int output_message(hs_output_plugin* p)
   }
 
   if (ret > 0 || te_ret > 0) {
-    hs_log(g_module, 3, "terminated: %s msg: %s", p->sb->filename,
+    hs_log(g_module, 3, "terminated: %s msg: %s", p->sb->name,
            lsb_get_error(p->sb->lsb));
     return 1;
   }
@@ -293,7 +292,7 @@ static void* input_thread(void* arg)
   hs_init_heka_message(&am, 8);
 
   hs_output_plugin* p = (hs_output_plugin*)arg;
-  hs_log(g_module, 6, "starting: %s", p->sb->filename);
+  hs_log(g_module, 6, "starting: %s", p->sb->name);
 
   size_t bytes_read[2] = { 0 };
 #ifdef HINDSIGHT_CLI
@@ -411,17 +410,17 @@ static void* input_thread(void* arg)
   hs_free_heka_message(&am);
   hs_free_heka_message(&im);
 
-  hs_log(g_module, 6, "detaching: %s", p->sb->filename);
+  hs_log(g_module, 6, "detaching: %s", p->sb->name);
 
   // hold the current checkpoints in memory incase we restart it
   hs_update_input_checkpoint(&p->plugins->cfg->cp_reader,
                              hs_input_dir,
-                             p->sb->filename,
+                             p->sb->name,
                              &p->cp.input);
 
   hs_update_input_checkpoint(&p->plugins->cfg->cp_reader,
                              hs_analysis_dir,
-                             p->sb->filename,
+                             p->sb->name,
                              &p->cp.analysis);
 
   pthread_mutex_lock(&p->plugins->list_lock);
@@ -474,7 +473,7 @@ static void add_to_output_plugins(hs_output_plugins* plugins,
   // the read and output checkpoints can differ to allow for batching
   hs_lookup_input_checkpoint(&cfg->cp_reader,
                              hs_input_dir,
-                             p->sb->filename,
+                             p->sb->name,
                              cfg->output_path,
                              &p->input.ib.cp);
   p->cur.input.id = p->cp.input.id = p->input.ib.cp.id;
@@ -482,7 +481,7 @@ static void add_to_output_plugins(hs_output_plugins* plugins,
 
   hs_lookup_input_checkpoint(&cfg->cp_reader,
                              hs_analysis_dir,
-                             p->sb->filename,
+                             p->sb->name,
                              cfg->output_path,
                              &p->analysis.ib.cp);
   p->cur.analysis.id = p->cp.analysis.id = p->analysis.ib.cp.id;
@@ -578,37 +577,17 @@ void hs_load_output_plugins(hs_output_plugins* plugins,
     exit(EXIT_FAILURE);
   }
 
-  char fqfn[HS_MAX_PATH];
   while ((entry = readdir(dp))) {
-    if (!hs_get_config_fqfn(dir, entry->d_name, fqfn, sizeof(fqfn))) continue;
     hs_sandbox_config sbc;
-    lua_State* L = hs_load_sandbox_config(fqfn, &sbc, &cfg->opd,
-                                          HS_SB_TYPE_OUTPUT);
-    if (L) {
-      if (!hs_get_fqfn(dir, sbc.filename, fqfn, sizeof(fqfn))) {
-        lua_close(L);
-        hs_free_sandbox_config(&sbc);
-        continue;
-      }
-      hs_output_plugin* p = create_output_plugin(fqfn, cfg, &sbc, L);
+    if (hs_load_sandbox_config(dir, entry->d_name, &sbc, &cfg->opd,
+                               HS_SB_TYPE_OUTPUT)) {
+      hs_output_plugin* p = create_output_plugin(cfg, &sbc);
       if (p) {
         p->plugins = plugins;
-
-        size_t len = strlen(entry->d_name) + sizeof(g_output) + 1;
-        p->sb->filename = malloc(len);
-        snprintf(p->sb->filename, len, "%s/%s", g_output, entry->d_name);
-
         hs_init_input(&p->input, cfg->max_message_size, cfg->output_path,
-                      p->sb->filename);
+                      p->sb->name);
         hs_init_input(&p->analysis, cfg->max_message_size, cfg->output_path,
-                      p->sb->filename);
-
-        if (sbc.preserve_data) {
-          len = strlen(fqfn);
-          p->sb->state = malloc(len + 1);
-          memcpy(p->sb->state, fqfn, len + 1);
-          memcpy(p->sb->state + len - 3, "dat", 3);
-        }
+                      p->sb->name);
 
         p->sb->mm = hs_create_message_matcher(plugins->mmb,
                                               sbc.message_matcher);
@@ -616,23 +595,21 @@ void hs_load_output_plugins(hs_output_plugins* plugins,
         if (!p->sb->mm || ret) {
           if (!p->sb->mm) {
             hs_log(g_module, 3, "file: %s invalid message_matcher: %s",
-                   p->sb->filename, sbc.message_matcher);
+                   p->sb->name, sbc.message_matcher);
           } else {
             hs_log(g_module, 3, "lsb_init() file: %s received: %d %s",
-                   p->sb->filename,
+                   p->sb->name,
                    ret,
                    lsb_get_error(p->sb->lsb));
           }
           free_output_plugin(p);
           free(p);
           p = NULL;
-          lua_close(L);
           hs_free_sandbox_config(&sbc);
           continue;
         }
         add_to_output_plugins(plugins, p);
       }
-      lua_close(L);
     }
     hs_free_sandbox_config(&sbc);
   }
@@ -641,10 +618,8 @@ void hs_load_output_plugins(hs_output_plugins* plugins,
 
 
 hs_sandbox* hs_create_output_sandbox(void* parent,
-                                     const char* file,
                                      const hs_config* cfg,
-                                     const hs_sandbox_config* sbc,
-                                     lua_State* env)
+                                     hs_sandbox_config* sbc)
 {
   char lsb_config[1024 * 2];
   int ret = snprintf(lsb_config, sizeof(lsb_config), g_sb_template,
@@ -658,5 +633,5 @@ hs_sandbox* hs_create_output_sandbox(void* parent,
     return NULL;
   }
 
-  return hs_create_sandbox(parent, file, lsb_config, sbc, env);
+  return hs_create_sandbox(parent, lsb_config, sbc);
 }

@@ -52,6 +52,7 @@ static char* test_load_default_config()
   return NULL;
 }
 
+
 static char* test_load_config()
 {
   hs_config cfg;
@@ -85,6 +86,7 @@ static char* test_load_config()
   return NULL;
 }
 
+
 static char* test_load_invalid_config()
 {
   hs_config cfg;
@@ -94,11 +96,75 @@ static char* test_load_invalid_config()
   return NULL;
 }
 
+
+static char* test_sandbox_input_config()
+{
+  hs_sandbox_config cfg;
+  bool ret = hs_load_sandbox_config("sandbox", "input.cfg", &cfg, NULL,
+                                        HS_SB_TYPE_INPUT);
+  mu_assert(ret, "hs_load_sandbox_config failed");
+  mu_assert(strcmp(cfg.filename, "input.lua") == 0, "received %s",
+            cfg.filename);
+  mu_assert(cfg.message_matcher == NULL, "received %s", cfg.message_matcher);
+  mu_assert(cfg.async_buffer_size == 0, "received %d", cfg.async_buffer_size);
+  mu_assert(cfg.thread == 0, "received %d", cfg.thread);
+
+  hs_free_sandbox_config(&cfg);
+  return NULL;
+}
+
+
+static char* test_sandbox_analysis_config()
+{
+  hs_sandbox_config cfg;
+  bool ret = hs_load_sandbox_config("sandbox", "analysis.cfg", &cfg, NULL,
+                                        HS_SB_TYPE_ANALYSIS);
+  mu_assert(ret, "hs_load_sandbox_config failed");
+  mu_assert(strcmp(cfg.filename, "analysis.lua") == 0, "received %s",
+            cfg.filename);
+  mu_assert(strcmp(cfg.cfg_name, "analysis") == 0, "received %s",
+            cfg.cfg_name);
+  mu_assert(cfg.output_limit == 77777, "received %d", cfg.output_limit);
+  mu_assert(cfg.memory_limit == 88888, "received %d", cfg.memory_limit);
+  mu_assert(cfg.instruction_limit == 99999, "received %d",
+            cfg.instruction_limit);
+  mu_assert(cfg.ticker_interval == 17, "received %d", cfg.ticker_interval);
+  mu_assert(cfg.preserve_data == true, "received %s",
+            cfg.preserve_data ? "true" : "false");
+  mu_assert(strcmp(cfg.message_matcher, "TRUE") == 0, "received %s",
+            cfg.message_matcher);
+  mu_assert(cfg.thread == 1, "received %d", cfg.thread);
+  mu_assert(cfg.async_buffer_size == 0, "received %d", cfg.async_buffer_size);
+
+  hs_free_sandbox_config(&cfg);
+  return NULL;
+}
+
+
+static char* test_sandbox_output_config()
+{
+  hs_sandbox_config cfg;
+  bool ret = hs_load_sandbox_config("sandbox", "output.cfg", &cfg, NULL,
+                                        HS_SB_TYPE_OUTPUT);
+  mu_assert(ret, "hs_load_sandbox_config failed");
+  mu_assert(strcmp(cfg.filename, "output.lua") == 0, "received %s",
+            cfg.filename);
+  mu_assert(cfg.async_buffer_size == 999, "received %d", cfg.async_buffer_size);
+  mu_assert(cfg.thread == 0, "received %d", cfg.thread);
+
+  hs_free_sandbox_config(&cfg);
+  return NULL;
+}
+
+
 static char* all_tests()
 {
   mu_run_test(test_load_default_config);
   mu_run_test(test_load_config);
   mu_run_test(test_load_invalid_config);
+  mu_run_test(test_sandbox_input_config);
+  mu_run_test(test_sandbox_analysis_config);
+  mu_run_test(test_sandbox_output_config);
   return NULL;
 }
 

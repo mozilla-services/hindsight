@@ -16,6 +16,7 @@
 
 extern const char* hs_input_dir;
 extern const char* hs_analysis_dir;
+extern const char* hs_output_dir;
 
 typedef enum {
   HS_SB_TYPE_UNKNOWN,
@@ -27,9 +28,12 @@ typedef enum {
 typedef struct hs_sandbox_config
 {
   hs_sb_type type;
+  char* dir;
   char* filename;
-  char* message_matcher; // analysis/output sandbox only
+  char* cfg_name;
+  lua_State* custom_config;
 
+  char* message_matcher; // analysis/output sandbox only
   unsigned thread; // analysis sandbox only
   unsigned async_buffer_size; // output sandbox only
 
@@ -84,12 +88,13 @@ void hs_free_config(hs_config* cfg);
  * @param cfg Configuration structure to populate
  * @param dflt
  *
- * @return int NULL on failure
+ * @return bool false on failure
  */
-lua_State* hs_load_sandbox_config(const char* fn,
-                                  hs_sandbox_config* cfg,
-                                  const hs_sandbox_config* dflt,
-                                  hs_sb_type mode);
+bool hs_load_sandbox_config(const char* dir,
+                            const char* fn,
+                            hs_sandbox_config* cfg,
+                            const hs_sandbox_config* dflt,
+                            hs_sb_type mode);
 
 /**
  * Loads the Hinsight configuration from a file
@@ -105,6 +110,5 @@ bool hs_get_config_fqfn(const char* path,
                         const char* name,
                         char* fqfn,
                         size_t fqfn_len);
-
 
 #endif

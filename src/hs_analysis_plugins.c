@@ -71,7 +71,7 @@ static int inject_message(lua_State* L)
   hs_analysis_plugin* p = (hs_analysis_plugin*)lsb_get_parent(lsb);
 
   if (lua_type(L, 1) == LUA_TTABLE) {
-    lua_pushstring(L, p->sb->filename);
+    lua_pushstring(L, p->sb->name);
     lua_setfield(L, 1, "Logger");
     lua_pushstring(L, p->at->plugins->cfg->hostname);
     lua_setfield(L, 1, "Hostname");
@@ -285,12 +285,12 @@ static void free_analysis_thread(hs_analysis_thread* at)
 }
 
 
-int hs_init_analysis_sandbox(hs_sandbox* sb)
+int hs_init_analysis_sandbox(hs_sandbox* sb, lua_CFunction im_fp)
 {
-  if (!sb->im_fp) return -1;
+  if (!im_fp) return -1;
 
   lsb_add_function(sb->lsb, &read_message, "read_message");
-  lsb_add_function(sb->lsb, sb->im_fp, "inject_message");
+  lsb_add_function(sb->lsb, im_fp, "inject_message");
   lsb_add_function(sb->lsb, &inject_payload, "inject_payload");
 
   int ret = lsb_init(sb->lsb, sb->state);
@@ -308,7 +308,7 @@ int hs_init_analysis_sandbox(hs_sandbox* sb)
 
 static void terminate_sandbox(hs_analysis_thread* at, int i)
 {
-  hs_log(g_module, 3, "terminated: %s msg: %s", at->list[i]->sb->filename,
+  hs_log(g_module, 3, "terminated: %s msg: %s", at->list[i]->sb->name,
          lsb_get_error(at->list[i]->sb->lsb));
   free_analysis_plugin(at->list[i]);
   free(at->list[i]);
@@ -382,18 +382,17 @@ static void shutdown_timer_event(hs_analysis_thread* at)
 }
 
 
-static hs_analysis_plugin* create_analysis_plugin(const char* file,
-                                                  const hs_config* cfg,
-                                                  const hs_sandbox_config* sbc,
-                                                  lua_State* env)
+static hs_analysis_plugin* create_analysis_plugin(const hs_config* cfg,
+                                                  hs_sandbox_config* sbc)
 {
   hs_analysis_plugin* p = calloc(1, sizeof(hs_analysis_plugin));
   if (!p) return NULL;
 
-  p->sb = hs_create_analysis_sandbox(p, file, cfg, sbc, env);
+  p->sb = hs_create_analysis_sandbox(p, cfg, sbc);
   if (!p->sb) {
     free(p);
-    hs_log(g_module, 3, "lsb_create_custom failed: %s", file);
+    hs_log(g_module, 3, "lsb_create_custom failed: %s/%s", sbc->dir,
+           sbc->filename);
     return NULL;
   }
 
@@ -548,55 +547,32 @@ void hs_load_analysis_plugins(hs_analysis_plugins* plugins,
     exit(EXIT_FAILURE);
   }
 
-  char fqfn[HS_MAX_PATH];
   while ((entry = readdir(dp))) {
-    if (!hs_get_config_fqfn(dir, entry->d_name, fqfn, sizeof(fqfn))) continue;
     hs_sandbox_config sbc;
-    lua_State* L = hs_load_sandbox_config(fqfn, &sbc, &cfg->apd,
-                                          HS_SB_TYPE_ANALYSIS);
-    if (L) {
-      if (!hs_get_fqfn(dir, sbc.filename, fqfn, sizeof(fqfn))) {
-        lua_close(L);
-        hs_free_sandbox_config(&sbc);
-        continue;
-      }
-      hs_analysis_plugin* p = create_analysis_plugin(fqfn, cfg, &sbc, L);
+    if (hs_load_sandbox_config(dir, entry->d_name,
+                               &sbc, &cfg->apd, HS_SB_TYPE_ANALYSIS)) {
+      hs_analysis_plugin* p = create_analysis_plugin(cfg, &sbc);
       if (p) {
-        p->sb->im_fp = &inject_message;
-
-        size_t len = strlen(entry->d_name) + strlen(hs_analysis_dir) + 2;
-        p->sb->filename = malloc(len);
-        snprintf(p->sb->filename, len, "%s/%s", hs_analysis_dir, entry->d_name);
-
-        if (sbc.preserve_data) {
-          len = strlen(fqfn);
-          p->sb->state = malloc(len + 1);
-          memcpy(p->sb->state, fqfn, len + 1);
-          memcpy(p->sb->state + len - 3, "dat", 3);
-        }
-
         p->sb->mm = hs_create_message_matcher(plugins->mmb,
                                               sbc.message_matcher);
-        int ret = hs_init_analysis_sandbox(p->sb);
+        int ret = hs_init_analysis_sandbox(p->sb, &inject_message);
         if (!p->sb->mm || ret) {
           if (!p->sb->mm) {
             hs_log(g_module, 3, "%s invalid message_matcher: %s",
-                   p->sb->filename,
+                   p->sb->name,
                    sbc.message_matcher);
           } else {
             hs_log(g_module, 3, "lsb_init: %s received: %d %s",
-                   p->sb->filename, ret, lsb_get_error(p->sb->lsb));
+                   p->sb->name, ret, lsb_get_error(p->sb->lsb));
           }
           free_analysis_plugin(p);
           free(p);
           p = NULL;
-          lua_close(L);
           hs_free_sandbox_config(&sbc);
           continue;
         }
         add_to_analysis_plugins(&sbc, plugins, p);
       }
-      lua_close(L);
     }
     hs_free_sandbox_config(&sbc);
   }
@@ -634,10 +610,8 @@ void hs_start_analysis_threads(hs_analysis_plugins* plugins)
 
 
 hs_sandbox* hs_create_analysis_sandbox(void* parent,
-                                       const char* file,
                                        const hs_config* cfg,
-                                       const hs_sandbox_config* sbc,
-                                       lua_State* env)
+                                       hs_sandbox_config* sbc)
 {
   char lsb_config[1024 * 2];
   int ret = snprintf(lsb_config, sizeof(lsb_config), g_sb_template,
@@ -651,5 +625,5 @@ hs_sandbox* hs_create_analysis_sandbox(void* parent,
     return NULL;
   }
 
-  return hs_create_sandbox(parent, file, lsb_config, sbc, env);
+  return hs_create_sandbox(parent, lsb_config, sbc);
 }

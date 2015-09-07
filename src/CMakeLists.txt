@@ -16,6 +16,7 @@ hs_logger.c
 hs_message_matcher.c
 hs_output.c
 hs_output_plugins.c
+hs_running_stats.c
 hs_sandbox.c
 hs_string_matcher.c
 hs_util.c

@@ -224,19 +224,18 @@ static void free_ip_checkpoint(hs_ip_checkpoint* cp)
 }
 
 
-static hs_input_plugin* create_input_plugin(const char* file,
-                                            const hs_config* cfg,
-                                            const hs_sandbox_config* sbc,
-                                            lua_State* env)
+static hs_input_plugin* create_input_plugin(const hs_config* cfg,
+                                            hs_sandbox_config* sbc)
 {
   hs_input_plugin* p = calloc(1, sizeof(hs_input_plugin));
   if (!p) return NULL;
   p->list_index = -1;
 
-  p->sb = hs_create_input_sandbox(p, file, cfg, sbc, env);
+  p->sb = hs_create_input_sandbox(p, cfg, sbc);
   if (!p->sb) {
     free(p);
-    hs_log(g_module, 3, "lsb_create_custom failed: %s", file);
+    hs_log(g_module, 3, "lsb_create_custom failed: %s/%s", sbc->dir,
+           sbc->filename);
     return NULL;
   }
 
@@ -263,11 +262,11 @@ static void free_input_plugin(hs_input_plugin* p)
 }
 
 
-int hs_init_input_plugin(hs_sandbox* sb)
+int hs_init_input_sandbox(hs_sandbox* sb, lua_CFunction im_fp)
 {
-  if (!sb->im_fp) return -1;
+  if (!im_fp) return -1;
 
-  lsb_add_function(sb->lsb, sb->im_fp, "inject_message");
+  lsb_add_function(sb->lsb, im_fp, "inject_message");
   // inject_payload is intentionally excluded from input plugins
   // you can construct whatever you need with inject_message
   int ret = lsb_init(sb->lsb, sb->state);
@@ -288,14 +287,14 @@ static void* input_thread(void* arg)
   struct timespec ts;
   int ret = 0;
 
-  hs_log(g_module, 6, "starting: %s", p->sb->filename);
+  hs_log(g_module, 6, "starting: %s", p->sb->name);
   while (true) {
     ret = process_message(p->sb->lsb, p);
     if (ret <= 0) {
       if (ret < 0) {
         const char* err = lsb_get_error(p->sb->lsb);
         if (strlen(err) > 0) {
-          hs_log(g_module, 4, "file: %s received: %d %s", p->sb->filename, ret,
+          hs_log(g_module, 4, "file: %s received: %d %s", p->sb->name, ret,
                  lsb_get_error(p->sb->lsb));
         }
       }
@@ -303,7 +302,7 @@ static void* input_thread(void* arg)
       if (p->sb->ticker_interval == 0) break; // run once
 
       if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
-        hs_log(g_module, 3, "clock_gettime failed: %s", p->sb->filename);
+        hs_log(g_module, 3, "clock_gettime failed: %s", p->sb->name);
         break;
       }
       ts.tv_sec += p->sb->ticker_interval;
@@ -318,11 +317,11 @@ static void* input_thread(void* arg)
   }
 
   hs_log(g_module, 6, "detaching: %s received: %d msg: %s",
-         p->sb->filename, ret, lsb_get_error(p->sb->lsb));
+         p->sb->name, ret, lsb_get_error(p->sb->lsb));
 
   // hold the current checkpoint in memory until we shutdown
   // to facilitate resuming where it left off
-  hs_update_checkpoint(&p->plugins->cfg->cp_reader, p->sb->filename, &p->cp);
+  hs_update_checkpoint(&p->plugins->cfg->cp_reader, p->sb->name, &p->cp);
 
   pthread_mutex_lock(&p->plugins->list_lock);
   hs_input_plugins* plugins = p->plugins;
@@ -370,7 +369,7 @@ static void add_to_input_plugins(hs_input_plugins* plugins, hs_input_plugin* p)
   assert(p->list_index >= 0);
 
   hs_lookup_checkpoint(&p->plugins->cfg->cp_reader,
-                       p->sb->filename,
+                       p->sb->name,
                        &p->cp);
 
   int ret = pthread_create(&p->thread,
@@ -445,50 +444,28 @@ void hs_load_input_plugins(hs_input_plugins* plugins, const hs_config* cfg,
     exit(EXIT_FAILURE);
   }
 
-  char fqfn[HS_MAX_PATH];
   while ((entry = readdir(dp))) {
-    if (!hs_get_config_fqfn(dir, entry->d_name, fqfn, sizeof(fqfn))) continue;
     hs_sandbox_config sbc;
-    lua_State* L = hs_load_sandbox_config(fqfn, &sbc, &cfg->ipd,
-                                          HS_SB_TYPE_INPUT);
-    if (L) {
-      if (!hs_get_fqfn(dir, sbc.filename, fqfn, sizeof(fqfn))) {
-        lua_close(L);
-        hs_free_sandbox_config(&sbc);
-        continue;
-      }
-      hs_input_plugin* p = create_input_plugin(fqfn, cfg, &sbc, L);
+    if (hs_load_sandbox_config(dir, entry->d_name, &sbc, &cfg->ipd,
+                               HS_SB_TYPE_INPUT)) {
+      hs_input_plugin* p = create_input_plugin(cfg, &sbc);
       if (p) {
         p->plugins = plugins;
-        p->sb->im_fp = &inject_message;
 
-        size_t len = strlen(entry->d_name) + strlen(hs_input_dir) + 2;
-        p->sb->filename = malloc(len);
-        snprintf(p->sb->filename, len, "%s/%s", hs_input_dir, entry->d_name);
-
-        if (sbc.preserve_data) {
-          len = strlen(fqfn);
-          p->sb->state = malloc(len + 1);
-          memcpy(p->sb->state, fqfn, len + 1);
-          memcpy(p->sb->state + len - 3, "dat", 3);
-        }
-
-        int ret = hs_init_input_plugin(p->sb);
+        int ret = hs_init_input_sandbox(p->sb, &inject_message);
         if (ret) {
           hs_log(g_module, 3, "lsb_init() file: %s received: %d %s",
-                 p->sb->filename,
+                 p->sb->name,
                  ret,
                  lsb_get_error(p->sb->lsb));
           free_input_plugin(p);
           free(p);
           p = NULL;
-          lua_close(L);
           hs_free_sandbox_config(&sbc);
           continue;
         }
         add_to_input_plugins(plugins, p);
       }
-      lua_close(L);
     }
     hs_free_sandbox_config(&sbc);
   }
@@ -510,10 +487,8 @@ void hs_stop_input_plugins(hs_input_plugins* plugins)
 
 
 hs_sandbox* hs_create_input_sandbox(void* parent,
-                                    const char* file,
                                     const hs_config* cfg,
-                                    const hs_sandbox_config* sbc,
-                                    lua_State* env)
+                                    hs_sandbox_config* sbc)
 {
   char lsb_config[1024 * 2];
   int ret = snprintf(lsb_config, sizeof(lsb_config), g_sb_template,
@@ -528,7 +503,7 @@ hs_sandbox* hs_create_input_sandbox(void* parent,
     return NULL;
   }
 
-  hs_sandbox* sb = hs_create_sandbox(parent, file, lsb_config, sbc, env);
+  hs_sandbox* sb = hs_create_sandbox(parent, lsb_config, sbc);
   if (!sb) return NULL;
 
   // preload the Heka stream reader module

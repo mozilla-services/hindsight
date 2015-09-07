@@ -12,8 +12,10 @@
 #include <math.h>
 #include <luasandbox/lauxlib.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "hs_logger.h"
+#include "hs_util.h"
 
 
 static int read_config(lua_State* L)
@@ -25,56 +27,91 @@ static int read_config(lua_State* L)
 }
 
 
-static void populate_environment(lua_State* sb,
-                                 lua_State* env,
-                                 const hs_sandbox_config* sbc)
+static void process_table(lua_State* sb, const hs_sandbox_config* sbc)
 {
-  lua_pushcclosure(sb, read_config, 0);
+  lua_State* env = sbc->custom_config;
   lua_newtable(sb);
-
-  // load the user provided configuration variables
-  if (env) {
-    lua_pushnil(env);
-    while (lua_next(env, LUA_GLOBALSINDEX) != 0) {
-      int kt = lua_type(env, -2);
-      int vt = lua_type(env, -1);
-      switch (kt) {
+  lua_pushnil(env);
+  while (lua_next(env, -2) != 0) {
+    int kt = lua_type(env, -2);
+    int vt = lua_type(env, -1);
+    switch (kt) {
+    case LUA_TNUMBER:
+    case LUA_TSTRING:
+      switch (vt) {
       case LUA_TSTRING:
-        switch (vt) {
-        case LUA_TSTRING:
-          {
-            size_t len;
-            const char* tmp = lua_tolstring(env, -1, &len);
-            if (tmp) {
-              lua_pushlstring(sb, tmp, len);
+        {
+          size_t len;
+          const char* tmp = lua_tolstring(env, -1, &len);
+          if (tmp) {
+            lua_pushlstring(sb, tmp, len);
+            if (kt == LUA_TSTRING) {
               lua_setfield(sb, -2, lua_tostring(env, -2));
+            } else {
+              lua_rawseti(sb, -2, lua_tointeger(env, -2));
             }
           }
-          break;
-        case LUA_TNUMBER:
-          lua_pushnumber(sb, lua_tonumber(env, -1));
-          lua_setfield(sb, -2, lua_tostring(env, -2));
-          break;
-        case LUA_TBOOLEAN:
-          lua_pushboolean(sb, lua_toboolean(env, -1));
-          lua_setfield(sb, -2, lua_tostring(env, -2));
-          break;
-        default:
-          hs_log(sbc->filename, 4, "skipping config value type: %s",
-                 lua_typename(env, vt));
-          break;
         }
         break;
+      case LUA_TNUMBER:
+        lua_pushnumber(sb, lua_tonumber(env, -1));
+        if (kt == LUA_TSTRING) {
+          lua_setfield(sb, -2, lua_tostring(env, -2));
+        } else {
+          lua_rawseti(sb, -2, lua_tointeger(env, -2));
+        }
+        break;
+      case LUA_TBOOLEAN:
+        lua_pushboolean(sb, lua_toboolean(env, -1));
+        if (kt == LUA_TSTRING) {
+          lua_setfield(sb, -2, lua_tostring(env, -2));
+        } else {
+          lua_rawseti(sb, -2, lua_tointeger(env, -2));
+        }
+        break;
+      case LUA_TTABLE:
+        process_table(sb, sbc);
+        break;
       default:
-        hs_log(sbc->filename, 4, "skipping config key type: %s",
-               lua_typename(env, kt));
+        hs_log(sbc->filename, 4, "skipping config value type: %s",
+               lua_typename(env, vt));
         break;
       }
-      lua_pop(env, 1);
+      break;
+    default:
+      hs_log(sbc->filename, 4, "skipping config key type: %s",
+             lua_typename(env, kt));
+      break;
     }
+    lua_pop(env, 1);
+  }
+
+  switch (lua_type(env, -2)) {
+  case LUA_TSTRING:
+    lua_setfield(sb, -2, lua_tostring(env, -2));
+    break;
+  case LUA_TNUMBER:
+    lua_rawseti(sb, -2, lua_tointeger(env, -2));
+    break;
+  }
+}
+
+
+static void populate_environment(lua_State* sb, const hs_sandbox_config* sbc)
+{
+  lua_pushcclosure(sb, read_config, 0);
+  if (sbc->custom_config) {
+    lua_pushnil(sbc->custom_config);
+    lua_pushvalue(sbc->custom_config, LUA_GLOBALSINDEX);
+    process_table(sb, sbc);
+    lua_pop(sbc->custom_config, 2);
   }
 
   // load the known configuration variables
+  lua_pushstring(sb, sbc->cfg_name);
+  lua_setfield(sb, -2, "cfg_name");
+  lua_pushstring(sb, sbc->message_matcher);
+  lua_setfield(sb, -2, "message_matcher");
   lua_pushinteger(sb, sbc->output_limit);
   lua_setfield(sb, -2, "output_limit");
   lua_pushinteger(sb, sbc->memory_limit);
@@ -87,8 +124,14 @@ static void populate_environment(lua_State* sb,
   lua_setfield(sb, -2, "filename");
   lua_pushinteger(sb, sbc->ticker_interval);
   lua_setfield(sb, -2, "ticker_interval");
-  lua_pushinteger(sb, sbc->async_buffer_size);
-  lua_setfield(sb, -2, "async_buffer_size");
+  if (sbc->type == HS_SB_TYPE_ANALYSIS) {
+    lua_pushinteger(sb, sbc->thread);
+    lua_setfield(sb, -2, "thread");
+  }
+  if (sbc->type == HS_SB_TYPE_OUTPUT) {
+    lua_pushinteger(sb, sbc->async_buffer_size);
+    lua_setfield(sb, -2, "async_buffer_size");
+  }
 
   // add the table as the environment for the read_config function
   lua_setfenv(sb, -2);
@@ -97,13 +140,16 @@ static void populate_environment(lua_State* sb,
 
 
 hs_sandbox* hs_create_sandbox(void* parent,
-                              const char* file,
                               const char* lsb_config,
-                              const hs_sandbox_config* sbc,
-                              lua_State* env)
+                              hs_sandbox_config* sbc)
 {
   hs_sandbox* sb = calloc(1, sizeof(hs_sandbox));
   if (!sb) return NULL;
+  char fqfn[HS_MAX_PATH];
+  if (!hs_get_fqfn(sbc->dir, sbc->filename, fqfn, sizeof(fqfn))) {
+    free(sb);
+    return NULL;
+  }
 
   sb->ticker_interval = sbc->ticker_interval;
   int stagger = sbc->ticker_interval > 60 ? 60 : sbc->ticker_interval;
@@ -112,15 +158,56 @@ hs_sandbox* hs_create_sandbox(void* parent,
     sb->next_timer_event = time(NULL) + rand() % stagger;
   }
 
-  sb->lsb = lsb_create_custom(parent, file, lsb_config);
+  sb->lsb = lsb_create_custom(parent, fqfn, lsb_config);
   if (!sb->lsb) {
     free(sb);
-    hs_log(file, 3, "lsb_create_custom failed");
+    hs_log(sbc->filename, 3, "lsb_create_custom failed");
     return NULL;
   }
-  populate_environment(lsb_get_lua(sb->lsb), env, sbc);
+
+  const char* type;
+  switch (sbc->type) {
+  case HS_SB_TYPE_INPUT:
+    type = hs_input_dir;
+    break;
+  case HS_SB_TYPE_ANALYSIS:
+    type = hs_analysis_dir;
+    break;
+  case HS_SB_TYPE_OUTPUT:
+    type = hs_output_dir;
+    break;
+  default:
+    type = "unknown";
+    break;
+  }
+
+  size_t len = strlen(type) + strlen(sbc->cfg_name) + 2;
+  sb->name = malloc(len);
+  int ret = snprintf(sb->name, len, "%s/%s", type, sbc->cfg_name);
+  if (ret < 0 || ret > (int)len - 1) {
+    free(sb->name);
+    free(sb);
+    hs_log(sbc->cfg_name, 3, "failed to construct the plugin name");
+    return NULL;
+  }
+
+  if (sbc->preserve_data) {
+    len = strlen(sbc->dir) + strlen(sbc->cfg_name) + 7;
+    sb->state = malloc(len);
+    int ret = snprintf(sb->state, len, "%s/%s.data", sbc->dir, sbc->cfg_name);
+    if (ret < 0 || ret > (int)len - 1) {
+      free(sb->state); sb->state = NULL;
+      free(sb->name); sb->name = NULL;
+      free(sb);
+      hs_log(sbc->cfg_name, 3, "failed to construct the state fqfn");
+      return NULL;
+    }
+  }
+
+  populate_environment(lsb_get_lua(sb->lsb), sbc);
+  lua_close(sbc->custom_config);
+  sbc->custom_config = NULL; // remove the table once it has been copied
   lsb_add_function(sb->lsb, lsb_decode_protobuf, "decode_message");
-  sb->mm = NULL;
   return sb;
 }
 
@@ -131,13 +218,13 @@ void hs_free_sandbox(hs_sandbox* sb)
 
   char* e = lsb_destroy(sb->lsb, sb->state);
   if (e) {
-    hs_log(sb->filename, 3, "lsb_destroy() received: %s", e);
+    hs_log(sb->name, 3, "lsb_destroy() received: %s", e);
     free(e);
   }
   sb->lsb = NULL;
 
-  free(sb->filename);
-  sb->filename = NULL;
+  free(sb->name);
+  sb->name = NULL;
 
   free(sb->state);
   sb->state = NULL;
@@ -248,25 +335,3 @@ int hs_timer_event(lua_sandbox* lsb, time_t t)
   lua_gc(lua, LUA_GCCOLLECT, 0);
   return 0;
 }
-
-
-void hs_update_running_stats(hs_running_stats* s, double d)
-{
-  double old_mean = s->mean;
-  double old_sum = s->sum;
-
-  if (++s->count == 1) {
-    s->mean = d;
-  } else {
-    s->mean = old_mean + (d - old_mean) / s->count;
-    s->sum = old_sum + (d - old_mean) * (d - s->mean);
-  }
-}
-
-
-double hs_sd_running_stats(hs_running_stats* s)
-{
-  if (s->count < 2) return 0;
-  return sqrt(s->sum / (s->count - 1));
-}
-

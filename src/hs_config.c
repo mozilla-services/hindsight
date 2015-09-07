@@ -19,7 +19,9 @@
 
 const char* hs_input_dir = "input";
 const char* hs_analysis_dir = "analysis";
+const char* hs_output_dir = "output";
 
+static const char g_cfg_ext[] = ".cfg";
 static const char g_module[] = "config_parser";
 
 static const char* cfg_output_path = "output_path";
@@ -49,11 +51,15 @@ static const char* cfg_sb_matcher = "message_matcher";
 
 static void init_sandbox_config(hs_sandbox_config* cfg)
 {
+  cfg->type = HS_SB_TYPE_UNKNOWN;
   cfg->output_limit = 1024 * 64;
   cfg->memory_limit = 1024 * 1024 * 8;
   cfg->instruction_limit = 1000000;
   cfg->preserve_data = false;
+  cfg->dir = NULL;
   cfg->filename = NULL;
+  cfg->cfg_name = NULL;
+  cfg->custom_config = NULL;
   cfg->message_matcher = NULL;
   cfg->ticker_interval = 0;
   cfg->thread = 0;
@@ -210,8 +216,19 @@ static int load_sandbox_defaults(lua_State* L,
 
 void hs_free_sandbox_config(hs_sandbox_config* cfg)
 {
+  free(cfg->dir);
+  cfg->dir = NULL;
+
+  free(cfg->cfg_name);
+  cfg->cfg_name = NULL;
+
   free(cfg->filename);
   cfg->filename = NULL;
+
+  if (cfg->custom_config) {
+    lua_close(cfg->custom_config);
+    cfg->custom_config = NULL;
+  }
 
   free(cfg->message_matcher);
   cfg->message_matcher = NULL;
@@ -252,20 +269,26 @@ void hs_free_config(hs_config* cfg)
 }
 
 
-lua_State* hs_load_sandbox_config(const char* fn,
-                                  hs_sandbox_config* cfg,
-                                  const hs_sandbox_config* dflt,
-                                  hs_sb_type mode)
+
+
+bool hs_load_sandbox_config(const char* dir,
+                            const char* fn,
+                            hs_sandbox_config* cfg,
+                            const hs_sandbox_config* dflt,
+                            hs_sb_type mode)
 {
-  if (!cfg) return NULL;
+  if (!cfg) return false;
+  init_sandbox_config(cfg);
+
+  char fqfn[HS_MAX_PATH];
+  if (!hs_get_config_fqfn(dir, fn, fqfn, sizeof(fqfn))) return false;
 
   lua_State* L = luaL_newstate();
   if (!L) {
     hs_log(g_module, 3, "luaL_newstate failed: %s", fn);
-    return NULL;
+    return false;
   }
 
-  init_sandbox_config(cfg);
   if (dflt) {
     cfg->output_limit = dflt->output_limit;
     cfg->memory_limit = dflt->memory_limit;
@@ -273,8 +296,18 @@ lua_State* hs_load_sandbox_config(const char* fn,
     cfg->preserve_data = dflt->preserve_data;
   }
 
-  int ret = luaL_dofile(L, fn);
+  int ret = luaL_dofile(L, fqfn);
   if (ret) goto cleanup;
+
+  size_t len = strlen(dir) + 1;
+  cfg->dir = malloc(len);
+  memcpy(cfg->dir, dir, len);
+
+  // remove the extension and leave room for the NUL
+  len = strlen(fn) - sizeof(g_cfg_ext) + 2;
+  cfg->cfg_name = malloc(len);
+  memcpy(cfg->cfg_name, fn, len);
+  cfg->cfg_name[len - 1] = 0;
 
   ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_sb_output,
                          &cfg->output_limit);
@@ -322,10 +355,12 @@ cleanup:
   if (ret) {
     hs_log(g_module, 3, "loading %s failed: %s", fn, lua_tostring(L, -1));
     lua_close(L);
-    return NULL;
+    return false;
   }
 
-  return L;
+  cfg->type = mode;
+  cfg->custom_config = L;
+  return true;
 }
 
 
@@ -437,11 +472,11 @@ bool hs_get_config_fqfn(const char* path,
                         char* fqfn,
                         size_t fqfn_len)
 {
-  static const size_t ext_size = 4;
   size_t len = strlen(name);
-  if (len <= ext_size) return false;
+  size_t ext_len = sizeof(g_cfg_ext) - 1;
+  if (len <= ext_len) return false;
 
-  if (strcmp(".cfg", name + len - ext_size)) return false;
+  if (strcmp(g_cfg_ext, name + len - ext_len)) return false;
 
   int ret = snprintf(fqfn, fqfn_len, "%s/%s", path, name);
   if (ret < 0 || ret > (int)fqfn_len - 1) {
