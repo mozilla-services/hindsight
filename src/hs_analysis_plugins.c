@@ -582,25 +582,8 @@ void hs_load_analysis_plugins(hs_analysis_plugins* plugins,
 
 void hs_start_analysis_threads(hs_analysis_plugins* plugins)
 {
-  pthread_attr_t attr;
-  if (pthread_attr_init(&attr)) {
-    perror("hs_start_analysis_threads pthread_attr_init failed");
-    exit(EXIT_FAILURE);
-  }
-  if (pthread_attr_setschedpolicy(&attr, SCHED_FIFO)) {
-    perror("hs_start_analysis_threads pthread_attr_setschedpolicy failed");
-    exit(EXIT_FAILURE);
-  }
-
-  struct sched_param sp;
-  sp.sched_priority = sched_get_priority_min(SCHED_FIFO);
-  if (pthread_attr_setschedparam(&attr, &sp)) {
-    perror("hs_start_analysis_threads pthread_attr_setschedparam failed");
-    exit(EXIT_FAILURE);
-  }
-
   for (int i = 0; i < plugins->thread_cnt; ++i) {
-    if (pthread_create(&plugins->threads[i], &attr, input_thread,
+    if (pthread_create(&plugins->threads[i], NULL, input_thread,
                        (void*)&plugins->list[i])) {
       perror("hs_start_analysis_threads pthread_create failed");
       exit(EXIT_FAILURE);
