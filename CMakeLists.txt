@@ -18,11 +18,13 @@ if(CMAKE_HOST_UNIX)
   find_library(PTHREAD_LIBRARY pthread)
   find_library(LIBDL_LIBRARY dl)
   find_library(LIBM_LIBRARY m)
+  find_library(LIBRT_LIBRARY rt)
 
   set(UNIX_LIBRARIES
   ${PTHREAD_LIBRARY}
   ${LIBDL_LIBRARY}
-  ${LIBM_LIBRARY})
+  ${LIBM_LIBRARY}
+  ${LIBRT_LIBRARY})
   add_definitions(-D_POSIX_C_SOURCE=199309L -D_XOPEN_SOURCE=600)
 endif()
 
