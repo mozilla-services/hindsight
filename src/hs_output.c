@@ -22,13 +22,13 @@
 static const char g_module[] = "output";
 
 
-static bool extract_id(const char* fn, size_t* id)
+static bool extract_id(const char* fn, unsigned long long* id)
 {
   size_t l = strlen(fn);
   size_t i = 0;
   for (; i < l && isdigit(fn[i]); ++i);
   if (i > 0 && i + 4 == l && strncmp(fn + i, ".log", 4) == 0) {
-    *id = (size_t)strtoull(fn, NULL, 10);
+    *id = strtoull(fn, NULL, 10);
     return true;
   }
   return false;
@@ -37,7 +37,7 @@ static bool extract_id(const char* fn, size_t* id)
 
 static size_t find_last_id(const char* path)
 {
-  size_t file_id = 0, current_id = 0;
+  unsigned long long file_id = 0, current_id = 0;
   struct dirent* entry;
   DIR* dp = opendir(path);
   if (dp == NULL) return file_id;
@@ -57,7 +57,7 @@ static size_t find_last_id(const char* path)
 void hs_init_output(hs_output* output, const char* path, const char* subdir)
 {
   output->fh = NULL;
-  output->offset = 0;
+  output->cp.offset = 0;
   size_t len = strlen(path) + strlen(subdir) + 2;
   output->path = malloc(len);
   if (!output->path) {
@@ -65,7 +65,7 @@ void hs_init_output(hs_output* output, const char* path, const char* subdir)
     exit(EXIT_FAILURE);
   }
   snprintf(output->path, len, "%s/%s", path, subdir);
-  output->id = find_last_id(output->path);
+  output->cp.id = find_last_id(output->path);
 
   int ret = mkdir(path, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP);
   if (ret && errno != EEXIST) {
@@ -106,8 +106,8 @@ void hs_open_output_file(hs_output* output)
     fclose(output->fh);
     output->fh = NULL;
   }
-  int ret = snprintf(fqfn, sizeof(fqfn), "%s/%zu.log", output->path,
-                     output->id);
+  int ret = snprintf(fqfn, sizeof(fqfn), "%s/%llu.log", output->path,
+                     output->cp.id);
   if (ret < 0 || ret > (int)sizeof(fqfn) - 1) {
     hs_log(g_module, 0, "output filename exceeds %zu", sizeof(fqfn));
     exit(EXIT_FAILURE);
@@ -119,5 +119,5 @@ void hs_open_output_file(hs_output* output)
   } else {
     fseek(output->fh, 0, SEEK_END);
   }
-  output->offset = ftell(output->fh);
+  output->cp.offset = ftell(output->fh);
 }

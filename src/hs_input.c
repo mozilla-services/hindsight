@@ -20,13 +20,13 @@
 
 static const char g_module[] = "input_reader";
 
-int hs_open_file(hs_input* hsi, const char* subdir, size_t id)
+int hs_open_file(hs_input* hsi, const char* subdir, unsigned long long id)
 {
   char path[HS_MAX_PATH];
-  int ret = snprintf(path, sizeof(path), "%s/%s/%zu.log", hsi->path, subdir,
+  int ret = snprintf(path, sizeof(path), "%s/%s/%llu.log", hsi->path, subdir,
                      id);
   if (ret < 0 || ret > (int)sizeof(path) - 1) {
-    hs_log(g_module, 0, "%s file: %zu.log: fully qualiifed path is"
+    hs_log(g_module, 0, "%s file: %llu.log: fully qualiifed path is"
            " greater than %zu", hsi->name, hsi->ib.cp.id, sizeof(path));
     exit(EXIT_FAILURE);
   }

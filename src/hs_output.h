@@ -9,6 +9,8 @@
 #ifndef hs_output_h_
 #define hs_output_h_
 
+#include "hs_config.h"
+
 #include <luasandbox/lua.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -18,8 +20,7 @@ typedef struct hs_output
   FILE* fh;
   char* path;
   pthread_mutex_t lock;
-  size_t id;
-  size_t offset;
+  hs_checkpoint cp;
 } hs_output;
 
 

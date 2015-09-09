@@ -188,10 +188,10 @@ static int inject_message(lua_State* L)
   fwrite(output, output_len, 1, p->plugins->output.fh);
   bytes_written += tlen;
   if (bytes_written > BUFSIZ) {
-    p->plugins->output.offset += bytes_written;
+    p->plugins->output.cp.offset += bytes_written;
     bytes_written = 0;
-    if (p->plugins->output.offset >= p->plugins->cfg->output_size) {
-      ++p->plugins->output.id;
+    if (p->plugins->output.cp.offset >= p->plugins->cfg->output_size) {
+      ++p->plugins->output.cp.id;
       hs_open_output_file(&p->plugins->output);
     }
   }

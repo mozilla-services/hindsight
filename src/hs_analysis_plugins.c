@@ -99,9 +99,9 @@ static int inject_message(lua_State* L)
   header[3 + len] = 0x1f;
   fwrite(header, 4 + len, 1, p->at->plugins->output.fh);
   fwrite(output, output_len, 1, p->at->plugins->output.fh);
-  p->at->plugins->output.offset += tlen;
-  if (p->at->plugins->output.offset >= (size_t)p->at->plugins->cfg->output_size) {
-    ++p->at->plugins->output.id;
+  p->at->plugins->output.cp.offset += tlen;
+  if (p->at->plugins->output.cp.offset >= (size_t)p->at->plugins->cfg->output_size) {
+    ++p->at->plugins->output.cp.id;
     hs_open_output_file(&p->at->plugins->output);
   }
   pthread_mutex_unlock(&p->at->plugins->output.lock);

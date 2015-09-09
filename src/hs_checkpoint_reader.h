@@ -28,14 +28,15 @@ typedef struct hs_ip_checkpoint {
   hs_ip_checkpoint_type type;
   unsigned len;  // string checkpoint length
   unsigned cap;  // string checkpoint capacity
-  union {
+  union
+  {
     double d; // numeric checkpoint
     char* s;  // string checkpoint
   } value;
 } hs_ip_checkpoint;
 
 typedef struct hs_checkpoint {
-  size_t id;
+  unsigned long long id;
   size_t offset;
 } hs_checkpoint;
 

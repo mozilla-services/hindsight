@@ -22,13 +22,13 @@
 
 static const char g_module[] = "checkpoint_reader";
 
-static bool extract_id(const char* fn, size_t* id)
+static bool extract_id(const char* fn, unsigned long long* id)
 {
   size_t l = strlen(fn);
   size_t i = 0;
   for (; i < l && isdigit(fn[i]); ++i);
   if (i > 0 && i + 4 == l && strncmp(fn + i, ".log", 4) == 0) {
-    *id = (size_t)strtoull(fn, NULL, 10);
+    *id = strtoull(fn, NULL, 10);
     return true;
   }
   return false;
@@ -43,7 +43,7 @@ static size_t find_first_id(const char* path)
     exit(EXIT_FAILURE);
   }
 
-  size_t file_id = ULLONG_MAX, current_id = 0;
+  unsigned long long file_id = ULLONG_MAX, current_id = 0;
   while ((entry = readdir(dp))) {
     if (extract_id(entry->d_name, &current_id)) {
       if (current_id < file_id) {
@@ -199,8 +199,8 @@ void hs_lookup_input_checkpoint(hs_checkpoint_reader* cpr,
     if (tmp) {
       pos = strchr(tmp, ':');
       if (pos) {
-        cp->id = strtoul(tmp, NULL, 10);
-        cp->offset = strtoul(pos + 1, NULL, 10);
+        cp->id = strtoull(tmp, NULL, 10);
+        cp->offset = (size_t)strtoull(pos + 1, NULL, 10);
       }
     }
   }
