@@ -185,18 +185,17 @@ void hs_free_input_buffer(hs_input_buffer* b)
  */
 static size_t clp2(size_t x)
 {
-  static const size_t size = sizeof(size_t);
   x = x - 1;
   x = x | (x >> 1);
   x = x | (x >> 2);
   x = x | (x >> 4);
   x = x | (x >> 8);
-  if (size > 2) {
+# if SIZE_MAX > 65536
     x = x | (x >> 16);
-  }
-  if (size > 4) {
+# endif
+# if SIZE_MAX > 4294967296
     x = x | (x >> 32);
-  }
+# endif
   return x + 1;
 }
 
