@@ -15,6 +15,7 @@
 #include <luasandbox/lualib.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 
 #include "hs_logger.h"
 #include "hs_util.h"
@@ -43,7 +44,7 @@ static size_t find_first_id(const char* path)
     exit(EXIT_FAILURE);
   }
 
-  size_t file_id = ULLONG_MAX, current_id = 0;
+  size_t file_id = SIZE_MAX, current_id = 0;
   while ((entry = readdir(dp))) {
     if (extract_id(entry->d_name, &current_id)) {
       if (current_id < file_id) {
@@ -52,7 +53,7 @@ static size_t find_first_id(const char* path)
     }
   }
   closedir(dp);
-  return file_id == ULLONG_MAX ? 0 : file_id;
+  return file_id == SIZE_MAX ? 0 : file_id;
 }
 
 
