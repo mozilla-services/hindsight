@@ -72,7 +72,7 @@ void hs_start_analysis_threads(hs_analysis_plugins* plugins);
 
 void hs_load_analysis_plugins(hs_analysis_plugins* plugins,
                               const hs_config* cfg,
-                              const char* path);
+                              bool dynamic);
 
 void hs_start_analysis_input(hs_analysis_plugins* plugins, pthread_t* t);
 void hs_wait_analysis_plugins(hs_analysis_plugins* plugins);

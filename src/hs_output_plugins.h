@@ -34,7 +34,6 @@ struct hs_output_plugins
 
   int list_cnt;
   int list_cap;
-  bool stop;
 
   pthread_mutex_t list_lock;
 };
@@ -51,6 +50,7 @@ struct hs_output_plugin
   bool matched;
   bool sample;
   bool batching;
+  bool stop;
 
   hs_input input;
   hs_input analysis;
@@ -69,7 +69,8 @@ void hs_init_output_plugins(hs_output_plugins* plugins,
 void hs_free_output_plugins(hs_output_plugins* plugins);
 void hs_load_output_plugins(hs_output_plugins* plugins,
                             const hs_config* cfg,
-                            const char* path);
+                            bool dynamic);
+void hs_stop_output_plugins(hs_output_plugins* plugins);
 void hs_wait_output_plugins(hs_output_plugins* plugins);
 
 hs_sandbox* hs_create_output_sandbox(void* parent,

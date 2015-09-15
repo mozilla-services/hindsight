@@ -40,6 +40,7 @@ static size_t find_first_id(const char* path)
   struct dirent* entry;
   DIR* dp = opendir(path);
   if (dp == NULL) {
+    hs_log(g_module, 0, "path does not exist: %s", path);
     exit(EXIT_FAILURE);
   }
 

@@ -14,9 +14,14 @@
 
 #include "hs_checkpoint_reader.h"
 
+#define HS_EXT_LEN 4
+
 extern const char* hs_input_dir;
 extern const char* hs_analysis_dir;
 extern const char* hs_output_dir;
+extern const char* hs_lua_ext;
+extern const char* hs_cfg_ext;
+extern const char* hs_off_ext;
 
 typedef enum {
   HS_SB_TYPE_UNKNOWN,
@@ -110,5 +115,7 @@ bool hs_get_config_fqfn(const char* path,
                         const char* name,
                         char* fqfn,
                         size_t fqfn_len);
+
+int hs_process_load_cfg(const char* lpath, const char* rpath, const char* name);
 
 #endif

@@ -28,29 +28,27 @@ struct hs_input_plugin
   pthread_t thread;
   int list_index;
   hs_ip_checkpoint cp;
+  sem_t shutdown;
 };
 
 struct hs_input_plugins
 {
-  sem_t* shutdown;
   hs_input_plugin** list;
   hs_config* cfg;
 
   pthread_mutex_t list_lock;
   int list_cnt;
   int list_cap;
-  bool stop;
 
   hs_output output;
 };
 
 void hs_init_input_plugins(hs_input_plugins* plugins,
-                           hs_config* cfg,
-                           sem_t* shutdown);
+                           hs_config* cfg);
 void hs_free_input_plugins(hs_input_plugins* plugins);
 
 void hs_load_input_plugins(hs_input_plugins* plugins, const hs_config* cfg,
-                           const char* path);
+                           bool dynamic);
 
 void hs_stop_input_plugins(hs_input_plugins* plugins);
 void hs_wait_input_plugins(hs_input_plugins* plugins);

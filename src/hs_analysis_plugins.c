@@ -178,32 +178,90 @@ static int inject_payload(lua_State* lua)
 }
 
 
+static void free_analysis_plugin(hs_analysis_plugin* p)
+{
+  if (!p->sb) return;
+
+  hs_free_sandbox(p->sb);
+  free(p->sb);
+  p->sb = NULL;
+  p->at = NULL;
+}
+
+
+static void remove_plugin(hs_analysis_thread* at, int idx)
+{
+  hs_log(g_module, 6, "analysis thread: %d stopping: %s", at->tid,
+         at->list[idx]->sb->name);
+  hs_analysis_plugin* p = at->list[idx];
+  at->list[idx] = NULL;
+  free_analysis_plugin(p);
+  free(p);
+  --at->list_cnt;
+}
+
+
+static void remove_from_analysis_plugins(hs_analysis_thread* at,
+                                         const char* name)
+{
+  const size_t tlen = strlen(hs_analysis_dir) + 1;
+  pthread_mutex_lock(&at->list_lock);
+  for (int i = 0; i < at->list_cap; ++i) {
+    if (!at->list[i]) continue;
+
+    char* pos = at->list[i]->sb->name + tlen;
+    if (strstr(name, pos) && strlen(pos) == strlen(name) - HS_EXT_LEN) {
+      remove_plugin(at, i);
+      break;
+    }
+  }
+  pthread_mutex_unlock(&at->list_lock);
+}
+
+
+static void add_plugin(hs_analysis_thread* at, hs_analysis_plugin* p, int idx)
+{
+  hs_log(g_module, 6, "analysis thread: %d starting: %s", at->tid, p->sb->name);
+  at->list[idx] = p;
+  ++at->list_cnt;
+}
+
+
 static void add_to_analysis_plugins(const hs_sandbox_config* cfg,
                                     hs_analysis_plugins* plugins,
                                     hs_analysis_plugin* p)
 {
+  bool added = false;
+  int idx = -1;
   int thread = cfg->thread % plugins->cfg->analysis_threads;
   hs_analysis_thread* at = &plugins->list[thread];
   p->at = at;
 
   pthread_mutex_lock(&at->list_lock);
   // todo shrink it down if there are a lot of empty slots
-  if (at->list_cnt < at->list_cap) { // add to an empty slot
-    for (int i = 0; i < at->list_cap; ++i) {
-      if (!at->list[i]) {
-        at->list[i] = p;
-        ++at->list_cnt;
-      }
+  for (int i = 0; i < at->list_cap; ++i) {
+    if (!at->list[i]) {
+      idx = i;
+    } else if (strcmp(at->list[i]->sb->name, p->sb->name) == 0) {
+      idx = i;
+      remove_plugin(at, idx);
+      add_plugin(at, p, idx);
+      added = true;
+      break;
     }
-  } else { // expand the list
+  }
+  if (!added && idx != -1) add_plugin(at, p, idx);
+
+  if (idx == -1) {
     ++at->list_cap;
     // todo probably don't want to grow it by 1
     hs_analysis_plugin** tmp = realloc(at->list,
-                                       sizeof(hs_analysis_plugin) * at->list_cap);
+                                       sizeof(hs_analysis_plugin*)
+                                       * at->list_cap);
+    idx = at->list_cap - 1;
     if (tmp) {
       at->list = tmp;
-      at->list[at->list_cap - 1] = p;
-      ++at->list_cnt;
+      add_plugin(at, p, idx);
     } else {
       hs_log(g_module, 0, "plugins realloc failed");
       exit(EXIT_FAILURE);
@@ -248,17 +306,6 @@ static void init_analysis_thread(hs_analysis_plugins* plugins, int tid)
 }
 
 
-static void free_analysis_plugin(hs_analysis_plugin* p)
-{
-  if (!p->sb) return;
-
-  hs_free_sandbox(p->sb);
-  free(p->sb);
-  p->sb = NULL;
-  p->at = NULL;
-}
-
-
 static void free_analysis_thread(hs_analysis_thread* at)
 {
   pthread_mutex_destroy(&at->cp_lock);
@@ -266,9 +313,7 @@ static void free_analysis_thread(hs_analysis_thread* at)
   at->plugins = NULL;
   for (int i = 0; i < at->list_cap; ++i) {
     if (!at->list[i]) continue;
-    free_analysis_plugin(at->list[i]);
-    free(at->list[i]);
-    at->list[i] = NULL;
+    remove_plugin(at, i);
   }
   free(at->list);
   at->list = NULL;
@@ -310,10 +355,7 @@ static void terminate_sandbox(hs_analysis_thread* at, int i)
 {
   hs_log(g_module, 3, "terminated: %s msg: %s", at->list[i]->sb->name,
          lsb_get_error(at->list[i]->sb->lsb));
-  free_analysis_plugin(at->list[i]);
-  free(at->list[i]);
-  at->list[i] = NULL;
-  --at->list_cnt;
+  remove_plugin(at, i);
 }
 
 
@@ -505,9 +547,8 @@ void hs_wait_analysis_plugins(hs_analysis_plugins* plugins)
 {
   void* thread_result;
   for (int i = 0; i < plugins->thread_cnt; ++i) {
-    int ret = pthread_join(plugins->threads[i], &thread_result);
-    if (ret) {
-      perror("pthread_join failed");
+    if (pthread_join(plugins->threads[i], &thread_result)) {
+      hs_log(g_module, 3, "thread could not be joined");
     }
   }
   free(plugins->threads);
@@ -531,26 +572,186 @@ void hs_free_analysis_plugins(hs_analysis_plugins* plugins)
 }
 
 
+static void process_lua(hs_analysis_plugins* plugins, const char* lpath,
+                        const char* rpath, DIR* dp)
+{
+  char lua_lpath[HS_MAX_PATH];
+  char lua_rpath[HS_MAX_PATH];
+  char cfg_lpath[HS_MAX_PATH];
+  char cfg_rpath[HS_MAX_PATH];
+  size_t tlen = strlen(hs_analysis_dir) + 1;
+
+  struct dirent* entry;
+  while ((entry = readdir(dp))) {
+    size_t nlen = strlen(entry->d_name);
+
+    // move the Lua to the run directory
+    if (nlen <= HS_EXT_LEN) continue;
+    if (strcmp(entry->d_name + nlen - HS_EXT_LEN, hs_lua_ext) == 0) {
+      if (!hs_get_fqfn(lpath, entry->d_name, lua_lpath, sizeof(lua_lpath))) {
+        hs_log(g_module, 0, "load lua path too long");
+        exit(EXIT_FAILURE);
+      }
+      if (!hs_get_fqfn(rpath, entry->d_name, lua_rpath, sizeof(lua_rpath))) {
+        hs_log(g_module, 0, "run lua path too long");
+        exit(EXIT_FAILURE);
+      }
+      if (rename(lua_lpath, lua_rpath)) {
+        hs_log(g_module, 3, "failed to move: %s to %s errno: %d", lua_lpath,
+               lua_rpath, errno);
+        continue;
+      }
+
+      for (int t = 0; t < plugins->thread_cnt; ++t) {
+        // restart any plugins using this Lua code
+        hs_analysis_thread* at = &plugins->list[t];
+        pthread_mutex_lock(&at->list_lock);
+        for (int i = 0; i < at->list_cap; ++i) {
+          if (!at->list[i]) continue;
+
+          hs_analysis_plugin* p = at->list[i];
+          if (strcmp(lua_rpath, lsb_get_lua_file(p->sb->lsb)) == 0) {
+            int ret = snprintf(cfg_lpath, HS_MAX_PATH, "%s/%s%s", lpath,
+                               p->sb->name + tlen, hs_cfg_ext);
+            if (ret < 0 || ret > HS_MAX_PATH - 1) {
+              hs_log(g_module, 0, "load cfg path too long");
+              exit(EXIT_FAILURE);
+            }
+
+            ret = snprintf(cfg_rpath, HS_MAX_PATH, "%s/%s%s", rpath,
+                           p->sb->name + tlen, hs_cfg_ext);
+            if (ret < 0 || ret > HS_MAX_PATH - 1) {
+              hs_log(g_module, 0, "run cfg path too long");
+              exit(EXIT_FAILURE);
+            }
+
+            // if no new cfg was provided, move the existing cfg to the load
+            // directory
+            if (!hs_file_exists(cfg_lpath)) {
+              if (rename(cfg_rpath, cfg_lpath)) {
+                hs_log(g_module, 3, "failed to move: %s to %s errno: %d",
+                       cfg_rpath, cfg_lpath, errno);
+              }
+            }
+          }
+        }
+        pthread_mutex_unlock(&at->list_lock);
+      }
+    }
+  }
+  rewinddir(dp);
+}
+
+
+static int get_thread_id(const char* lpath, const char* rpath, const char* name)
+{
+  size_t nlen = strlen(name);
+  if (nlen <= HS_EXT_LEN) return -2;
+
+  if (strcmp(name + nlen - HS_EXT_LEN, hs_cfg_ext) == 0) {
+    int otid = -1, ntid = -2;
+    hs_sandbox_config sbc;
+    if (hs_load_sandbox_config(lpath, name, &sbc, NULL, HS_SB_TYPE_ANALYSIS)) {
+      ntid = sbc.thread;
+      hs_free_sandbox_config(&sbc);
+    }
+
+    if (hs_load_sandbox_config(rpath, name, &sbc, NULL, HS_SB_TYPE_ANALYSIS)) {
+      otid = sbc.thread;
+      hs_free_sandbox_config(&sbc);
+    } else {
+      otid = ntid;
+    }
+
+    if (otid != ntid) { // mis-matched cfgs so remove the load .cfg
+      char path[HS_MAX_PATH];
+      if (!hs_get_fqfn(lpath, name, path, sizeof(path))) {
+        hs_log(g_module, 0, "load off path too long");
+        exit(EXIT_FAILURE);
+      }
+      if (unlink(path)) {
+        hs_log(g_module, 3, "failed to delete: %s errno: %d", path, errno);
+      }
+      return -1;
+    }
+    return otid;
+  } else if (strcmp(name + nlen - HS_EXT_LEN, hs_off_ext) == 0) {
+    char cfg[HS_MAX_PATH];
+    strcpy(cfg, name);
+    strcpy(cfg + nlen - HS_EXT_LEN, hs_cfg_ext);
+
+    hs_sandbox_config sbc;
+    if (hs_load_sandbox_config(rpath, cfg, &sbc, NULL, HS_SB_TYPE_ANALYSIS)) {
+      hs_free_sandbox_config(&sbc);
+      return sbc.thread;
+    }
+
+    // no config was found so remove the .off flag
+    char path[HS_MAX_PATH];
+    if (!hs_get_fqfn(lpath, name, path, sizeof(path))) {
+      hs_log(g_module, 0, "load off path too long");
+      exit(EXIT_FAILURE);
+    }
+    if (unlink(path)) {
+      hs_log(g_module, 3, "failed to delete: %s errno: %d", path, errno);
+    }
+  }
+  return -2;
+}
+
+
 void hs_load_analysis_plugins(hs_analysis_plugins* plugins,
                               const hs_config* cfg,
-                              const char* path)
+                              bool dynamic)
 {
-  char dir[HS_MAX_PATH];
-  if (!hs_get_fqfn(path, hs_analysis_dir, dir, sizeof(dir))) {
+  char lpath[HS_MAX_PATH];
+  char rpath[HS_MAX_PATH];
+  if (!hs_get_fqfn(cfg->load_path, hs_analysis_dir, lpath, sizeof(lpath))) {
     hs_log(g_module, 0, "load path too long");
     exit(EXIT_FAILURE);
   }
-
-  struct dirent* entry;
-  DIR* dp = opendir(dir);
-  if (dp == NULL) {
+  if (!hs_get_fqfn(cfg->run_path, hs_analysis_dir, rpath, sizeof(rpath))) {
+    hs_log(g_module, 0, "run path too long");
     exit(EXIT_FAILURE);
   }
 
+  const char* dir = dynamic ? lpath : rpath;
+  DIR* dp = opendir(dir);
+  if (dp == NULL) {
+    hs_log(g_module, 0, "%s: %s", dir, strerror(errno));
+    exit(EXIT_FAILURE);
+  }
+
+  if (dynamic) process_lua(plugins, lpath, rpath, dp);
+
+  struct dirent* entry;
   while ((entry = readdir(dp))) {
+    if (dynamic) {
+      int tid = get_thread_id(lpath, rpath, entry->d_name);
+      if (tid < 0) {
+        if (tid == -1) {
+          hs_log(g_module, 3, "plugin cannot be restarted on a different "
+                 "thread: %s", entry->d_name);
+        }
+        continue;
+      }
+
+      tid %= plugins->thread_cnt;
+      int ret = hs_process_load_cfg(lpath, rpath, entry->d_name);
+
+      switch (ret) {
+      case 0:
+        remove_from_analysis_plugins(&plugins->list[tid], entry->d_name);
+        break;
+      case 1: // proceed to load
+        break;
+      default: // ignore
+        continue;
+      }
+    }
     hs_sandbox_config sbc;
-    if (hs_load_sandbox_config(dir, entry->d_name,
-                               &sbc, &cfg->apd, HS_SB_TYPE_ANALYSIS)) {
+    if (hs_load_sandbox_config(rpath, entry->d_name, &sbc, &cfg->apd,
+                               HS_SB_TYPE_ANALYSIS)) {
       hs_analysis_plugin* p = create_analysis_plugin(cfg, &sbc);
       if (p) {
         p->sb->mm = hs_create_message_matcher(plugins->mmb,
@@ -573,8 +774,8 @@ void hs_load_analysis_plugins(hs_analysis_plugins* plugins,
         }
         add_to_analysis_plugins(&sbc, plugins, p);
       }
+      hs_free_sandbox_config(&sbc);
     }
-    hs_free_sandbox_config(&sbc);
   }
   closedir(dp);
 }

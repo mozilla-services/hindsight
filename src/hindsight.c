@@ -78,19 +78,18 @@ int main(int argc, char* argv[])
   hs_message_match_builder mmb;
   hs_init_message_match_builder(&mmb, cfg.analysis_lua_path,
                                 cfg.analysis_lua_cpath);
-
   hs_input_plugins ips;
-  hs_init_input_plugins(&ips, &cfg, &g_shutdown);
-  hs_load_input_plugins(&ips, &cfg, cfg.run_path);
+  hs_init_input_plugins(&ips, &cfg);
+  hs_load_input_plugins(&ips, &cfg, false);
 
   hs_analysis_plugins aps;
   hs_init_analysis_plugins(&aps, &cfg, &mmb);
-  hs_load_analysis_plugins(&aps, &cfg, cfg.run_path);
+  hs_load_analysis_plugins(&aps, &cfg, false);
   hs_start_analysis_threads(&aps);
 
   hs_output_plugins ops;
   hs_init_output_plugins(&ops, &cfg, &mmb);
-  hs_load_output_plugins(&ops, &cfg, cfg.run_path);
+  hs_load_output_plugins(&ops, &cfg, false);
 
   hs_checkpoint_writer cpw;
   hs_init_checkpoint_writer(&cpw, &ips, &aps, &ops, cfg.output_path);
@@ -108,30 +107,40 @@ int main(int argc, char* argv[])
     }
     hs_write_checkpoints(&cpw, &cfg.cp_reader);
     if (++cnt == 59) { // scan just before emitting the stats
-      hs_log(g_module, 7, "todo scan and move the load directories");
+      hs_log(g_module, 7, "scan load directories");
+      hs_load_input_plugins(&ips, &cfg, true);
+      hs_load_analysis_plugins(&aps, &cfg, true);
+      hs_load_output_plugins(&ops, &cfg, true);
       cnt = 0;
     }
 #ifdef HINDSIGHT_CLI
     if (ips.list_cnt == 0) {
       hs_log(g_module, 6, "input plugins have exited; "
-                          "cascading shutdown initiated");
+             "cascading shutdown initiated");
       break; // when all the inputs are done, exit
     }
 #endif
   }
 #ifndef HINDSIGHT_CLI // non CLI mode should shut everything down immediately
+  hs_stop_input_plugins(&ips);
   aps.stop = true;
-  ops.stop = true;
+  hs_stop_output_plugins(&ops);
 #endif
 
-  hs_stop_input_plugins(&ips);
-  hs_wait_input_plugins(&ips);
 #ifdef HINDSIGHT_CLI
+  hs_stop_input_plugins(&ips);
+#endif
+  hs_wait_input_plugins(&ips);
+
+#ifdef HINDSIGHT_CLI
+  sleep(1);
   aps.stop = true;
 #endif
   hs_wait_analysis_plugins(&aps);
+
 #ifdef HINDSIGHT_CLI
-  ops.stop = true;
+  sleep(1);
+  hs_stop_output_plugins(&ops);
 #endif
   hs_wait_output_plugins(&ops);
 

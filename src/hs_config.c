@@ -10,18 +10,22 @@
 
 #include <luasandbox/lauxlib.h>
 #include <luasandbox/lua.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
 #include "hs_logger.h"
+#include "hs_util.h"
 
 const char* hs_input_dir = "input";
 const char* hs_analysis_dir = "analysis";
 const char* hs_output_dir = "output";
+const char* hs_lua_ext = ".lua";
+const char* hs_cfg_ext = ".cfg";
+const char* hs_off_ext = ".off";
 
-static const char g_cfg_ext[] = ".cfg";
 static const char g_module[] = "config_parser";
 
 static const char* cfg_output_path = "output_path";
@@ -282,6 +286,7 @@ bool hs_load_sandbox_config(const char* dir,
 
   char fqfn[HS_MAX_PATH];
   if (!hs_get_config_fqfn(dir, fn, fqfn, sizeof(fqfn))) return false;
+  if (!hs_file_exists(fqfn)) return false;
 
   lua_State* L = luaL_newstate();
   if (!L) {
@@ -304,7 +309,7 @@ bool hs_load_sandbox_config(const char* dir,
   memcpy(cfg->dir, dir, len);
 
   // remove the extension and leave room for the NUL
-  len = strlen(fn) - sizeof(g_cfg_ext) + 2;
+  len = strlen(fn) - HS_EXT_LEN + 1;
   cfg->cfg_name = malloc(len);
   memcpy(cfg->cfg_name, fn, len);
   cfg->cfg_name[len - 1] = 0;
@@ -355,6 +360,7 @@ cleanup:
   if (ret) {
     hs_log(g_module, 3, "loading %s failed: %s", fn, lua_tostring(L, -1));
     lua_close(L);
+    hs_free_sandbox_config(cfg);
     return false;
   }
 
@@ -473,14 +479,81 @@ bool hs_get_config_fqfn(const char* path,
                         size_t fqfn_len)
 {
   size_t len = strlen(name);
-  size_t ext_len = sizeof(g_cfg_ext) - 1;
-  if (len <= ext_len) return false;
+  if (len <= HS_EXT_LEN) return false;
 
-  if (strcmp(g_cfg_ext, name + len - ext_len)) return false;
+  if (strcmp(hs_cfg_ext, name + len - HS_EXT_LEN)) return false;
 
   int ret = snprintf(fqfn, fqfn_len, "%s/%s", path, name);
   if (ret < 0 || ret > (int)fqfn_len - 1) {
     return false;
   }
   return true;
+}
+
+
+int hs_process_load_cfg(const char* lpath, const char* rpath, const char* name)
+{
+  size_t nlen = strlen(name);
+  if (nlen <= HS_EXT_LEN) return -1;
+
+  if (strcmp(name + nlen - HS_EXT_LEN, hs_cfg_ext) == 0) {
+    char cfg_lpath[HS_MAX_PATH];
+    if (!hs_get_fqfn(lpath, name, cfg_lpath, sizeof(cfg_lpath))) {
+      hs_log(g_module, 0, "load cfg path too long");
+      exit(EXIT_FAILURE);
+    }
+    char cfg_rpath[HS_MAX_PATH];
+    if (!hs_get_fqfn(rpath, name, cfg_rpath, sizeof(cfg_rpath))) {
+      hs_log(g_module, 0, "run cfg path too long");
+      exit(EXIT_FAILURE);
+    }
+
+    // if the plugin was off clear the flag and prepare for restart
+    char off_rpath[HS_MAX_PATH];
+    strcpy(off_rpath, cfg_rpath);
+    strcpy(off_rpath + strlen(off_rpath) - HS_EXT_LEN, hs_off_ext);
+    if (hs_file_exists(off_rpath)) {
+      if (unlink(off_rpath)) {
+        hs_log(g_module, 3, "failed to delete: %s errno: %d", off_rpath,
+               errno);
+        return -1;
+      }
+    }
+
+    // move the cfg to the run directory and prepare for start/restart
+    if (rename(cfg_lpath, cfg_rpath)) {
+      hs_log(g_module, 3, "failed to move: %s to %s errno: %d", cfg_lpath,
+             cfg_rpath, errno);
+      return -1;
+    }
+    return 1;
+  } else if (strcmp(name + nlen - HS_EXT_LEN, hs_off_ext) == 0) {
+    char off_lpath[HS_MAX_PATH];
+    if (!hs_get_fqfn(lpath, name, off_lpath, sizeof(off_lpath))) {
+      hs_log(g_module, 0, "load off path too long");
+      exit(EXIT_FAILURE);
+    }
+    if (unlink(off_lpath)) {
+      hs_log(g_module, 3, "failed to delete: %s errno: %d", off_lpath,
+             errno);
+      return -1;
+    }
+
+    // move the current cfg to .off and shutdown the plugin
+    char off_rpath[HS_MAX_PATH];
+    if (!hs_get_fqfn(rpath, name, off_rpath, sizeof(off_rpath))) {
+      hs_log(g_module, 0, "run off path too long");
+      exit(EXIT_FAILURE);
+    }
+    char cfg_rpath[HS_MAX_PATH];
+    strcpy(cfg_rpath, off_rpath);
+    strcpy(cfg_rpath + strlen(cfg_rpath) - HS_EXT_LEN, hs_cfg_ext);
+    if (rename(cfg_rpath, off_rpath)) {
+      hs_log(g_module, 4, "failed to move: %s to %s errno: %d", cfg_rpath,
+             off_rpath, errno);
+      return -1;
+    }
+    return 0;
+  }
+  return -1;
 }
