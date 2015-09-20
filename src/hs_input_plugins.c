@@ -252,14 +252,6 @@ static hs_input_plugin* create_input_plugin(const hs_config* cfg,
     return NULL;
   }
 
-  // preload the Heka stream reader module
-  lua_State* L = lsb_get_lua(p->sb->lsb);
-  luaL_findtable(L, LUA_REGISTRYINDEX, "_PRELOADED", 1);
-  lua_pushstring(L, "heka_stream_reader");
-  lua_pushcfunction(L, luaopen_heka_stream_reader);
-  lua_rawset(L, -3);
-  lua_pop(L, 1); // remove the preloaded table
-
   init_ip_checkpoint(&p->cp);
   return p;
 }

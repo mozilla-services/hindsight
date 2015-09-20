@@ -1,5 +1,4 @@
-Hindsight
----------
+# Hindsight
 
 ## Overview
 
@@ -9,24 +8,14 @@ about a lighter weight and faster data pipeline with delivery guarantees to repl
 [Heka](https://github.com/mozilla-services/heka).  Hindsight is that light weight skeleton around
 the same lua sandbox offering 'at least once' delivery semantics.
 
-[Full Documentation](docs/index.md)
+So how much lighter and faster? see: [Performance](performance.md)
 
-## Installation
+## Table of Contents
 
-### Prerequisites
-
-* Clang 3.1 or GCC 4.7+
-* CMake (3.0+) - http://cmake.org/cmake/resources/software.html
-
-### CMake Build Instructions
-
-    git clone git@github.com:trink/hindsight.git
-    cd hindsight 
-    mkdir release
-    cd release
-    
-    # Linux
-    cmake -DCMAKE_BUILD_TYPE=release ..
-    make
-
-    # Cross platform support is planned but not supported yet
+* [Architecture](architecture.md)
+* [Configuration](configuration.md)
+* [Message Matcher](message_matcher.md)
+* [Input Plugins](input_plugins.md)
+  * [Heka Stream Reader](heka_stream_reader.md)
+* [Analysis Plugins](analysis_plugins.md)
+* [Output Plugins](output_plugins.md)

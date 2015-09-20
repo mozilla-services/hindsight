@@ -203,6 +203,8 @@ static int output_message(hs_output_plugin* p)
         case -2: // skip
           ++p->sb->stats.pm_cnt;
           break;
+        case -3: // retry
+          break;
         case -5: // async update
           if (!p->async_len) {
             lsb_terminate(p->sb->lsb, "cannot use async checkpointing without"
@@ -210,11 +212,9 @@ static int output_message(hs_output_plugin* p)
             ret = 1;
           }
           // fall thru
-        case -3: // batching
+        case -4: // batching
           ++p->sb->stats.pm_cnt;
           p->batching = true;
-          break;
-        case -4: // retry
           break;
         default:
           lsb_terminate(p->sb->lsb, "invalid process_message return status");
@@ -239,6 +239,14 @@ static int output_message(hs_output_plugin* p)
                                                   LSB_UT_INSTRUCTION,
                                                   LSB_US_MAXIMUM);
         pthread_mutex_unlock(&p->cp_lock);
+
+        if (ret == -1) {
+          const char* err = lsb_get_error(p->sb->lsb);
+          if (strlen(err) > 0) {
+            hs_log(g_module, 4, "file: %s received: %d %s", p->sb->name, ret,
+                   lsb_get_error(p->sb->lsb));
+          }
+        }
       }
     }
 

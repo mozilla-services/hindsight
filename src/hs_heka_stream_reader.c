@@ -59,13 +59,6 @@ static heka_stream_reader* check_hsr(lua_State* lua, int args)
 }
 
 
-static int hsr_version(lua_State* lua)
-{
-  lua_pushstring(lua, "0.1.0");
-  return 1;
-}
-
-
 static int hsr_find_message(lua_State* lua)
 {
   heka_stream_reader* hsr = check_hsr(lua, 2);
@@ -148,7 +141,6 @@ static int hsr_gc(lua_State* lua)
 static const struct luaL_reg heka_stream_readerlib_f[] =
 {
   { "new", hsr_new }
-  , { "version", hsr_version }
   , { NULL, NULL }
 };
 

@@ -391,6 +391,11 @@ static void analyze_message(hs_analysis_thread* at)
         ++sb->stats.pm_cnt;
         if (ret < 0) {
           ++sb->stats.pm_failures;
+          const char* err = lsb_get_error(sb->lsb);
+          if (strlen(err) > 0) {
+            hs_log(g_module, 4, "file: %s received: %d %s", sb->name, ret,
+                   lsb_get_error(sb->lsb));
+          }
         }
       }
     }
