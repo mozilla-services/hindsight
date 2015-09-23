@@ -12,25 +12,19 @@ local cnt = 0
 
 function process_message(offset)
     local fh = assert(io.open(fn, "rb"))
-    if offset then fh:seek("set", offset) end
+    if offset then fh:seek("set", offset) else offset = 0 end
 
-    local found, read, need = false, 0, 8192
-    local offset = 0
-    while true do
-        local buf = fh:read(need)
-        if not buf then break end
-
+    local found, read, consumed
+    repeat
         repeat
-            found, read, need = hsr:find_message(buf)
-            if read then offset = offset + read end
+            found, consumed, read = hsr:find_message(fh)
+            offset = offset + consumed
             if found then
                 cnt = cnt + 1
                 inject_message(hsr, offset)
             end
-            buf = nil
         until not found
-    end
+    until read == 0
     fh:close()
-
     return 0, tostring(cnt)
 end

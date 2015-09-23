@@ -16,7 +16,7 @@ local threads = {}
 local sockets = {server}
 
 local function handle_client(client)
-    local found, read, need = false, 0, 8192 * 4
+    local found, consumed, need = false, 0, 8192 * 4
     local caddr, cport = client:getpeername()
     if not caddr then
         caddr = "unknown"
@@ -32,7 +32,7 @@ local function handle_client(client)
         if not buf then break end
 
         repeat
-            found, read, need = hsr:find_message(buf)
+            found, consumed, need = hsr:find_message(buf)
             if found then inject_message(hsr) end
             buf = nil
         until not found

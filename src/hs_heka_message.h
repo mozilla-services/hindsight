@@ -101,7 +101,7 @@ void hs_init_heka_message(hs_heka_message* m, size_t size);
 void hs_free_heka_message(hs_heka_message* m);
 
 void hs_clear_heka_message(hs_heka_message* m);
-bool hs_find_message(hs_heka_message* m, hs_input_buffer* hsib);
+bool hs_find_message(hs_heka_message* m, hs_input_buffer* hsib, bool decode);
 bool hs_decode_heka_message(hs_heka_message* m,
                             const unsigned char* buf,
                             size_t len);

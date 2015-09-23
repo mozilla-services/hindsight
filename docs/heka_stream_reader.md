@@ -27,17 +27,30 @@ local hsr = heka_stream_reader.new("stdin")
 Locates a Heka message within the stream.
 
 ```lua
-local found, read, need = hsr:find_message(buf)
+local found, consumed, need = hsr:find_message(buf)
 
 ```
 
 *Arguments*
-* buf (string) - buffer containing a Heka protobuf stream
+* buf (string, userdata (FILE*)) - buffer containing a Heka protobuf stream data or a userdate file object
+* decode (bool default: true) - true if the framed message should be protobuf decoded
 
 *Return*
 * found (bool) - true if a message was found
-* read (number) - number of bytes read so the offset can be tracked for checkpointing purposes
-* need (number) - number of bytes needed to complete the message or fill the underlying buffer
+* consumed (number) - number of bytes consumed so the offset can be tracked for checkpointing purposes
+* need/read (number) - number of bytes needed to complete the message or fill the underlying buffer
+  or in the case of a file object the number of bytes added to the buffer
+
+#### decode_message
+
+Converts a Heka protobuf encoded message string into a stream reader representation.  Note: this operation
+clear the internal stream reader buffer.
+
+*Arguments*
+* heka_pb (string) - Heka protobuf binary string
+
+*Return*
+* none - throws an error on failure
 
 #### read_message
 

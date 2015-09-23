@@ -310,7 +310,7 @@ static void* input_thread(void* arg)
   while (!p->stop) {
 #endif
     if (p->input.fh && !pim) {
-      if (hs_find_message(&im, &p->input.ib)) {
+      if (hs_find_message(&im, &p->input.ib, true)) {
         pim = &im;
       } else {
         bytes_read[0] = hs_read_file(&p->input);
@@ -338,7 +338,7 @@ static void* input_thread(void* arg)
     }
 
     if (p->analysis.fh && !pam) {
-      if (hs_find_message(&am, &p->analysis.ib)) {
+      if (hs_find_message(&am, &p->analysis.ib, true)) {
         pam = &am;
       } else {
         bytes_read[1] = hs_read_file(&p->analysis);

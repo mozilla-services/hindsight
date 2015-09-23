@@ -39,14 +39,14 @@ Converts a Heka protobuf encoded message string into a Lua table.
 
 #### inject_message
 
-Creates a new Heka protocol buffer message using the contents of the specified Lua table.
+Sends a Heka protocol buffer message into Hindsight.
 
 *Arguments*
-* msg ([Heka message table](heka_message_table.md) or [Heka stream reader](heka_stream_reader.md))
+* msg ([Heka message table](heka_message_table.md), [Heka stream reader](heka_stream_reader.md) or Heka protobuf string)
 * offset (optional: string, number) - checkpoint offset to be returned in the `process_message` call
 
 *Return*
-* none (throws an error if the table does not match the Heka message schema)
+* none - throws an error on invalid input
 
 ### Modes of Operation
 

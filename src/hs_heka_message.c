@@ -250,7 +250,7 @@ static size_t decode_header(unsigned char* buf, size_t len,
 }
 
 
-bool hs_find_message(hs_heka_message* m, hs_input_buffer* hsib)
+bool hs_find_message(hs_heka_message* m, hs_input_buffer* hsib, bool decode)
 {
   if (hsib->readpos == hsib->scanpos) return false;
 
@@ -277,7 +277,7 @@ bool hs_find_message(hs_heka_message* m, hs_input_buffer* hsib)
              hsib->name,
              hsib->cp.offset - hsib->readpos + hsib->scanpos + 1);
       ++hsib->scanpos;
-      return hs_find_message(m, hsib);
+      return hs_find_message(m, hsib, decode);
     }
 
     if (!hsib->msglen) {
@@ -289,17 +289,26 @@ bool hs_find_message(hs_heka_message* m, hs_input_buffer* hsib)
       size_t mend = hend + hsib->msglen;
       if (mend > hsib->readpos) return false; // message is not in buf
 
-      if (hs_decode_heka_message(m, &hsib->buf[hend], hsib->msglen)) {
+      if (decode) {
+        if (hs_decode_heka_message(m, &hsib->buf[hend], hsib->msglen)) {
+          hsib->scanpos = mend;
+          hsib->msglen = 0;
+          return true;
+        } else {
+          hs_log(g_module, 4, "decode failure\tname:%s\toffset:%zu",
+                 hsib->name,
+                 hsib->cp.offset - hsib->readpos + hend);
+          ++hsib->scanpos;
+          hsib->msglen = 0;
+          return hs_find_message(m, hsib, decode);
+        }
+      } else {
+        hs_clear_heka_message(m); // framed message is not a heka protobuf
+        m->msg = &hsib->buf[hend];
+        m->msg_len = hsib->msglen;
         hsib->scanpos = mend;
         hsib->msglen = 0;
         return true;
-      } else {
-        hs_log(g_module, 4, "decode failure\tname:%s\toffset:%zu",
-               hsib->name,
-               hsib->cp.offset - hsib->readpos + hend);
-        ++hsib->scanpos;
-        hsib->msglen = 0;
-        return hs_find_message(m, hsib);
       }
     } else {
       hs_log(g_module, 4,
@@ -307,7 +316,7 @@ bool hs_find_message(hs_heka_message* m, hs_input_buffer* hsib)
              hsib->name,
              hsib->cp.offset - hsib->readpos + hsib->scanpos);
       ++hsib->scanpos;
-      return hs_find_message(m, hsib);
+      return hs_find_message(m, hsib, decode);
     }
   } else {
     hs_log(g_module, 4, "discarded bytes\tname:%s\toffset:%zu\tbytes:%zu",
@@ -563,7 +572,11 @@ int hs_read_message(lua_State* lua, hs_heka_message* m)
   }
 
   if (strcmp(field, "Uuid") == 0) {
-    lua_pushlstring(lua, m->uuid, 16);
+    if (m->uuid) {
+      lua_pushlstring(lua, m->uuid, 16);
+    } else {
+      lua_pushnil(lua);
+    }
   } else if (strcmp(field, "Timestamp") == 0) {
     lua_pushnumber(lua, m->timestamp);
   } else if (strcmp(field, "Type") == 0) {

@@ -145,24 +145,43 @@ static int inject_message(lua_State* L)
 
   size_t output_len;
   const char* output;
-  if (lua_type(L, 1) == LUA_TUSERDATA) {
-    void* ud = luaL_checkudata(L, 1, mozsvc_heka_stream_reader);
-    luaL_argcheck(L, ud != NULL, 1, "invalid userdata type");
-    heka_stream_reader* hsr = (heka_stream_reader*)ud;
-    if (hsr->msg.msg) {
-      output_len = hsr->msg.msg_len;
-      output = (const char*)hsr->msg.msg;
-    } else {
-      return luaL_error(L, "attempted to inject a nil message");
+  switch (lua_type(L, 1)) {
+  case LUA_TUSERDATA:
+    {
+      void* ud = luaL_checkudata(L, 1, mozsvc_heka_stream_reader);
+      luaL_argcheck(L, ud != NULL, 1, "invalid userdata type");
+      heka_stream_reader* hsr = (heka_stream_reader*)ud;
+      if (hsr->msg.msg) {
+        output_len = hsr->msg.msg_len;
+        output = (const char*)hsr->msg.msg;
+      } else {
+        return luaL_error(L, "attempted to inject a nil message");
+      }
     }
-  } else {
+    break;
+  case LUA_TSTRING:
+    {
+      hs_heka_message m;
+      hs_init_heka_message(&m, 8);
+      output = lua_tolstring(L, 1, &output_len);
+      bool ok = hs_decode_heka_message(&m, (const unsigned char*)output,
+                                       output_len);
+      hs_free_heka_message(&m);
+      if (!ok) {
+        return luaL_error(L, "attempted to inject a invalid protobuf string");
+      }
+    }
+    break;
+  default:
     if (lsb_output_protobuf(lsb, 1, 0) != 0) {
       return luaL_error(L, "inject_message() could not encode protobuf - %s",
                         lsb_get_error(lsb));
     }
     output_len = 0;
     output = lsb_get_output(lsb, &output_len);
+    break;
   }
+
   if (!hs_load_checkpoint(L, 2, &p->cp)) {
     return luaL_error(L, "inject_message() only accepts numeric"
                       " or string checkpoints < %d", HS_MAX_IP_CHECKPOINT);

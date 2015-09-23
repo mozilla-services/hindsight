@@ -472,7 +472,7 @@ static void* input_thread(void* arg)
   while (!at->plugins->stop) {
 #endif
     if (at->input.fh) {
-      if (hs_find_message(&msg, &at->input.ib)) {
+      if (hs_find_message(&msg, &at->input.ib, true)) {
         at->msg = &msg;
         at->current_t = time(NULL);
         analyze_message(at);
