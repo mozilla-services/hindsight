@@ -1,7 +1,7 @@
 ## Heka Stream Reader Module
 
 Enables parsing of a framed Heka protobuf stream in a Lua sandbox. See: 
-[Example of a Heka protobuf reader](input_plugin.md#example-of-a-heka-protobuf-stdin-reader)
+[Example of a Heka protobuf reader](input_plugins.md#example-of-a-heka-protobuf-stdin-reader)
 
 ### API
 
