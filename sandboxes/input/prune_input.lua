@@ -40,8 +40,7 @@ if not (input or analysis) then
 end
 
 local function get_min(t, n, i, o)
-    local elt = t[n] or {}
-    if not elt.min then elt.min = math.huge end
+    local elt = t[n] or {min = math.huge}
     if i < elt.min then
         elt.min = i
         elt.off = o
