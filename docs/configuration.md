@@ -68,16 +68,19 @@ plugins](input_plugins.md#polling)
 #### Input Plugin Configuration Variables
 
 * [Default Configuration Variables](#default-sandbox-configuration-variables)
+* **filename** - path to the lua sandbox input plugin
 
 #### Analysis Plugin Configuration Variables
 
 * [Default Configuration Variables](#default-sandbox-configuration-variables)
+* **filename** - path to the lua sandbox analysis plugin
 * **message_matcher** - filter to select which messages this plugin receives see: [Message Matcher](message_matcher.md)
 * **thread** - analysis thread the plugin will be run on (`thread % analysis_threads`)
 
 #### Output Plugin Configuration Variables
 
 * [Default Configuration Variables](#default-sandbox-configuration-variables)
+* **filename** - path to the lua sandbox output plugin
 * **message_matcher** - filter to select which messages this plugin receives see: [Message Matcher](message_matcher.md)
 * **async_buffer_size** - when using asynchronous output this controls the number of message checkpoints to hold in
 memory. i.e., if the output can have 1000 messages in flight the async_buffer_size should be set to 1000
