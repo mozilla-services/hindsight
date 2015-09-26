@@ -106,3 +106,12 @@ double hs_timespec_delta(const struct timespec* s, const struct timespec* e)
   }
   return delta;
 }
+
+
+bool hs_has_ext(const char* fn, const char* ext)
+{
+  size_t flen = strlen(fn);
+  size_t elen = strlen(ext);
+  if (flen <= elen) return false; // a fn with only an extension is invalid
+  return strcmp(fn + flen - elen, ext) == 0 ? true : false;
+}

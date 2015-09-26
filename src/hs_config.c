@@ -332,6 +332,17 @@ bool hs_load_sandbox_config(const char* dir,
 
   ret = get_string_item(L, LUA_GLOBALSINDEX, cfg_sb_filename, &cfg->filename,
                         NULL);
+  if (!ret) {
+    if (strpbrk(cfg->filename, "/\\")) {
+      lua_pushfstring(L, "%s must be not contain a path component",
+                      cfg_sb_filename);
+      ret = 1;
+    } else if (!hs_has_ext(cfg->filename, hs_lua_ext)) {
+      lua_pushfstring(L, "%s must have a %s extension", hs_lua_ext,
+                      cfg_sb_filename);
+      ret = 1;
+    }
+  }
   if (ret) goto cleanup;
 
   ret = get_bool_item(L, LUA_GLOBALSINDEX, cfg_sb_preserve,
@@ -478,10 +489,7 @@ bool hs_get_config_fqfn(const char* path,
                         char* fqfn,
                         size_t fqfn_len)
 {
-  size_t len = strlen(name);
-  if (len <= HS_EXT_LEN) return false;
-
-  if (strcmp(hs_cfg_ext, name + len - HS_EXT_LEN)) return false;
+  if (!hs_has_ext(name, hs_cfg_ext)) return false;
 
   int ret = snprintf(fqfn, fqfn_len, "%s/%s", path, name);
   if (ret < 0 || ret > (int)fqfn_len - 1) {
@@ -493,10 +501,7 @@ bool hs_get_config_fqfn(const char* path,
 
 int hs_process_load_cfg(const char* lpath, const char* rpath, const char* name)
 {
-  size_t nlen = strlen(name);
-  if (nlen <= HS_EXT_LEN) return -1;
-
-  if (strcmp(name + nlen - HS_EXT_LEN, hs_cfg_ext) == 0) {
+  if (hs_has_ext(name, hs_cfg_ext)) {
     char cfg_lpath[HS_MAX_PATH];
     if (!hs_get_fqfn(lpath, name, cfg_lpath, sizeof(cfg_lpath))) {
       hs_log(g_module, 0, "load cfg path too long");
@@ -527,7 +532,7 @@ int hs_process_load_cfg(const char* lpath, const char* rpath, const char* name)
       return -1;
     }
     return 1;
-  } else if (strcmp(name + nlen - HS_EXT_LEN, hs_off_ext) == 0) {
+  } else if (hs_has_ext(name, hs_off_ext)) {
     char off_lpath[HS_MAX_PATH];
     if (!hs_get_fqfn(lpath, name, off_lpath, sizeof(off_lpath))) {
       hs_log(g_module, 0, "load off path too long");

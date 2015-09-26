@@ -633,11 +633,8 @@ static void process_lua(hs_output_plugins* plugins, const char* lpath,
 
   struct dirent* entry;
   while ((entry = readdir(dp))) {
-    size_t nlen = strlen(entry->d_name);
-
-    // move the Lua to the run directory
-    if (nlen <= HS_EXT_LEN) continue;
-    if (strcmp(entry->d_name + nlen - HS_EXT_LEN, hs_lua_ext) == 0) {
+    if (hs_has_ext(entry->d_name, hs_lua_ext)) {
+      // move the Lua to the run directory
       if (!hs_get_fqfn(lpath, entry->d_name, lua_lpath, sizeof(lua_lpath))) {
         hs_log(g_module, 0, "load lua path too long");
         exit(EXIT_FAILURE);

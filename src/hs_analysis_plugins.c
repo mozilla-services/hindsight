@@ -588,11 +588,8 @@ static void process_lua(hs_analysis_plugins* plugins, const char* lpath,
 
   struct dirent* entry;
   while ((entry = readdir(dp))) {
-    size_t nlen = strlen(entry->d_name);
-
-    // move the Lua to the run directory
-    if (nlen <= HS_EXT_LEN) continue;
-    if (strcmp(entry->d_name + nlen - HS_EXT_LEN, hs_lua_ext) == 0) {
+    if (hs_has_ext(entry->d_name, hs_lua_ext)) {
+      // move the Lua to the run directory
       if (!hs_get_fqfn(lpath, entry->d_name, lua_lpath, sizeof(lua_lpath))) {
         hs_log(g_module, 0, "load lua path too long");
         exit(EXIT_FAILURE);
@@ -650,10 +647,7 @@ static void process_lua(hs_analysis_plugins* plugins, const char* lpath,
 
 static int get_thread_id(const char* lpath, const char* rpath, const char* name)
 {
-  size_t nlen = strlen(name);
-  if (nlen <= HS_EXT_LEN) return -2;
-
-  if (strcmp(name + nlen - HS_EXT_LEN, hs_cfg_ext) == 0) {
+  if (hs_has_ext(name, hs_cfg_ext)) {
     int otid = -1, ntid = -2;
     hs_sandbox_config sbc;
     if (hs_load_sandbox_config(lpath, name, &sbc, NULL, HS_SB_TYPE_ANALYSIS)) {
@@ -680,10 +674,10 @@ static int get_thread_id(const char* lpath, const char* rpath, const char* name)
       return -1;
     }
     return otid;
-  } else if (strcmp(name + nlen - HS_EXT_LEN, hs_off_ext) == 0) {
+  } else if (hs_has_ext(name, hs_off_ext)) {
     char cfg[HS_MAX_PATH];
     strcpy(cfg, name);
-    strcpy(cfg + nlen - HS_EXT_LEN, hs_cfg_ext);
+    strcpy(cfg + strlen(name) - HS_EXT_LEN, hs_cfg_ext);
 
     hs_sandbox_config sbc;
     if (hs_load_sandbox_config(rpath, cfg, &sbc, NULL, HS_SB_TYPE_ANALYSIS)) {

@@ -101,7 +101,7 @@ static char* test_sandbox_input_config()
 {
   hs_sandbox_config cfg;
   bool ret = hs_load_sandbox_config("sandbox", "input.cfg", &cfg, NULL,
-                                        HS_SB_TYPE_INPUT);
+                                    HS_SB_TYPE_INPUT);
   mu_assert(ret, "hs_load_sandbox_config failed");
   mu_assert(strcmp(cfg.filename, "input.lua") == 0, "received %s",
             cfg.filename);
@@ -118,7 +118,7 @@ static char* test_sandbox_analysis_config()
 {
   hs_sandbox_config cfg;
   bool ret = hs_load_sandbox_config("sandbox", "analysis.cfg", &cfg, NULL,
-                                        HS_SB_TYPE_ANALYSIS);
+                                    HS_SB_TYPE_ANALYSIS);
   mu_assert(ret, "hs_load_sandbox_config failed");
   mu_assert(strcmp(cfg.filename, "analysis.lua") == 0, "received %s",
             cfg.filename);
@@ -145,13 +145,29 @@ static char* test_sandbox_output_config()
 {
   hs_sandbox_config cfg;
   bool ret = hs_load_sandbox_config("sandbox", "output.cfg", &cfg, NULL,
-                                        HS_SB_TYPE_OUTPUT);
+                                    HS_SB_TYPE_OUTPUT);
   mu_assert(ret, "hs_load_sandbox_config failed");
   mu_assert(strcmp(cfg.filename, "output.lua") == 0, "received %s",
             cfg.filename);
   mu_assert(cfg.async_buffer_size == 999, "received %d", cfg.async_buffer_size);
   mu_assert(cfg.thread == 0, "received %d", cfg.thread);
 
+  hs_free_sandbox_config(&cfg);
+  return NULL;
+}
+
+
+static char* test_sandbox_filename_config()
+{
+  hs_sandbox_config cfg;
+  bool ret = hs_load_sandbox_config("sandbox", "path_in_fn.cfg", &cfg, NULL,
+                                    HS_SB_TYPE_INPUT);
+  mu_assert(!ret, "accepted a filename with a path");
+  hs_free_sandbox_config(&cfg);
+
+  ret = hs_load_sandbox_config("sandbox", "invalid_fn_ext.cfg", &cfg, NULL,
+                               HS_SB_TYPE_INPUT);
+  mu_assert(!ret, "accepted a filename with a invalid extension");
   hs_free_sandbox_config(&cfg);
   return NULL;
 }
@@ -165,6 +181,7 @@ static char* all_tests()
   mu_run_test(test_sandbox_input_config);
   mu_run_test(test_sandbox_analysis_config);
   mu_run_test(test_sandbox_output_config);
+  mu_run_test(test_sandbox_filename_config);
   return NULL;
 }
 

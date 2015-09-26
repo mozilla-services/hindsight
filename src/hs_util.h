@@ -46,4 +46,6 @@ unsigned const char*
 hs_read_varint(unsigned const char* p, unsigned const char* e, long long* vi);
 
 double hs_timespec_delta(const struct timespec* s, const struct timespec* e);
+
+bool hs_has_ext(const char* fn, const char* ext);
 #endif
