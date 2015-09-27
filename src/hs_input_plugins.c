@@ -5,9 +5,9 @@
 * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 /** @brief Hindsight configuration loader @file */
+#define _GNU_SOURCE
 
 #include "hs_input_plugins.h"
-
 
 #include <assert.h>
 #include <ctype.h>
@@ -329,7 +329,8 @@ static void* input_thread(void* arg)
 
       if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
         hs_log(g_module, 3, "clock_gettime failed: %s", p->sb->name);
-        break;
+        ts.tv_sec = time(NULL);
+        ts.tv_nsec = 0;
       }
       ts.tv_sec += p->sb->ticker_interval;
       if (!sem_timedwait(&p->shutdown, &ts)) {
@@ -372,18 +373,51 @@ static void* input_thread(void* arg)
 }
 
 
+static void join_thread(hs_input_plugins* plugins, hs_input_plugin* p)
+{
+  struct timespec ts;
+  if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
+    hs_log(g_module, 3, "%s clock_gettime failed", p->sb->name);
+    ts.tv_sec = time(NULL);
+    ts.tv_nsec = 0;
+  }
+  ts.tv_sec += 2;
+  int ret = pthread_timedjoin_np(p->thread, NULL, &ts);
+  if (ret) {
+    if (ret == ETIMEDOUT) {
+      // The plugin is blocked on a C function call so we are in a known state
+      // but there is no guarantee cancelling the thread and interacting with
+      // the Lua state at that point is safe.  The lsb_terminate limits the
+      // interaction but lua_close will still be called. At this point I would
+      // rather risk the core and have to restart the process instead of leaking
+      // the memory or hanging on a plugin stop and having to kill the process
+      // anyway (todo: more investigation)
+      hs_log(g_module, 2, "%s join timed out, cancelling the thread",
+             p->sb->name);
+      pthread_cancel(p->thread);
+      if (pthread_join(p->thread, NULL)) {
+        hs_log(g_module, 2, "%s cancelled thread could not be joined",
+               p->sb->name);
+      }
+      lsb_terminate(p->sb->lsb, "thread cancelled");
+    } else {
+      hs_log(g_module, 2, "%s thread could not be joined", p->sb->name);
+      lsb_terminate(p->sb->lsb, "thread join error");
+    }
+  }
+  free_input_plugin(p);
+  free(p);
+  --plugins->list_cnt;
+}
+
+
 static void remove_plugin(hs_input_plugins* plugins, int idx)
 {
   hs_input_plugin* p = plugins->list[idx];
   plugins->list[idx] = NULL;
   sem_post(&p->shutdown);
   stop_sandbox(p->sb->lsb);
-  if (pthread_join(p->thread, NULL)) {
-    hs_log(g_module, 3, "remove_plugin could not pthread_join");
-  }
-  free_input_plugin(p);
-  free(p);
-  --plugins->list_cnt;
+  join_thread(plugins, p);
 }
 
 
@@ -487,12 +521,7 @@ void hs_wait_input_plugins(hs_input_plugins* plugins)
 
     hs_input_plugin* p = plugins->list[i];
     plugins->list[i] = NULL;
-    if (pthread_join(p->thread, NULL)) {
-      hs_log(g_module, 3, "thread could not be joined");
-    }
-    free_input_plugin(p);
-    free(p);
-    --plugins->list_cnt;
+    join_thread(plugins, p);
   }
   pthread_mutex_unlock(&plugins->list_lock);
 }

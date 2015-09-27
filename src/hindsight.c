@@ -99,6 +99,8 @@ int main(int argc, char* argv[])
   while (true) {
     if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
       hs_log(g_module, 3, "clock_gettime failed");
+      ts.tv_sec = time(NULL);
+      ts.tv_nsec = 0;
     }
     ts.tv_sec += 1;
     if (!sem_timedwait(&g_shutdown, &ts)) {
