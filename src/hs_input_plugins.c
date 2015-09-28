@@ -40,7 +40,8 @@ static const char* g_sb_template = "{"
   "max_message_size = %u,"
   "remove_entries = {"
   "[''] = {'dofile','load','loadfile','loadstring','newproxy','print'},"
-  "os = {'getenv','exit','setlocale'}"
+  "os = {'getenv','exit','setlocale'},"
+  "string = {'dump'},"
   "}"
   "}";
 

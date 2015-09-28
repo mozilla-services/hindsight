@@ -2,6 +2,19 @@
 -- License, v. 2.0. If a copy of the MPL was not distributed with this
 -- file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+--[[
+Heka compatible TCP output
+
+-- .cfg
+filename        = "heka_tcp.lua"
+message_matcher = "TRUE"
+
+address = "127.0.0.1"
+port    = 5565
+timeout = 10
+
+--]]
+
 local socket = require "socket"
 
 local address = read_config("address") or "127.0.0.1"
@@ -21,15 +34,6 @@ end
 local client, err = create_client()
 
 local function send_message(msg, i)
-   -- client:settimeout(0)
-   -- local data, err = client:receive(0) -- test connection
-   -- if err == "closed" then
-   --     client:close()
-   --     client = nil
-   --     return -3, err
-   -- end
-   --
-   -- client:settimeout(timeout)
     local len, err, i = client:send(msg, i)
     if not len then
         if err == "timeout" or err == "closed" then
@@ -42,8 +46,6 @@ local function send_message(msg, i)
     return 0
 end
 
----
-
 function process_message()
     if not client then
         client, err = create_client()
@@ -54,4 +56,5 @@ function process_message()
 end
 
 function timer_event(ns)
+    -- no op
 end

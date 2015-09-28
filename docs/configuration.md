@@ -65,22 +65,37 @@ output_defaults = {
 plugins](input_plugins.md#polling)
   * For analysis and output plugins it is the amount of time between `timer_event` function calls.
 
-#### Input Plugin Configuration Variables
+#### Common Plugin Configuration Variables
 
+* **filename** - plugin source file (must have no path component and a `.lua` extension)
+
+##### Reserved
+
+* **cfg_name** - configuration filename without the `.cfg` extension (set by Hindsight) e.g., `myplugin`
+
+##### User Defined
+
+* *key* (string | number) - user defined variable with a (string | number | boolean | table) value
+
+###### User Defined Private Variable
+
+* **_***key* (string) - user defined variable beginning with an underscore (allows filtering in UI displays)
+
+#### Input Plugin Configuration Variables
 * [Default Configuration Variables](#default-sandbox-configuration-variables)
-* **filename** - input plugin source file (must have no path component and a `.lua` extension)
+* [Common Plugin Configuration Variables](#common-plugin-configuration-variables)
 
 #### Analysis Plugin Configuration Variables
 
 * [Default Configuration Variables](#default-sandbox-configuration-variables)
-* **filename** - analysis plugin source file (must have no path component and a `.lua` extension)
+* [Common Plugin Configuration Variables](#common-plugin-configuration-variables)
 * **message_matcher** - filter to select which messages this plugin receives see: [Message Matcher](message_matcher.md)
 * **thread** - analysis thread the plugin will be run on (`thread % analysis_threads`)
 
 #### Output Plugin Configuration Variables
 
 * [Default Configuration Variables](#default-sandbox-configuration-variables)
-* **filename** - output plugin source file (must have no path component and a `.lua` extension)
+* [Common Plugin Configuration Variables](#common-plugin-configuration-variables)
 * **message_matcher** - filter to select which messages this plugin receives see: [Message Matcher](message_matcher.md)
 * **async_buffer_size** - when using asynchronous output this controls the number of message checkpoints to hold in
 memory. i.e., if the output can have 1000 messages in flight the async_buffer_size should be set to 1000

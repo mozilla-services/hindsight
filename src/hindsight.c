@@ -123,27 +123,30 @@ int main(int argc, char* argv[])
     }
 #endif
   }
-#ifndef HINDSIGHT_CLI // non CLI mode should shut everything down immediately
-  hs_stop_input_plugins(&ips);
-  aps.stop = true;
-  hs_stop_output_plugins(&ops);
-#endif
 
 #ifdef HINDSIGHT_CLI
   hs_stop_input_plugins(&ips);
-#endif
   hs_wait_input_plugins(&ips);
+  hs_write_checkpoints(&cpw, &cfg.cp_reader);
+  hs_free_input_plugins(&ips);
 
-#ifdef HINDSIGHT_CLI
-  sleep(1);
   aps.stop = true;
-#endif
   hs_wait_analysis_plugins(&aps);
+  hs_write_checkpoints(&cpw, &cfg.cp_reader);
+  hs_free_analysis_plugins(&aps);
 
-#ifdef HINDSIGHT_CLI
-  sleep(1);
   hs_stop_output_plugins(&ops);
-#endif
+  hs_wait_output_plugins(&ops);
+  hs_write_checkpoints(&cpw, &cfg.cp_reader);
+  hs_free_output_plugins(&ops);
+#else
+// non CLI mode should shut everything down immediately
+  hs_stop_input_plugins(&ips);
+  aps.stop = true;
+  hs_stop_output_plugins(&ops);
+
+  hs_wait_input_plugins(&ips);
+  hs_wait_analysis_plugins(&aps);
   hs_wait_output_plugins(&ops);
 
   hs_write_checkpoints(&cpw, &cfg.cp_reader);
@@ -151,6 +154,8 @@ int main(int argc, char* argv[])
   hs_free_input_plugins(&ips);
   hs_free_analysis_plugins(&aps);
   hs_free_output_plugins(&ops);
+#endif
+
   hs_free_message_match_builder(&mmb);
   hs_free_checkpoint_writer(&cpw);
   hs_free_config(&cfg);

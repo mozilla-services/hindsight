@@ -39,7 +39,8 @@ static const char* g_sb_template = "{"
   "cpath = [[%s]],"
   "remove_entries = {"
   "[''] = {'dofile','load','loadfile','loadstring','newproxy','print'},"
-  "os = {'getenv','exit','setlocale'}"
+  "os = {'getenv','exit','setlocale'},"
+  "string = {'dump'},"
   "}"
   "}";
 
