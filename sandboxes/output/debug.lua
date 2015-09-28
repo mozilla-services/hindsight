@@ -18,11 +18,7 @@ local byte   = require "string".byte
 local concat = require "table".concat
 
 local function get_uuid(uuid)
-    return string.format("%X%X%X%X-%X%X-%X%X-%X%X-%X%X%X%X%X",
-                         byte(uuid, 1), byte(uuid, 2), byte(uuid, 3), byte(uuid, 4),
-                         byte(uuid, 5), byte(uuid, 6), byte(uuid, 7), byte(uuid, 8),
-                         byte(uuid, 9), byte(uuid, 10), byte(uuid, 11), byte(uuid, 12),
-                         byte(uuid, 13), byte(uuid, 14), byte(uuid, 15), byte(uuid, 16))
+    return string.format("%X%X%X%X-%X%X-%X%X-%X%X-%X%X%X%X%X", byte(uuid, 1, 16))
 end
 
 local function get_timestamp(ts)
