@@ -50,8 +50,9 @@ The Hindsight infrastructure can be run as a service with no initial business lo
 be dynamically loaded and unloaded as necessary.
 
 ```lua
-sandbox_load_path = "hs_load"
-sandbox_run_path  = "hs_run"
+sandbox_load_path     = "hs_load"
+sandbox_load_interval = 60
+sandbox_run_path      = "hs_run"
 ```
 
 ##### Starting a New Plugin

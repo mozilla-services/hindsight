@@ -14,6 +14,7 @@
   * input (directory) - input plugin queue
   * analysis (directory) - analysis plugin queue
   * output (directory) - output plugin queue
+* **sandbox_load_interval** - time interval at which the `sandbox_load_path` directory should be scanned for new dynamic plugins to load (seconds, default 60)
 * **sandbox_run_path** - base path containing the running cfgs, Lua, and state preservation files.
   The following directory structure must exist under the base path:
   * input (directory) - input plugins
@@ -30,6 +31,7 @@
 output_path             = "hs_output"
 output_size             = 1024 * 1024 * 1024
 sandbox_load_path       = "hs_load"
+sandbox_load_interval   = 60
 sandbox_run_path        = "hs_run"
 analysis_threads        = 1
 analysis_lua_path       = "/usr/lib/luasandbox/modules/?.lua"
