@@ -31,6 +31,7 @@ static const char g_module[] = "config_parser";
 static const char* cfg_output_path = "output_path";
 static const char* cfg_output_size = "output_size";
 static const char* cfg_load_path = "sandbox_load_path";
+static const char* cfg_load_interval = "sandbox_load_interval";
 static const char* cfg_run_path = "sandbox_run_path";
 static const char* cfg_threads = "analysis_threads";
 static const char* cfg_analysis_lua_path = "analysis_lua_path";
@@ -75,6 +76,7 @@ static void init_config(hs_config* cfg)
 {
   cfg->run_path = NULL;
   cfg->load_path = NULL;
+  cfg->load_interval = 60;
   cfg->output_path = NULL;
   cfg->io_lua_path = NULL;
   cfg->io_lua_cpath = NULL;
@@ -414,6 +416,14 @@ int hs_load_config(const char* fn, hs_config* cfg)
 
   ret = get_string_item(L, LUA_GLOBALSINDEX, cfg_load_path, &cfg->load_path,
                         "");
+  if (ret) goto cleanup;
+
+  ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_load_interval,
+                         &cfg->load_interval);
+  if (cfg->load_interval < 1) {
+    lua_pushfstring(L, "%s must be >= 1", cfg_load_interval);
+    ret = 1;
+  }
   if (ret) goto cleanup;
 
   ret = get_string_item(L, LUA_GLOBALSINDEX, cfg_run_path, &cfg->run_path,
