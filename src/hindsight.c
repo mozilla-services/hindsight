@@ -95,7 +95,7 @@ int main(int argc, char* argv[])
   hs_init_checkpoint_writer(&cpw, &ips, &aps, &ops, cfg.output_path);
 
   struct timespec ts;
-  int cnt = 0;
+  unsigned cnt = 0;
   while (true) {
     if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
       hs_log(g_module, 3, "clock_gettime failed");
@@ -108,7 +108,7 @@ int main(int argc, char* argv[])
       break; // shutting down
     }
     hs_write_checkpoints(&cpw, &cfg.cp_reader);
-    if (cfg.load_path[0] != 0 && ++cnt == 59) { // scan just before emitting the stats
+    if (cfg.load_path[0] != 0 && ++cnt == cfg.load_interval) { // scan just before emitting the stats
       hs_log(g_module, 7, "scan load directories");
       hs_load_input_plugins(&ips, &cfg, true);
       hs_load_analysis_plugins(&aps, &cfg, true);

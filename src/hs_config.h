@@ -53,6 +53,7 @@ typedef struct hs_config
 {
   char* run_path;
   char* load_path;
+  unsigned load_interval;
   char* output_path;
   char* io_lua_path;
   char* io_lua_cpath;
