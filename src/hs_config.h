@@ -53,7 +53,6 @@ typedef struct hs_config
 {
   char* run_path;
   char* load_path;
-  unsigned load_interval;
   char* output_path;
   char* io_lua_path;
   char* io_lua_cpath;
@@ -63,6 +62,7 @@ typedef struct hs_config
   unsigned max_message_size;
   unsigned output_size;
   unsigned analysis_threads;
+  unsigned load_interval;
   int pid;
   hs_checkpoint_reader cp_reader;
   hs_sandbox_config ipd; // input plugin defaults

@@ -108,7 +108,7 @@ int main(int argc, char* argv[])
       break; // shutting down
     }
     hs_write_checkpoints(&cpw, &cfg.cp_reader);
-    if (cfg.load_path[0] != 0 && ++cnt == cfg.load_interval) { // scan just before emitting the stats
+    if (cfg.load_path[0] != 0 && ++cnt == cfg.load_interval) {
       hs_log(g_module, 7, "scan load directories");
       hs_load_input_plugins(&ips, &cfg, true);
       hs_load_analysis_plugins(&aps, &cfg, true);
