@@ -298,6 +298,7 @@ bool hs_load_sandbox_config(const char* dir,
     cfg->output_limit = dflt->output_limit;
     cfg->memory_limit = dflt->memory_limit;
     cfg->instruction_limit = dflt->instruction_limit;
+    cfg->ticker_interval = dflt->ticker_interval;
     cfg->preserve_data = dflt->preserve_data;
   }
 
