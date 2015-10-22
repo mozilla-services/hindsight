@@ -152,7 +152,7 @@ end
 ##### Batching
 
 * `process_message` batches the message/transformation in memory or on disk and returns one of the following values:
-  * batching (-5) - the message was successfully added to the batch
+  * batching (-4) - the message was successfully added to the batch
   * failure (-1) - the message cannot be batch
     * the failure count is incremented
     * any optional error message is written to the log
