@@ -10,6 +10,7 @@
 #define hs_sandbox_h_
 
 #include <luasandbox.h>
+#include <stdbool.h>
 #include <time.h>
 
 #include "hs_config.h"
@@ -55,6 +56,6 @@ void hs_free_sandbox(hs_sandbox* p);
 
 
 int hs_process_message(lua_sandbox* lsb, void* sequence_id);
-int hs_timer_event(lua_sandbox* lsb, time_t t);
+int hs_timer_event(lua_sandbox* lsb, time_t t, bool shutdown);
 
 #endif

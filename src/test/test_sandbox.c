@@ -44,7 +44,7 @@ static char* test_create_input_sandbox()
   mu_assert(sb != NULL, "hs_create_sandbox failed");
   int status = hs_process_message(sb->lsb, NULL);
   mu_assert(status == 0, "process_message failed: %s", lsb_get_error(sb->lsb));
-  status = hs_timer_event(sb->lsb, 0);
+  status = hs_timer_event(sb->lsb, 0, false);
   mu_assert(status == 0, "timer_event failed: %s", lsb_get_error(sb->lsb));
 
   hs_free_sandbox(sb);
@@ -67,7 +67,7 @@ static char* test_create_analysis_sandbox()
   mu_assert(sb != NULL, "hs_create_sandbox failed");
   int status = hs_process_message(sb->lsb, NULL);
   mu_assert(status == 0, "process_message failed: %s", lsb_get_error(sb->lsb));
-  status = hs_timer_event(sb->lsb, 0);
+  status = hs_timer_event(sb->lsb, 0, false);
   mu_assert(status == 0, "timer_event failed: %s", lsb_get_error(sb->lsb));
 
   hs_free_sandbox(sb);
@@ -90,7 +90,7 @@ static char* test_create_output_sandbox()
   mu_assert(sb != NULL, "hs_create_sandbox failed");
   int status = hs_process_message(sb->lsb, NULL);
   mu_assert(status == 0, "process_message failed: %s", lsb_get_error(sb->lsb));
-  status = hs_timer_event(sb->lsb, 0);
+  status = hs_timer_event(sb->lsb, 0, false);
   mu_assert(status == 0, "timer_event failed: %s", lsb_get_error(sb->lsb));
 
   hs_free_sandbox(sb);

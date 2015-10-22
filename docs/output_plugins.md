@@ -28,6 +28,7 @@ Called when the `ticker_interval` timer expires.
 *Arguments*
 * ns (number) - nanosecond timestamp of the function call (it is actually `time_t * 1e9`
 to keep the timestamp units consistent so it will only have a one second resolution)
+* shutdown (bool) - true if timer_event is being called due to a shutdown
 
 *Return*
 * none
@@ -57,6 +58,18 @@ Converts a Heka protobuf encoded message string into a Lua table.
 
 *Return*
 * msg ([Heka message table (array fields)](heka_message_table.md#array-based-message-fields))
+
+#### batch_checkpoint_update
+
+Available only when `async_buffer_size` is not configured, this function advances the output checkpoint
+when in batching mode. The standard use case is to call it from `timer_event` after successfully flushing
+a batch on timeout/shutdown.
+
+*Arguments*
+* none
+
+*Return*
+* none
 
 #### async_checkpoint_update
 
@@ -160,11 +173,11 @@ ticker_interval = 60
 
 buffer_max = 1000
 db_config = {
+    host = "example.com",
+    port = 5432,
     name = "dev",
     user = "test",
     _password = "testpw",
-    host = "example.com",
-    port = 5439,
 }
 ```
 
@@ -173,13 +186,15 @@ db_config = {
 -- License, v. 2.0. If a copy of the MPL was not distributed with this
 -- file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+require "os"
 require "string"
 require "table"
 
 local driver = require "luasql.postgres"
 
-local db_config = read_config("db_config") or error("db_config must be set")
-local buffer_max = read_config("buffer_max") or 1000
+local ticker_interval = read_config("ticker_interval")
+local db_config       = read_config("db_config") or error("db_config must be set")
+local buffer_max      = read_config("buffer_max") or 1000
 assert(buffer_max > 0, "buffer_max must be greater than zero")
 
 local env = assert(driver.postgres())
@@ -225,11 +240,11 @@ assert(con:execute(make_create_table()))
 
 local function bulk_load()
     local cnt, err = con:execute(table.concat(buffer))
-    if cnt then
+    if not err then
         buffer = {}
         buffer_len = 0
     else
-        error("bulk load failed: " .. err)
+        return err
     end
 end
 
@@ -244,7 +259,7 @@ local function esc_str(v)
     local escd = con:escape(v)
     if not escd then return "NULL" end
 
-    return table.concat({"'", escd, "'"})
+    return string.format("'%s'", escd)
 end
 
 local function esc_num(v)
@@ -279,6 +294,7 @@ local function make_insert(sep)
     return table.concat(pieces)
 end
 
+local last_load = 0
 function process_message()
     local sep = ","
     if buffer_len == 0 then
@@ -289,15 +305,27 @@ function process_message()
     buffer_len = buffer_len + 1
     buffer[buffer_len] = make_insert(sep)
 
-    if buffer_len + 1 >= buffer_max then
-        bulk_load()
-        return 0
+    if buffer_len - 1 >= buffer_max then
+        local err = bulk_load()
+        if err then
+            buffer[buffer_len] = nil
+            buffer_len = buffer_len - 1
+            return -3, err
+        else
+            last_load = os.time()
+            return 0
+        end
     end
     return -4
 end
 
-function timer_event(ns)
-  -- no op
+function timer_event(ns, shutdown)
+    if buffer_len > 1 and (shutdown or last_load + ticker_interval <= ns / 1e9)then
+        local err = bulk_load()
+        if not err then
+            batch_checkpoint_update()
+        end
+    end
 end
 ```
 

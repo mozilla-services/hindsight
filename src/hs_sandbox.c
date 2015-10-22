@@ -307,7 +307,7 @@ int hs_process_message(lua_sandbox* lsb, void* sequence_id)
 }
 
 
-int hs_timer_event(lua_sandbox* lsb, time_t t)
+int hs_timer_event(lua_sandbox* lsb, time_t t, bool shutdown)
 {
   static const char* func_name = "timer_event";
   lua_State* lua = lsb_get_lua(lsb);
@@ -321,7 +321,8 @@ int hs_timer_event(lua_sandbox* lsb, time_t t)
   }
 
   lua_pushnumber(lua, t * 1e9); // todo change if we need more than 1 sec resolution
-  if (lua_pcall(lua, 1, 0, 0) != 0) {
+  lua_pushboolean(lua, shutdown);
+  if (lua_pcall(lua, 2, 0, 0) != 0) {
     char err[LSB_ERROR_SIZE];
     size_t len = snprintf(err, LSB_ERROR_SIZE, "%s() %s", func_name,
                           lua_tostring(lua, -1));

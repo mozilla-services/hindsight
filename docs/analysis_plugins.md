@@ -22,6 +22,7 @@ Called when the `ticker_interval` timer expires.
 *Arguments*
 * ns (number) - nanosecond timestamp of the function call (it is actually `time_t * 1e9`
 to keep the timestamp units consistent so it will only have a one second resolution)
+* shutdown (bool) - true if timer_event is being called due to a shutdown
 
 *Return*
 * none

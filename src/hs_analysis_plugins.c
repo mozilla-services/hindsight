@@ -404,7 +404,7 @@ static void analyze_message(hs_analysis_thread* at)
     if (ret <= 0 && sb->ticker_interval
         && at->current_t >= sb->next_timer_event) {
       clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
-      ret = hs_timer_event(sb->lsb, at->current_t);
+      ret = hs_timer_event(sb->lsb, at->current_t, false);
       clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts1);
       hs_update_running_stats(&sb->stats.te, hs_timespec_delta(&ts, &ts1));
       sb->next_timer_event = at->current_t + sb->ticker_interval;
@@ -422,7 +422,7 @@ static void shutdown_timer_event(hs_analysis_thread* at)
   for (int i = 0; i < at->list_cap; ++i) {
     if (!at->list[i]) continue;
 
-    if (hs_timer_event(at->list[i]->sb->lsb, at->current_t)) {
+    if (hs_timer_event(at->list[i]->sb->lsb, at->current_t, true)) {
       terminate_sandbox(at, i);
     }
   }

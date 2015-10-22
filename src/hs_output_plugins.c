@@ -44,6 +44,14 @@ static const char* g_sb_template = "{"
   "}"
   "}";
 
+enum process_message_result {
+  PMR_SENT = 0,
+  PMR_FAIL = -1,
+  PMR_SKIP = -2,
+  PMR_RETRY = -3,
+  PMR_BATCH = -4,
+  PMR_ASYNC = -5
+};
 
 static int read_message(lua_State* lua)
 {
@@ -93,6 +101,33 @@ static int async_checkpoint_update(lua_State* lua)
 }
 
 
+static void update_checkpoint(hs_output_plugin* p)
+{
+  pthread_mutex_lock(&p->cp_lock);
+  p->cp.input.id = p->cur.input.id;
+  p->cp.input.offset = p->cur.input.offset;
+  p->cp.analysis.id = p->cur.analysis.id;
+  p->cp.analysis.offset = p->cur.analysis.offset;
+  pthread_mutex_unlock(&p->cp_lock);
+}
+
+
+static int batch_checkpoint_update(lua_State* lua)
+{
+  lua_sandbox* lsb = lua_touserdata(lua, lua_upvalueindex(1));
+  if (!lsb) {
+    return luaL_error(lua, "batch_checkpoint_update() invalid upvalueindex");
+  }
+
+  hs_output_plugin* p = (hs_output_plugin*)lsb_get_parent(lsb);
+  if (p->batching) {
+    update_checkpoint(p);
+    p->batching = false;
+  }
+  return 0;
+}
+
+
 static hs_output_plugin* create_output_plugin(const hs_config* cfg,
                                               hs_sandbox_config* sbc)
 {
@@ -124,6 +159,9 @@ static hs_output_plugin* create_output_plugin(const hs_config* cfg,
     }
     lsb_add_function(p->sb->lsb, &async_checkpoint_update,
                      "async_checkpoint_update");
+  } else {
+    lsb_add_function(p->sb->lsb, &batch_checkpoint_update,
+                     "batch_checkpoint_update");
   }
   return p;
 }
@@ -149,7 +187,7 @@ static void free_output_plugin(hs_output_plugin* p)
 static void shutdown_timer_event(hs_output_plugin* p)
 {
   if (lsb_get_state(p->sb->lsb) != LSB_TERMINATED) {
-    if (hs_timer_event(p->sb->lsb, time(NULL))) {
+    if (hs_timer_event(p->sb->lsb, time(NULL), true)) {
       hs_log(g_module, 3, "terminated: %s msg: %s", p->sb->name,
              lsb_get_error(p->sb->lsb));
     }
@@ -193,27 +231,27 @@ static int output_message(hs_output_plugin* p)
       if (ret <= 0) {
         pthread_mutex_lock(&p->cp_lock);
         switch (ret) {
-        case 0: // sent
+        case PMR_SENT:
           ++p->sb->stats.pm_cnt;
           p->batching = false;
           break;
-        case -1: // failure
+        case PMR_FAIL:
           ++p->sb->stats.pm_cnt;
           ++p->sb->stats.pm_failures;
           break;
-        case -2: // skip
+        case PMR_SKIP:
           ++p->sb->stats.pm_cnt;
           break;
-        case -3: // retry
+        case PMR_RETRY:
           break;
-        case -5: // async update
+        case PMR_ASYNC:
           if (!p->async_len) {
             lsb_terminate(p->sb->lsb, "cannot use async checkpointing without"
                           " a configured buffer");
             ret = 1;
           }
           // fall thru
-        case -4: // batching
+        case PMR_BATCH:
           ++p->sb->stats.pm_cnt;
           p->batching = true;
           break;
@@ -241,11 +279,11 @@ static int output_message(hs_output_plugin* p)
                                                   LSB_US_MAXIMUM);
         pthread_mutex_unlock(&p->cp_lock);
 
-        if (ret == -1) {
+        if (ret == PMR_FAIL) {
           const char* err = lsb_get_error(p->sb->lsb);
           if (strlen(err) > 0) {
             hs_log(g_module, 4, "file: %s received: %d %s", p->sb->name, ret,
-                   lsb_get_error(p->sb->lsb));
+                   err);
           }
         }
       }
@@ -253,12 +291,7 @@ static int output_message(hs_output_plugin* p)
 
     // advance the checkpoint if not batching/async
     if (ret <= 0 && !p->batching) {
-      pthread_mutex_lock(&p->cp_lock);
-      p->cp.input.id = p->cur.input.id;
-      p->cp.input.offset = p->cur.input.offset;
-      p->cp.analysis.id = p->cur.analysis.id;
-      p->cp.analysis.offset = p->cur.analysis.offset;
-      pthread_mutex_unlock(&p->cp_lock);
+      update_checkpoint(p);
     }
 
     if (mmdelta) {
@@ -272,7 +305,7 @@ static int output_message(hs_output_plugin* p)
   if (ret <= 0 && p->sb->ticker_interval
       && current_t >= p->sb->next_timer_event) {
     clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
-    te_ret = hs_timer_event(p->sb->lsb, current_t);
+    te_ret = hs_timer_event(p->sb->lsb, current_t, false);
     clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts1);
 
     delta = hs_timespec_delta(&ts, &ts1);
@@ -394,9 +427,11 @@ static void* input_thread(void* arg)
           (p->analysis.ib.readpos - p->analysis.ib.scanpos);
       }
       int ret = output_message(p);
-      if (ret == -4) {
-        while (!p->stop && ret == -4) {
-          hs_log(g_module, 7, "retry message %zu", p->sb->stats.pm_cnt);
+      if (ret == PMR_RETRY) {
+        while (!p->stop && ret == PMR_RETRY) {
+          const char* err = lsb_get_error(p->sb->lsb);
+          hs_log(g_module, 7, "retry message %zu err: %s", p->sb->stats.pm_cnt,
+                 err);
           sleep(1);
           ret = output_message(p);
         }
