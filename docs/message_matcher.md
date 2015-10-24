@@ -46,7 +46,7 @@ All message variables must be on the left hand side of the relational comparison
  
 ##### String
 
-* Uuid
+* Uuid - 16 byte raw binary type 4 UUID (useful for partitioning data)
 * Type
 * Logger
 * Payload

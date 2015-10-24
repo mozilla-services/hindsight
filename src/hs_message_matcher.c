@@ -31,7 +31,7 @@ static const char* grammar =
   "local op_and        = l.C(l.P'&&')\n"
   "local op_or         = l.C(l.P'||')\n"
   "\n"
-  "local string_vars   = l.Cg(l.P'Type' + 'Logger' + 'Hostname' + 'EnvVersion' + 'Payload', 'variable')\n"
+  "local string_vars   = l.Cg(l.P'Type' + 'Logger' + 'Hostname' + 'EnvVersion' + 'Payload' + 'Uuid', 'variable')\n"
   "local numeric_vars  = l.Cg(l.P'Severity' + 'Pid', 'variable')\n"
   "local boolean       = l.Cg(l.P'TRUE' / function() return true end + l.P'FALSE' / function() return false end, 'value')\n"
   "local null          = l.P'NIL'\n"
@@ -246,6 +246,8 @@ bool eval_node(match_node* mn, hs_heka_message* m)
       return numeric_test(mn, m->pid);
     case HS_HEKA_HOSTNAME:
       return string_test(mn, m->hostname, m->hostname_len);
+    case HS_HEKA_UUID:
+      return string_test(mn, m->uuid, HEKA_UUID_SIZE);
     default:
       {
         hs_read_value val;
@@ -390,6 +392,8 @@ void load_expression_node(lua_State* L, match_node* mn)
       mn->pbid = HS_HEKA_PID;
     } else if (strcmp(tmp, "Hostname") == 0) {
       mn->pbid = HS_HEKA_HOSTNAME;
+    } else if (strcmp(tmp, "Uuid") == 0) {
+      mn->pbid = HS_HEKA_UUID;
     } else {
       fprintf(stderr, "broken message_matcher grammar: invalid header");
       exit(EXIT_FAILURE);

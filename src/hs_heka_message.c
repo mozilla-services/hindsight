@@ -352,7 +352,7 @@ bool hs_decode_heka_message(hs_heka_message* m,
     switch (tag) {
     case HS_HEKA_UUID:
       cp = read_string(wiretype, cp, ep, &s, &sl);
-      if (cp && sl == 16) {
+      if (cp && sl == HEKA_UUID_SIZE) {
         m->uuid = s;
       } else {
         cp = NULL;
@@ -573,7 +573,7 @@ int hs_read_message(lua_State* lua, hs_heka_message* m)
 
   if (strcmp(field, "Uuid") == 0) {
     if (m->uuid) {
-      lua_pushlstring(lua, m->uuid, 16);
+      lua_pushlstring(lua, m->uuid, HEKA_UUID_SIZE);
     } else {
       lua_pushnil(lua);
     }

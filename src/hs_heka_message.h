@@ -16,6 +16,8 @@
 
 #include "hs_input.h"
 
+#define HEKA_UUID_SIZE 16
+
 typedef enum {
   HS_FIELD_STRING,
   HS_FIELD_BYTES,

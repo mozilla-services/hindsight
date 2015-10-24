@@ -62,7 +62,7 @@ static char* test_read_message()
   mu_assert(hs_read_message(lua, &m) == 1, "hs_read_message failed");
   s = lua_tolstring(lua, -1, &len);
   mu_assert(s, "Uuid not set");
-  mu_assert(len == 16, "Uuid invalid len %zu", len);
+  mu_assert(len == HEKA_UUID_SIZE, "Uuid invalid len %zu", len);
   mu_assert(memcmp(s, "\x73\x1e\x36\x84\xec\x25\x42\x76\xa4\x01\x79\x6f\x17\xdd\x20\x63", len) == 0, "incorrect Uuid");
 
   lua_pop(lua, lua_gettop(lua));
