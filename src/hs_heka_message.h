@@ -16,7 +16,18 @@
 
 #include "hs_input.h"
 
-#define HEKA_UUID_SIZE 16
+#define HS_HEKA_UUID_SIZE 16
+
+#define HS_HEKA_UUID_KEY "Uuid"
+#define HS_HEKA_TIMESTAMP_KEY "Timestamp"
+#define HS_HEKA_TYPE_KEY "Type"
+#define HS_HEKA_LOGGER_KEY "Logger"
+#define HS_HEKA_SEVERITY_KEY "Severity"
+#define HS_HEKA_PAYLOAD_KEY "Payload"
+#define HS_HEKA_ENV_VERSION_KEY "EnvVersion"
+#define HS_HEKA_PID_KEY "Pid"
+#define HS_HEKA_HOSTNAME_KEY "Hostname"
+#define HS_HEKA_FIELDS_KEY "Fields"
 
 typedef enum {
   HS_FIELD_STRING,

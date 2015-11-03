@@ -352,7 +352,7 @@ bool hs_decode_heka_message(hs_heka_message* m,
     switch (tag) {
     case HS_HEKA_UUID:
       cp = read_string(wiretype, cp, ep, &s, &sl);
-      if (cp && sl == HEKA_UUID_SIZE) {
+      if (cp && sl == HS_HEKA_UUID_SIZE) {
         m->uuid = s;
       } else {
         cp = NULL;
@@ -571,44 +571,44 @@ int hs_read_message(lua_State* lua, hs_heka_message* m)
     return 1;
   }
 
-  if (strcmp(field, "Uuid") == 0) {
+  if (strcmp(field, HS_HEKA_UUID_KEY) == 0) {
     if (m->uuid) {
-      lua_pushlstring(lua, m->uuid, HEKA_UUID_SIZE);
+      lua_pushlstring(lua, m->uuid, HS_HEKA_UUID_SIZE);
     } else {
       lua_pushnil(lua);
     }
-  } else if (strcmp(field, "Timestamp") == 0) {
+  } else if (strcmp(field, HS_HEKA_TIMESTAMP_KEY) == 0) {
     lua_pushnumber(lua, m->timestamp);
-  } else if (strcmp(field, "Type") == 0) {
+  } else if (strcmp(field, HS_HEKA_TYPE_KEY) == 0) {
     if (m->type) {
       lua_pushlstring(lua, m->type, m->type_len);
     } else {
       lua_pushnil(lua);
     }
-  } else if (strcmp(field, "Logger") == 0) {
+  } else if (strcmp(field, HS_HEKA_LOGGER_KEY) == 0) {
     if (m->logger) {
       lua_pushlstring(lua, m->logger, m->logger_len);
     } else {
       lua_pushnil(lua);
     }
-  } else if (strcmp(field, "Severity") == 0) {
+  } else if (strcmp(field, HS_HEKA_SEVERITY_KEY) == 0) {
     lua_pushinteger(lua, m->severity);
-  } else if (strcmp(field, "Payload") == 0) {
+  } else if (strcmp(field, HS_HEKA_PAYLOAD_KEY) == 0) {
     if (m->payload) {
       lua_pushlstring(lua, m->payload, m->payload_len);
     } else {
       lua_pushnil(lua);
     }
     lua_pushlstring(lua, m->payload, m->payload_len);
-  } else if (strcmp(field, "EnvVersion") == 0) {
+  } else if (strcmp(field, HS_HEKA_ENV_VERSION_KEY) == 0) {
     if (m->env_version) {
       lua_pushlstring(lua, m->env_version, m->env_version_len);
     } else {
       lua_pushnil(lua);
     }
-  } else if (strcmp(field, "Pid") == 0) {
+  } else if (strcmp(field, HS_HEKA_PID_KEY) == 0) {
     lua_pushinteger(lua, m->pid);
-  } else if (strcmp(field, "Hostname") == 0) {
+  } else if (strcmp(field, HS_HEKA_HOSTNAME_KEY) == 0) {
     if (m->hostname) {
       lua_pushlstring(lua, m->hostname, m->hostname_len);
     } else {
@@ -631,7 +631,7 @@ int hs_read_message(lua_State* lua, hs_heka_message* m)
     }
   } else {
     if (field_len >= 8
-        && memcmp(field, "Fields[", 7) == 0
+        && memcmp(field, HS_HEKA_FIELDS_KEY "[", 7) == 0
         && field[field_len - 1] == ']') {
       hs_read_value v;
       hs_read_message_field(m, field + 7, field_len - 8, 0, 0, &v);

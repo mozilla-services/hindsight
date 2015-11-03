@@ -73,11 +73,11 @@ static int inject_message(lua_State* L)
 
   if (lua_type(L, 1) == LUA_TTABLE) {
     lua_pushstring(L, p->sb->name);
-    lua_setfield(L, 1, "Logger");
+    lua_setfield(L, 1, HS_HEKA_LOGGER_KEY);
     lua_pushstring(L, p->at->plugins->cfg->hostname);
-    lua_setfield(L, 1, "Hostname");
+    lua_setfield(L, 1, HS_HEKA_HOSTNAME_KEY);
     lua_pushinteger(L, p->at->plugins->cfg->pid);
-    lua_setfield(L, 1, "Pid");
+    lua_setfield(L, 1, HS_HEKA_PID_KEY);
   }
 
   if (lsb_output_protobuf(lsb, 1, 0) != 0) {
@@ -158,11 +158,11 @@ static int inject_payload(lua_State* lua)
     lua_pushvalue(lua, 2);
     lua_setfield(lua, -2, "payload_name");
   }
-  lua_setfield(lua, -2, "Fields");
+  lua_setfield(lua, -2, HS_HEKA_FIELDS_KEY);
   lua_pushstring(lua, "inject_payload");
-  lua_setfield(lua, -2, "Type");
+  lua_setfield(lua, -2, HS_HEKA_TYPE_KEY);
   lua_pushlstring(lua, output, len);
-  lua_setfield(lua, -2, "Payload");
+  lua_setfield(lua, -2, HS_HEKA_PAYLOAD_KEY);
   lua_replace(lua, 1);
 
   // use inject_message to actually deliver it

@@ -57,7 +57,20 @@ Converts a Heka protobuf encoded message string into a Lua table.
 * heka_pb (string) - Heka protobuf binary string
 
 *Return*
-* msg ([Heka message table (array fields)](heka_message_table.md#array-based-message-fields))
+* msg ([Heka message table (array fields)](heka_message_table.md#array-based-message-fields)) or an error is thrown
+
+#### encode_message
+
+Returns a Heka protocol buffer message using the contents of the specified Lua table.
+Note: this operation uses the internal output buffer so it is goverened by the `output_limit`
+configuration setting.
+
+*Arguments*
+* msg ([Heka message table](heka_message_table.md)
+* framed (bool default: false) A value of true includes the framing header
+
+*Return*
+* heka_pb (string) - Heka protobuf binary string, framed as specified or an error is thrown
 
 #### batch_checkpoint_update
 

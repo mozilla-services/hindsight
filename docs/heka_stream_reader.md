@@ -44,7 +44,7 @@ local found, consumed, need = hsr:find_message(buf)
 #### decode_message
 
 Converts a Heka protobuf encoded message string into a stream reader representation.  Note: this operation
-clear the internal stream reader buffer.
+clears the internal stream reader buffer.
 
 *Arguments*
 * heka_pb (string) - Heka protobuf binary string

@@ -69,6 +69,88 @@ static int read_message(lua_State* lua)
 }
 
 
+static void set_missing_headers(lua_State* lua, int idx,
+                                const char* logger,
+                                const char* hostname,
+                                int pid)
+{
+  lua_getfield(lua, idx, HS_HEKA_LOGGER_KEY);
+  int t = lua_type(lua, -1);
+  lua_pop(lua, 1);
+  if (t == LUA_TNIL) {
+    lua_pushstring(lua, logger);
+    lua_setfield(lua, 1, HS_HEKA_LOGGER_KEY);
+  }
+
+  lua_getfield(lua, idx, HS_HEKA_HOSTNAME_KEY);
+  t = lua_type(lua, -1);
+  lua_pop(lua, 1);
+  if (t == LUA_TNIL) {
+    lua_pushstring(lua, hostname);
+    lua_setfield(lua, 1, HS_HEKA_HOSTNAME_KEY);
+  }
+
+  lua_getfield(lua, idx, HS_HEKA_PID_KEY);
+  t = lua_type(lua, -1);
+  lua_pop(lua, 1);
+  if (t == LUA_TNIL) {
+    lua_pushinteger(lua, pid);
+    lua_setfield(lua, 1, HS_HEKA_PID_KEY);
+  }
+}
+
+
+static int encode_message(lua_State* lua)
+{
+  int n = lua_gettop(lua);
+  bool framed = false;
+
+  switch (n) {
+  case 2:
+    luaL_checktype(lua, 2, LUA_TBOOLEAN);
+    framed = lua_toboolean(lua, 2);
+    // fall thru
+  case 1:
+    luaL_checktype(lua, 1, LUA_TTABLE);
+    break;
+  default:
+    luaL_argerror(lua, n, "incorrect number of arguments");
+  }
+
+  lua_sandbox* lsb = lua_touserdata(lua, lua_upvalueindex(1));
+  if (!lsb) {
+    return luaL_error(lua, "encode_message() invalid upvalueindex");
+  }
+  hs_output_plugin* p = (hs_output_plugin*)lsb_get_parent(lsb);
+
+  set_missing_headers(lua, 1, p->sb->name, p->plugins->cfg->hostname,
+                      p->plugins->cfg->pid);
+
+  if (lsb_output_protobuf(lsb, 1, 0) != 0) {
+    return luaL_error(lua, "encode_message() could not encode protobuf - %s",
+                      lsb_get_error(lsb));
+  }
+  size_t len = 0;
+  const char* output = lsb_get_output(lsb, &len);
+
+  if (framed) {
+      unsigned char header[14] = "\x1e\x00\x08"; // up to 10 varint bytes
+                                                 // and a \x1f
+      int hlen = hs_write_varint(header + 3, len) + 1;
+      header[1] = (char)hlen;
+      header[hlen + 2] = '\x1f';
+      luaL_Buffer b;
+      luaL_buffinit(lua, &b);
+      luaL_addlstring(&b, (char*)header, hlen + 3);
+      luaL_addlstring(&b, output, len);
+      luaL_pushresult(&b);
+  } else {
+    lua_pushlstring(lua, output, len);
+  }
+  return 1;
+}
+
+
 static int async_checkpoint_update(lua_State* lua)
 {
   lua_sandbox* lsb = lua_touserdata(lua, lua_upvalueindex(1));
@@ -591,6 +673,7 @@ static void add_to_output_plugins(hs_output_plugins* plugins,
 int hs_init_output_sandbox(hs_sandbox* sb)
 {
   lsb_add_function(sb->lsb, &read_message, "read_message");
+  lsb_add_function(sb->lsb, &encode_message, "encode_message");
 
   int ret = lsb_init(sb->lsb, sb->state);
   if (ret) return ret;

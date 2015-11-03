@@ -51,67 +51,67 @@ static char* test_read_message()
   lua_State* lua = luaL_newstate();
   mu_assert(lua, "luaL_newstate failed");
 
-  lua_pushstring(lua, "Timestamp");
+  lua_pushstring(lua, HS_HEKA_TIMESTAMP_KEY);
   mu_assert(hs_read_message(lua, &m) == 1, "hs_read_message failed");
   d = lua_tonumber(lua, -1);
-  mu_assert(d == 1e9, "incorrect Timestamp: %g", d);
+  mu_assert(d == 1e9, "incorrect " HS_HEKA_TIMESTAMP_KEY ": %g", d);
   lua_pop(lua, lua_gettop(lua));
 
   size_t len;
-  lua_pushstring(lua, "Uuid");
+  lua_pushstring(lua, HS_HEKA_UUID_KEY);
   mu_assert(hs_read_message(lua, &m) == 1, "hs_read_message failed");
   s = lua_tolstring(lua, -1, &len);
-  mu_assert(s, "Uuid not set");
-  mu_assert(len == HEKA_UUID_SIZE, "Uuid invalid len %zu", len);
-  mu_assert(memcmp(s, "\x73\x1e\x36\x84\xec\x25\x42\x76\xa4\x01\x79\x6f\x17\xdd\x20\x63", len) == 0, "incorrect Uuid");
+  mu_assert(s, HS_HEKA_UUID_KEY " not set");
+  mu_assert(len == HS_HEKA_UUID_SIZE, HS_HEKA_UUID_KEY " invalid len %zu", len);
+  mu_assert(memcmp(s, "\x73\x1e\x36\x84\xec\x25\x42\x76\xa4\x01\x79\x6f\x17\xdd\x20\x63", len) == 0, "incorrect " HS_HEKA_UUID_KEY);
 
   lua_pop(lua, lua_gettop(lua));
-  lua_pushstring(lua, "Type");
+  lua_pushstring(lua, HS_HEKA_TYPE_KEY);
   mu_assert(hs_read_message(lua, &m) == 1, "hs_read_message failed");
   s = lua_tostring(lua, -1);
-  mu_assert(s, "Type not set");
-  mu_assert(strcmp(s, "type") == 0, "incorrect Type: %s", s);
+  mu_assert(s, HS_HEKA_TYPE_KEY " not set");
+  mu_assert(strcmp(s, "type") == 0, "incorrect " HS_HEKA_TYPE_KEY ": %s", s);
   lua_pop(lua, lua_gettop(lua));
 
-  lua_pushstring(lua, "Logger");
+  lua_pushstring(lua, HS_HEKA_LOGGER_KEY);
   mu_assert(hs_read_message(lua, &m) == 1, "hs_read_message failed");
   s = lua_tostring(lua, -1);
-  mu_assert(s, "Logger not set");
-  mu_assert(strcmp(s, "logger") == 0, "incorrect Logger: %s", s);
+  mu_assert(s, HS_HEKA_LOGGER_KEY " not set");
+  mu_assert(strcmp(s, "logger") == 0, "incorrect " HS_HEKA_LOGGER_KEY ": %s", s);
   lua_pop(lua, lua_gettop(lua));
 
-  lua_pushstring(lua, "Payload");
+  lua_pushstring(lua, HS_HEKA_PAYLOAD_KEY);
   mu_assert(hs_read_message(lua, &m) == 1, "hs_read_message failed");
   s = lua_tostring(lua, -1);
-  mu_assert(s, "Payload not set");
-  mu_assert(strcmp(s, "payload") == 0, "incorrect Payload: %s", s);
+  mu_assert(s, HS_HEKA_PAYLOAD_KEY " not set");
+  mu_assert(strcmp(s, "payload") == 0, "incorrect " HS_HEKA_PAYLOAD_KEY ": %s", s);
   lua_pop(lua, lua_gettop(lua));
 
-  lua_pushstring(lua, "EnvVersion");
+  lua_pushstring(lua, HS_HEKA_ENV_VERSION_KEY);
   mu_assert(hs_read_message(lua, &m) == 1, "hs_read_message failed");
   s = lua_tostring(lua, -1);
-  mu_assert(s, "EnvVersion not set");
-  mu_assert(strcmp(s, "env_version") == 0, "incorrect EnvVersion: %s", s);
+  mu_assert(s, HS_HEKA_ENV_VERSION_KEY " not set");
+  mu_assert(strcmp(s, "env_version") == 0, "incorrect " HS_HEKA_ENV_VERSION_KEY ": %s", s);
   lua_pop(lua, lua_gettop(lua));
 
-  lua_pushstring(lua, "Hostname");
+  lua_pushstring(lua, HS_HEKA_HOSTNAME_KEY);
   mu_assert(hs_read_message(lua, &m) == 1, "hs_read_message failed");
   s = lua_tostring(lua, -1);
-  mu_assert(s, "Hostname not set");
-  mu_assert(strcmp(s, "hostname") == 0, "incorrect Hostname: %s", s);
+  mu_assert(s, HS_HEKA_HOSTNAME_KEY " not set");
+  mu_assert(strcmp(s, "hostname") == 0, "incorrect " HS_HEKA_HOSTNAME_KEY ": %s", s);
   lua_pop(lua, lua_gettop(lua));
 
   int n;
-  lua_pushstring(lua, "Severity");
+  lua_pushstring(lua, HS_HEKA_SEVERITY_KEY);
   mu_assert(hs_read_message(lua, &m) == 1, "hs_read_message failed");
   n = lua_tointeger(lua, -1);
-  mu_assert(n == 9, "incorrect Severity: %d", n);
+  mu_assert(n == 9, "incorrect " HS_HEKA_SEVERITY_KEY ": %d", n);
   lua_pop(lua, lua_gettop(lua));
 
-  lua_pushstring(lua, "Pid");
+  lua_pushstring(lua, HS_HEKA_PID_KEY);
   mu_assert(hs_read_message(lua, &m) == 1, "hs_read_message failed");
   n = lua_tointeger(lua, -1);
-  mu_assert(n == 0, "incorrect Pid: %d", n);
+  mu_assert(n == 0, "incorrect " HS_HEKA_PID_KEY ": %d", n);
   lua_pop(lua, lua_gettop(lua));
 
   lua_pushstring(lua, "raw");
@@ -122,20 +122,20 @@ static char* test_read_message()
   mu_assert(memcmp(s, pb, len) == 0, "incorrect raw");
   lua_pop(lua, lua_gettop(lua));
 
-  lua_pushstring(lua, "Fields[string]");
+  lua_pushstring(lua, HS_HEKA_FIELDS_KEY "[string]");
   mu_assert(hs_read_message(lua, &m) == 1, "hs_read_message failed");
   s = lua_tostring(lua, -1);
-  mu_assert(s, "Fields[string] not set");
-  mu_assert(strcmp(s, "string") == 0, "incorrect Fields[string]: %s", s);
+  mu_assert(s, HS_HEKA_FIELDS_KEY "[string] not set");
+  mu_assert(strcmp(s, "string") == 0, "incorrect " HS_HEKA_FIELDS_KEY "[string]: %s", s);
   lua_pop(lua, lua_gettop(lua));
 
-  lua_pushstring(lua, "Fields[notfound]");
+  lua_pushstring(lua, HS_HEKA_FIELDS_KEY "[notfound]");
   mu_assert(hs_read_message(lua, &m) == 1, "hs_read_message failed");
   n = lua_type(lua, -1);
   mu_assert(n == LUA_TNIL, "invalid type: %d", n);
   lua_pop(lua, lua_gettop(lua));
 
-  lua_pushstring(lua, "Fields[string"); // missing closing bracket
+  lua_pushstring(lua, HS_HEKA_FIELDS_KEY "[string"); // missing closing bracket
   mu_assert(hs_read_message(lua, &m) == 1, "hs_read_message failed");
   n = lua_type(lua, -1);
   mu_assert(n == LUA_TNIL, "invalid type: %d", n);

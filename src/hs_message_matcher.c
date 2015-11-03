@@ -31,8 +31,16 @@ static const char* grammar =
   "local op_and        = l.C(l.P'&&')\n"
   "local op_or         = l.C(l.P'||')\n"
   "\n"
-  "local string_vars   = l.Cg(l.P'Type' + 'Logger' + 'Hostname' + 'EnvVersion' + 'Payload' + 'Uuid', 'variable')\n"
-  "local numeric_vars  = l.Cg(l.P'Severity' + 'Pid', 'variable')\n"
+  "local string_vars   = l.Cg(l.P'" HS_HEKA_TYPE_KEY
+  "' + '" HS_HEKA_LOGGER_KEY
+  "' + '" HS_HEKA_HOSTNAME_KEY
+  "' + '" HS_HEKA_ENV_VERSION_KEY
+  "' + '" HS_HEKA_PAYLOAD_KEY
+  "' + '" HS_HEKA_UUID_KEY
+  "', 'variable')\n"
+  "local numeric_vars  = l.Cg(l.P'" HS_HEKA_SEVERITY_KEY
+  "' + '" HS_HEKA_PID_KEY
+  "', 'variable')\n"
   "local boolean       = l.Cg(l.P'TRUE' / function() return true end + l.P'FALSE' / function() return false end, 'value')\n"
   "local null          = l.P'NIL'\n"
   "local index         = l.P'[' * (l.digit^1 / tonumber) * l.P']' + l.Cc'0' / tonumber\n"
@@ -247,7 +255,7 @@ bool eval_node(match_node* mn, hs_heka_message* m)
     case HS_HEKA_HOSTNAME:
       return string_test(mn, m->hostname, m->hostname_len);
     case HS_HEKA_UUID:
-      return string_test(mn, m->uuid, HEKA_UUID_SIZE);
+      return string_test(mn, m->uuid, HS_HEKA_UUID_SIZE);
     default:
       {
         hs_read_value val;
@@ -376,23 +384,23 @@ void load_expression_node(lua_State* L, match_node* mn)
     mn->variable_len = len;
     memcpy(mn->variable, tmp, len + 1);
   } else {
-    if (strcmp(tmp, "Timestamp") == 0) {
+    if (strcmp(tmp, HS_HEKA_TIMESTAMP_KEY) == 0) {
       mn->pbid = HS_HEKA_TIMESTAMP;
-    } else if (strcmp(tmp, "Type") == 0) {
+    } else if (strcmp(tmp, HS_HEKA_TYPE_KEY) == 0) {
       mn->pbid = HS_HEKA_TYPE;
-    } else if (strcmp(tmp, "Logger") == 0) {
+    } else if (strcmp(tmp, HS_HEKA_LOGGER_KEY) == 0) {
       mn->pbid = HS_HEKA_LOGGER;
-    } else if (strcmp(tmp, "Severity") == 0) {
+    } else if (strcmp(tmp, HS_HEKA_SEVERITY_KEY) == 0) {
       mn->pbid = HS_HEKA_SEVERITY;
-    } else if (strcmp(tmp, "Payload") == 0) {
+    } else if (strcmp(tmp, HS_HEKA_PAYLOAD_KEY) == 0) {
       mn->pbid = HS_HEKA_PAYLOAD;
-    } else if (strcmp(tmp, "EnvVersion") == 0) {
+    } else if (strcmp(tmp, HS_HEKA_ENV_VERSION_KEY) == 0) {
       mn->pbid = HS_HEKA_ENV_VERSION;
-    } else if (strcmp(tmp, "Pid") == 0) {
+    } else if (strcmp(tmp, HS_HEKA_PID_KEY) == 0) {
       mn->pbid = HS_HEKA_PID;
-    } else if (strcmp(tmp, "Hostname") == 0) {
+    } else if (strcmp(tmp, HS_HEKA_HOSTNAME_KEY) == 0) {
       mn->pbid = HS_HEKA_HOSTNAME;
-    } else if (strcmp(tmp, "Uuid") == 0) {
+    } else if (strcmp(tmp, HS_HEKA_UUID_KEY) == 0) {
       mn->pbid = HS_HEKA_UUID;
     } else {
       fprintf(stderr, "broken message_matcher grammar: invalid header");
