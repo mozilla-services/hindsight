@@ -125,26 +125,29 @@ end
 -- License, v. 2.0. If a copy of the MPL was not distributed with this
 -- file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-require "io"
+--[[
+Reads a Heka protobuf stream from the stdin file handle
+
+-- .cfg
+filename = "heka_stdin.lua"
+
+--]]
+
+local stdin = require "io".stdin
 require "heka_stream_reader"
 
-local hsr = heka_stream_reader.new("stdin")
+local hsr = heka_stream_reader.new(read_config("cfg_name"))
 
 function process_message()
-    local found, read, need = false, 0, 8192
-    while true do
-        local buf = io.stdin:read(need)
-        if not buf then break end
-
+    local found, read, consumed
+    repeat
         repeat
-            found, read, need = hsr:find_message(buf)
+            found, consumed, read = hsr:find_message(stdin)
             if found then
                 inject_message(hsr)
             end
-            buf = nil
         until not found
-    end
+    until read == 0
     return 0
 end
-
 ```

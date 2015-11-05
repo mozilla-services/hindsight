@@ -6,20 +6,20 @@
 Reads a Heka protobuf stream from the stdin file handle
 
 -- .cfg
-filename = "heka_stdin.cfg"
+filename = "heka_stdin.lua"
 
 --]]
 
-require "io"
+local stdin = require "io".stdin
 require "heka_stream_reader"
 
 local hsr = heka_stream_reader.new(read_config("cfg_name"))
 
 function process_message()
-    local found, read, consumed
+    local found, consumed, read
     repeat
         repeat
-            found, consumed, read = hsr:find_message(io.stdin)
+            found, consumed, read = hsr:find_message(stdin)
             if found then
                 inject_message(hsr)
             end
