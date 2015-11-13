@@ -91,12 +91,6 @@ void hs_write_checkpoints(hs_checkpoint_writer* cpw, hs_checkpoint_reader* cpr)
               "Timer Event Avg (s)\tTimer Event SD (s)\n");
     }
   }
-  cpw->fh = freopen(NULL, "wb", cpw->fh);
-  if (!cpw->fh) {
-    hs_log(g_module, 1, "checkpoint_writer freopen() error: %d",
-           ferror(cpw->fh));
-    return;
-  }
   if (cpw->input_plugins) {
     hs_input_plugin* p;
     pthread_mutex_lock(&cpw->input_plugins->list_lock);
@@ -223,8 +217,15 @@ void hs_write_checkpoints(hs_checkpoint_writer* cpw, hs_checkpoint_reader* cpr)
     }
     pthread_mutex_unlock(&cpw->output_plugins->list_lock);
   }
-  hs_output_checkpoints(cpr, cpw->fh);
-  fflush(cpw->fh);
   if (tsv) fclose(tsv);
   if (++cnt == 60) cnt = 0;
+
+  cpw->fh = freopen(NULL, "wb", cpw->fh);
+  if (!cpw->fh) {
+    hs_log(g_module, 1, "checkpoint_writer freopen() error: %d",
+           ferror(cpw->fh));
+    return;
+  }
+  hs_output_checkpoints(cpr, cpw->fh);
+  fflush(cpw->fh);
 }

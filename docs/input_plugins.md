@@ -139,7 +139,7 @@ require "heka_stream_reader"
 local hsr = heka_stream_reader.new(read_config("cfg_name"))
 
 function process_message()
-    local found, read, consumed
+    local found, consumed, read
     repeat
         repeat
             found, consumed, read = hsr:find_message(stdin)
