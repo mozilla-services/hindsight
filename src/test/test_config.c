@@ -28,6 +28,7 @@ static char* test_load_default_config()
   mu_assert(cfg.max_message_size == 1024 * 64, "received %d", cfg.max_message_size);
   mu_assert(cfg.output_size == 1024 * 1024 * 64, "received %d",
             cfg.output_size);
+  mu_assert(cfg.backpressure == 0, "received %d", cfg.backpressure);
   mu_assert(strcmp(cfg.run_path, "run") == 0, "received %s",
             cfg.run_path);
   mu_assert(strcmp(cfg.load_path, "load") == 0, "received %s",
@@ -62,6 +63,7 @@ static char* test_load_config()
             cfg.output_path);
   mu_assert(cfg.output_size == 1024, "received %d",
             cfg.output_size);
+  mu_assert(cfg.backpressure == 10, "received %d", cfg.backpressure);
   mu_assert(strcmp(cfg.run_path, "run") == 0, "received %s",
             cfg.run_path);
   mu_assert(strcmp(cfg.load_path, "load") == 0, "received %s",

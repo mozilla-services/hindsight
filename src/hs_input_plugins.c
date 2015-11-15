@@ -135,6 +135,7 @@ static int process_message(lua_sandbox* lsb, hs_input_plugin* p)
 
 static int inject_message(lua_State* L)
 {
+  static bool backpressure = false;
   static size_t bytes_written = 0;
   static unsigned char header[14];
   void* luserdata = lua_touserdata(L, lua_upvalueindex(1));
@@ -213,9 +214,24 @@ static int inject_message(lua_State* L)
     if (p->plugins->output.cp.offset >= p->plugins->cfg->output_size) {
       ++p->plugins->output.cp.id;
       hs_open_output_file(&p->plugins->output);
+      if (p->plugins->cfg->backpressure
+          && p->plugins->output.cp.id - p->plugins->output.min_cp_id
+          > p->plugins->cfg->backpressure) {
+        backpressure = true;
+        hs_log(g_module, 4, "applying backpressure");
+      }
+    }
+  }
+  if (backpressure) {
+    if (p->plugins->output.cp.id == p->plugins->output.min_cp_id) {
+      backpressure = false;
+      hs_log(g_module, 4, "releasing backpressure");
     }
   }
   pthread_mutex_unlock(&p->plugins->output.lock);
+  if (backpressure) {
+    usleep(100000); // throttle to 10 messages per second
+  }
   return 0;
 }
 

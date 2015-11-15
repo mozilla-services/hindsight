@@ -75,6 +75,7 @@ void hs_free_checkpoint_writer(hs_checkpoint_writer* cpw)
 void hs_write_checkpoints(hs_checkpoint_writer* cpw, hs_checkpoint_reader* cpr)
 {
   static int cnt = 0;
+  unsigned long long min_input_id = ULLONG_MAX, min_analysis_id = ULLONG_MAX;
 
   FILE* tsv = NULL;
   bool sample = (cnt % 6 == 0); // sample performance 10 times a minute
@@ -137,6 +138,9 @@ void hs_write_checkpoints(hs_checkpoint_writer* cpw, hs_checkpoint_reader* cpr)
       pthread_mutex_lock(&at->cp_lock);
       cp = at->cp;
       pthread_mutex_unlock(&at->cp_lock);
+      if (cp.id < min_input_id ) {
+        min_input_id = cp.id;
+      }
       hs_update_input_checkpoint(cpr, hs_input_dir, at->input.name, &cp);
 
       pthread_mutex_lock(&cpw->analysis_plugins->output.lock);
@@ -182,6 +186,14 @@ void hs_write_checkpoints(hs_checkpoint_writer* cpw, hs_checkpoint_reader* cpr)
       if (!p) continue;
 
       pthread_mutex_lock(&p->cp_lock);
+      // use the current read checkpoints to prevent batching from causing
+      // backpressure
+      if (p->cur.input.id < min_input_id ) {
+        min_input_id = p->cur.input.id;
+      }
+      if (p->cur.analysis.id < min_analysis_id ) {
+        min_analysis_id = p->cur.analysis.id;
+      }
       p->sample = sample;
       hs_update_input_checkpoint(cpr,
                                  hs_input_dir,
@@ -220,11 +232,19 @@ void hs_write_checkpoints(hs_checkpoint_writer* cpw, hs_checkpoint_reader* cpr)
   if (tsv) fclose(tsv);
   if (++cnt == 60) cnt = 0;
 
+  if (cpw->input_plugins) {
+    cpw->input_plugins->output.min_cp_id = min_input_id;
+  }
+
+  if (cpw->analysis_plugins) {
+    cpw->analysis_plugins->output.min_cp_id = min_analysis_id;
+  }
+
   cpw->fh = freopen(NULL, "wb", cpw->fh);
   if (!cpw->fh) {
-    hs_log(g_module, 1, "checkpoint_writer freopen() error: %d",
+    hs_log(g_module, 0, "checkpoint_writer freopen() error: %d",
            ferror(cpw->fh));
-    return;
+    exit(EXIT_FAILURE);
   }
   hs_output_checkpoints(cpr, cpw->fh);
   fflush(cpw->fh);

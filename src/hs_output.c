@@ -65,7 +65,7 @@ void hs_init_output(hs_output* output, const char* path, const char* subdir)
     exit(EXIT_FAILURE);
   }
   snprintf(output->path, len, "%s/%s", path, subdir);
-  output->cp.id = find_last_id(output->path);
+  output->cp.id = output->min_cp_id = find_last_id(output->path);
 
   int ret = mkdir(path, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP);
   if (ret && errno != EEXIST) {

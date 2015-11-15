@@ -25,6 +25,10 @@
 * **io_lua_path** - path used by the input and output plugins to look for Lua modules
 * **io_lua_cpath** - path used by the input and output plugins to look for Lua C modules
 * **max_message_size** - maximum size of a valid message (bytes, default 64KiB)
+* **backpressure** - delta between the writer queue file and the slowest reader, when exceeded
+  backpressure is applied  (message injection will be slowed) until the writer and reader
+  are both on the same file (count, default 0 (no backpressure))
+  e.g. backpressure = 10 [writer = 100.log, slowest reader = 89.log, delta = 11]
 
 ```lua
 output_path             = "hs_output"

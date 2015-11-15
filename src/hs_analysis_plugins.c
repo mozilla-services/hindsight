@@ -63,6 +63,7 @@ static int read_message(lua_State* lua)
 
 static int inject_message(lua_State* L)
 {
+  static bool backpressure = false;
   static unsigned char header[14];
   void* luserdata = lua_touserdata(L, lua_upvalueindex(1));
   if (NULL == luserdata) {
@@ -101,11 +102,26 @@ static int inject_message(lua_State* L)
   fwrite(header, 4 + len, 1, p->at->plugins->output.fh);
   fwrite(output, output_len, 1, p->at->plugins->output.fh);
   p->at->plugins->output.cp.offset += tlen;
-  if (p->at->plugins->output.cp.offset >= (size_t)p->at->plugins->cfg->output_size) {
+  if (p->at->plugins->output.cp.offset >= p->at->plugins->cfg->output_size) {
     ++p->at->plugins->output.cp.id;
     hs_open_output_file(&p->at->plugins->output);
+    if (p->at->plugins->cfg->backpressure
+        && p->at->plugins->output.cp.id - p->at->plugins->output.min_cp_id
+        > p->at->plugins->cfg->backpressure) {
+      backpressure = true;
+      hs_log(g_module, 4, "applying backpressure");
+    }
+  }
+  if (backpressure) {
+    if (p->at->plugins->output.cp.id == p->at->plugins->output.min_cp_id) {
+      backpressure = false;
+      hs_log(g_module, 4, "releasing backpressure");
+    }
   }
   pthread_mutex_unlock(&p->at->plugins->output.lock);
+  if (backpressure) {
+      usleep(100000); // throttle to 10 messages per second
+  }
   return 0;
 }
 

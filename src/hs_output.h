@@ -19,6 +19,7 @@ typedef struct hs_output
 {
   FILE* fh;
   char* path;
+  unsigned long long min_cp_id;
   pthread_mutex_t lock;
   hs_checkpoint cp;
 } hs_output;
