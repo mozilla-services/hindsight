@@ -285,7 +285,7 @@ static void* input_thread(void *arg)
       scp = NULL;
       break;
     }
-    ret = lsb_heka_pm_input(p->hsb, NULL, ncp, scp, profile);
+    ret = lsb_heka_pm_input(p->hsb, ncp, scp, profile);
     if (ret <= 0) {
       if (p->ticker_interval == 0) break; // run once
 

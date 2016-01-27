@@ -215,15 +215,14 @@ static int output_message(hs_output_plugin *p, lsb_heka_message *msg)
   int ret = 0, te_ret = 0;
   bool sample = p->sample;
   time_t current_t = time(NULL);
-  struct timespec ts, ts1;
+  unsigned long long start;
 
   if (msg->raw.s) { // non idle/empty message
-    double mmdelta = 0;
-    if (sample) clock_gettime(CLOCK_MONOTONIC, &ts);
+    unsigned long long mmdelta = 0;
+    if (sample) start = lsb_get_time();
     bool matched = lsb_eval_message_matcher(p->mm, msg);
     if (sample) {
-      clock_gettime(CLOCK_MONOTONIC, &ts1);
-      mmdelta = lsb_timespec_delta(&ts, &ts1);
+      mmdelta = start - lsb_get_time();
     }
     if (matched) {
       if (p->async_len) {

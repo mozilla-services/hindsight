@@ -335,14 +335,13 @@ static void analyze_message(hs_analysis_thread *at)
     p = at->list[i];
 
     ret = 0;
-    struct timespec ts, ts1;
+    unsigned long long start;
 
     if (at->msg->raw.s) { // non idle/empty message
-      if (sample) clock_gettime(CLOCK_MONOTONIC, &ts);
+      if (sample) start = lsb_get_time();
       bool matched = lsb_eval_message_matcher(p->mm, at->msg);
       if (sample) {
-        clock_gettime(CLOCK_MONOTONIC, &ts1);
-        lsb_update_running_stats(&p->mms, lsb_timespec_delta(&ts, &ts1));
+        lsb_update_running_stats(&p->mms, lsb_get_time() - start);
       }
       if (matched) {
         ret = lsb_heka_pm_analysis(p->hsb, at->msg, false);
