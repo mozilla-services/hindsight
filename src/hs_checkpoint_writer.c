@@ -23,11 +23,11 @@
 static const char g_module[] = "checkpoint_writer";
 
 
-void hs_init_checkpoint_writer(hs_checkpoint_writer* cpw,
-                               hs_input_plugins* ip,
-                               hs_analysis_plugins* ap,
-                               hs_output_plugins* op,
-                               const char* path)
+void hs_init_checkpoint_writer(hs_checkpoint_writer *cpw,
+                               hs_input_plugins *ip,
+                               hs_analysis_plugins *ap,
+                               hs_output_plugins *op,
+                               const char *path)
 {
   cpw->input_plugins = ip;
   cpw->analysis_plugins = ap;
@@ -60,7 +60,7 @@ void hs_init_checkpoint_writer(hs_checkpoint_writer* cpw,
 }
 
 
-void hs_free_checkpoint_writer(hs_checkpoint_writer* cpw)
+void hs_free_checkpoint_writer(hs_checkpoint_writer *cpw)
 {
   if (cpw->fh) fclose(cpw->fh);
   cpw->fh = NULL;
@@ -72,12 +72,12 @@ void hs_free_checkpoint_writer(hs_checkpoint_writer* cpw)
 }
 
 
-void hs_write_checkpoints(hs_checkpoint_writer* cpw, hs_checkpoint_reader* cpr)
+void hs_write_checkpoints(hs_checkpoint_writer *cpw, hs_checkpoint_reader *cpr)
 {
   static int cnt = 0;
   unsigned long long min_input_id = ULLONG_MAX, min_analysis_id = ULLONG_MAX;
 
-  FILE* tsv = NULL;
+  FILE *tsv = NULL;
   bool sample = (cnt % 6 == 0); // sample performance 10 times a minute
   if (cnt == 0) { // write the stats once a minute just after the load
     tsv = fopen(cpw->tsv_path, "wb");
@@ -93,32 +93,32 @@ void hs_write_checkpoints(hs_checkpoint_writer* cpw, hs_checkpoint_reader* cpr)
     }
   }
   if (cpw->input_plugins) {
-    hs_input_plugin* p;
+    hs_input_plugin *p;
     pthread_mutex_lock(&cpw->input_plugins->list_lock);
     for (int i = 0; i < cpw->input_plugins->list_cap; ++i) {
       p = cpw->input_plugins->list[i];
       if (p) {
         pthread_mutex_lock(&p->cp.lock);
-        hs_update_checkpoint(cpr, p->sb->name, &p->cp);
+        hs_update_checkpoint(cpr, p->name, &p->cp);
         pthread_mutex_unlock(&p->cp.lock);
 
         if (tsv) {
           pthread_mutex_lock(&cpw->input_plugins->output.lock);
+          lsb_heka_stats stats = lsb_heka_get_stats(p->hsb);
           fprintf(tsv, "%s\t"
-                  "%zu\t%zu\t"
-                  "%zu\t%zu\t"
-                  "%u\t"
-                  "%u\t%u\t%u\t"
+                  "%llu\t%llu\t"
+                  "%llu\t%llu\t"
+                  "%llu\t%llu\t%llu\t%llu\t"
                   "0\t0\t"
-                  "0\t0\t"
-                  "0\t0\t\n",
-                  p->sb->name,
-                  p->sb->stats.im_cnt, p->sb->stats.im_bytes,
-                  p->sb->stats.pm_cnt, p->sb->stats.pm_failures,
-                  p->sb->stats.cur_memory,
-                  p->sb->stats.max_memory,
-                  p->sb->stats.max_output,
-                  p->sb->stats.max_instructions);
+                  "%g\t%g\t"
+                  "%g\t%g\t\n",
+                  p->name,
+                  stats.im_cnt, stats.im_bytes,
+                  stats.pm_cnt, stats.pm_failures,
+                  stats.mem_cur, stats.mem_max, stats.out_max, stats.ins_max,
+                  // no message matcher stats
+                  stats.pm_avg, stats.pm_sd,
+                  stats.te_avg, stats.te_sd);
           pthread_mutex_unlock(&cpw->input_plugins->output.lock);
         }
       }
@@ -134,11 +134,11 @@ void hs_write_checkpoints(hs_checkpoint_writer* cpw, hs_checkpoint_reader* cpr)
     hs_checkpoint cp;
 
     for (int i = 0; i < cpw->analysis_plugins->thread_cnt; ++i) {
-      hs_analysis_thread* at = &cpw->analysis_plugins->list[i];
+      hs_analysis_thread *at = &cpw->analysis_plugins->list[i];
       pthread_mutex_lock(&at->cp_lock);
       cp = at->cp;
       pthread_mutex_unlock(&at->cp_lock);
-      if (cp.id < min_input_id ) {
+      if (cp.id < min_input_id) {
         min_input_id = cp.id;
       }
       hs_update_input_checkpoint(cpr, hs_input_dir, at->input.name, &cp);
@@ -149,30 +149,27 @@ void hs_write_checkpoints(hs_checkpoint_writer* cpw, hs_checkpoint_reader* cpr)
       pthread_mutex_unlock(&cpw->analysis_plugins->output.lock);
 
       if (tsv) {
-        hs_analysis_plugin* p;
+        hs_analysis_plugin *p;
         pthread_mutex_lock(&at->list_lock);
         for (int i = 0; i < at->list_cap; ++i) {
           p = at->list[i];
           if (!p) continue;
+
+          lsb_heka_stats stats = lsb_heka_get_stats(p->hsb);
           fprintf(tsv, "%s\t"
-                  "%zu\t%zu\t"
-                  "%zu\t%zu\t"
-                  "%zu\t%zu\t%zu\t%zu\t"
+                  "%llu\t%llu\t"
+                  "%llu\t%llu\t"
+                  "%llu\t%llu\t%llu\t%llu\t"
                   "%g\t%g\t"
                   "%g\t%g\t"
                   "%g\t%g\t\n",
-                  p->sb->name,
-                  p->sb->stats.im_cnt, p->sb->stats.im_bytes,
-                  p->sb->stats.pm_cnt, p->sb->stats.pm_failures,
-                  // the sandbox is not in use here, it is safe to grab the
-                  // values directly
-                  lsb_usage(p->sb->lsb, LSB_UT_MEMORY, LSB_US_CURRENT),
-                  lsb_usage(p->sb->lsb, LSB_UT_MEMORY, LSB_US_MAXIMUM),
-                  lsb_usage(p->sb->lsb, LSB_UT_OUTPUT, LSB_US_MAXIMUM),
-                  lsb_usage(p->sb->lsb, LSB_UT_INSTRUCTION, LSB_US_MAXIMUM),
-                  p->sb->stats.mm.mean, hs_sd_running_stats(&p->sb->stats.mm),
-                  p->sb->stats.pm.mean, hs_sd_running_stats(&p->sb->stats.pm),
-                  p->sb->stats.te.mean, hs_sd_running_stats(&p->sb->stats.te));
+                  p->name,
+                  stats.im_cnt, stats.im_bytes,
+                  stats.pm_cnt, stats.pm_failures,
+                  stats.mem_cur, stats.mem_max, stats.out_max, stats.ins_max,
+                  p->mms.mean, lsb_sd_running_stats(&p->mms),
+                  stats.pm_avg, stats.pm_sd,
+                  stats.te_avg, stats.te_sd);
         }
         pthread_mutex_unlock(&at->list_lock);
       }
@@ -182,49 +179,44 @@ void hs_write_checkpoints(hs_checkpoint_writer* cpw, hs_checkpoint_reader* cpr)
   if (cpw->output_plugins) {
     pthread_mutex_lock(&cpw->output_plugins->list_lock);
     for (int i = 0; i < cpw->output_plugins->list_cap; ++i) {
-      hs_output_plugin* p = cpw->output_plugins->list[i];
+      hs_output_plugin *p = cpw->output_plugins->list[i];
       if (!p) continue;
 
       pthread_mutex_lock(&p->cp_lock);
       // use the current read checkpoints to prevent batching from causing
       // backpressure
-      if (p->cur.input.id < min_input_id ) {
+      if (p->cur.input.id < min_input_id) {
         min_input_id = p->cur.input.id;
       }
-      if (p->cur.analysis.id < min_analysis_id ) {
+      if (p->cur.analysis.id < min_analysis_id) {
         min_analysis_id = p->cur.analysis.id;
       }
       p->sample = sample;
       hs_update_input_checkpoint(cpr,
                                  hs_input_dir,
-                                 p->sb->name,
+                                 p->name,
                                  &p->cp.input);
       hs_update_input_checkpoint(cpr,
                                  hs_analysis_dir,
-                                 p->sb->name,
+                                 p->name,
                                  &p->cp.analysis);
-
       if (tsv) {
+        lsb_heka_stats stats = lsb_heka_get_stats(p->hsb);
         fprintf(tsv, "%s\t"
-                "%zu\t%zu\t"
-                "%zu\t%zu\t"
-                "%u\t"
-                "%u\t%u\t%u\t"
+                "%llu\t%llu\t"
+                "%llu\t%llu\t"
+                "%llu\t%llu\t%llu\t%llu\t"
                 "%g\t%g\t"
                 "%g\t%g\t"
                 "%g\t%g\t\n",
-                p->sb->name,
-                p->sb->stats.im_cnt, p->sb->stats.im_bytes,
-                p->sb->stats.pm_cnt, p->sb->stats.pm_failures,
-                p->sb->stats.cur_memory,
-                p->sb->stats.max_memory,
-                p->sb->stats.max_output,
-                p->sb->stats.max_instructions,
-                p->sb->stats.mm.mean, hs_sd_running_stats(&p->sb->stats.mm),
-                p->sb->stats.pm.mean, hs_sd_running_stats(&p->sb->stats.pm),
-                p->sb->stats.te.mean, hs_sd_running_stats(&p->sb->stats.te));
+                p->name,
+                stats.im_cnt, stats.im_bytes,
+                stats.pm_cnt, stats.pm_failures,
+                stats.mem_cur, stats.mem_max, stats.out_max, stats.ins_max,
+                p->mms.mean, lsb_sd_running_stats(&p->mms),
+                stats.pm_avg, stats.pm_sd,
+                stats.te_avg, stats.te_sd);
       }
-
       pthread_mutex_unlock(&p->cp_lock);
     }
     pthread_mutex_unlock(&cpw->output_plugins->list_lock);

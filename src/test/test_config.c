@@ -16,7 +16,7 @@
 #include "../hs_config.h"
 #include "../hs_logger.h"
 
-char* e = NULL;
+char *e = NULL;
 
 static char* test_load_default_config()
 {
@@ -102,8 +102,7 @@ static char* test_load_invalid_config()
 static char* test_sandbox_input_config()
 {
   hs_sandbox_config cfg;
-  bool ret = hs_load_sandbox_config("sandbox", "input.cfg", &cfg, NULL,
-                                    HS_SB_TYPE_INPUT);
+  bool ret = hs_load_sandbox_config("sandbox", "input.cfg", &cfg, NULL, 'i');
   mu_assert(ret, "hs_load_sandbox_config failed");
   mu_assert(strcmp(cfg.filename, "input.lua") == 0, "received %s",
             cfg.filename);
@@ -119,12 +118,11 @@ static char* test_sandbox_input_config()
 static char* test_sandbox_analysis_config()
 {
   hs_sandbox_config cfg;
-  bool ret = hs_load_sandbox_config("sandbox", "analysis.cfg", &cfg, NULL,
-                                    HS_SB_TYPE_ANALYSIS);
+  bool ret = hs_load_sandbox_config("sandbox", "analysis.cfg", &cfg, NULL, 'a');
   mu_assert(ret, "hs_load_sandbox_config failed");
   mu_assert(strcmp(cfg.filename, "analysis.lua") == 0, "received %s",
             cfg.filename);
-  mu_assert(strcmp(cfg.cfg_name, "analysis") == 0, "received %s",
+  mu_assert(strcmp(cfg.cfg_name, "analysis.analysis") == 0, "received %s",
             cfg.cfg_name);
   mu_assert(cfg.output_limit == 77777, "received %d", cfg.output_limit);
   mu_assert(cfg.memory_limit == 88888, "received %d", cfg.memory_limit);
@@ -146,8 +144,7 @@ static char* test_sandbox_analysis_config()
 static char* test_sandbox_output_config()
 {
   hs_sandbox_config cfg;
-  bool ret = hs_load_sandbox_config("sandbox", "output.cfg", &cfg, NULL,
-                                    HS_SB_TYPE_OUTPUT);
+  bool ret = hs_load_sandbox_config("sandbox", "output.cfg", &cfg, NULL, 'o');
   mu_assert(ret, "hs_load_sandbox_config failed");
   mu_assert(strcmp(cfg.filename, "output.lua") == 0, "received %s",
             cfg.filename);
@@ -163,12 +160,12 @@ static char* test_sandbox_filename_config()
 {
   hs_sandbox_config cfg;
   bool ret = hs_load_sandbox_config("sandbox", "path_in_fn.cfg", &cfg, NULL,
-                                    HS_SB_TYPE_INPUT);
+                                    'i');
   mu_assert(!ret, "accepted a filename with a path");
   hs_free_sandbox_config(&cfg);
 
   ret = hs_load_sandbox_config("sandbox", "invalid_fn_ext.cfg", &cfg, NULL,
-                               HS_SB_TYPE_INPUT);
+                               'i');
   mu_assert(!ret, "accepted a filename with a invalid extension");
   hs_free_sandbox_config(&cfg);
   return NULL;
@@ -191,7 +188,7 @@ static char* all_tests()
 int main()
 {
   hs_init_log(7);
-  char* result = all_tests();
+  char *result = all_tests();
   if (result) {
     printf("%s\n", result);
   } else {

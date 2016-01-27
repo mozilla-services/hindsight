@@ -33,7 +33,7 @@ void hs_free_log()
 }
 
 
-void hs_log(const char* plugin, int severity, const char* fmt, ...)
+void hs_log(const char *plugin, int severity, const char *fmt, ...)
 {
   if (severity > g_loglevel) return;
 
@@ -45,7 +45,7 @@ void hs_log(const char* plugin, int severity, const char* fmt, ...)
     ts.tv_nsec = 0;
   }
 
-  const char* level;
+  const char *level;
   switch (severity) {
   case 7:
     level = "debug";

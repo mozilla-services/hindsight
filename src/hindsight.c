@@ -26,7 +26,6 @@
 #include "hs_input_plugins.h"
 #include "hs_logger.h"
 #include "hs_output_plugins.h"
-#include "hs_sandbox.h"
 
 
 static const char g_module[] = "hindsight";
@@ -41,7 +40,7 @@ static void stop_signal(int sig)
 }
 
 
-int main(int argc, char* argv[])
+int main(int argc, char *argv[])
 {
   if (argc < 2 || argc > 3) {
     fprintf(stderr, "usage: %s <cfg> [loglevel]\n", argv[0]);
@@ -75,20 +74,20 @@ int main(int argc, char* argv[])
   hs_log(g_module, 6, "starting");
   signal(SIGINT, stop_signal);
 
-  hs_message_match_builder mmb;
-  hs_init_message_match_builder(&mmb, cfg.analysis_lua_path,
-                                cfg.analysis_lua_cpath);
+  lsb_message_match_builder *mmb;
+  mmb = lsb_create_message_match_builder(cfg.analysis_lua_path,
+                                         cfg.analysis_lua_cpath);
   hs_input_plugins ips;
   hs_init_input_plugins(&ips, &cfg);
   hs_load_input_plugins(&ips, &cfg, false);
 
   hs_analysis_plugins aps;
-  hs_init_analysis_plugins(&aps, &cfg, &mmb);
+  hs_init_analysis_plugins(&aps, &cfg, mmb);
   hs_load_analysis_plugins(&aps, &cfg, false);
   hs_start_analysis_threads(&aps);
 
   hs_output_plugins ops;
-  hs_init_output_plugins(&ops, &cfg, &mmb);
+  hs_init_output_plugins(&ops, &cfg, mmb);
   hs_load_output_plugins(&ops, &cfg, false);
 
   hs_checkpoint_writer cpw;
@@ -140,7 +139,7 @@ int main(int argc, char* argv[])
   hs_write_checkpoints(&cpw, &cfg.cp_reader);
   hs_free_output_plugins(&ops);
 #else
-// non CLI mode should shut everything down immediately
+  // non CLI mode should shut everything down immediately
   hs_stop_input_plugins(&ips);
   aps.stop = true;
   hs_stop_output_plugins(&ops);
@@ -156,7 +155,7 @@ int main(int argc, char* argv[])
   hs_free_output_plugins(&ops);
 #endif
 
-  hs_free_message_match_builder(&mmb);
+  lsb_destroy_message_match_builder(mmb);
   hs_free_checkpoint_writer(&cpw);
   hs_free_config(&cfg);
   hs_free_log();

@@ -28,10 +28,9 @@ typedef struct hs_ip_checkpoint {
   hs_ip_checkpoint_type type;
   unsigned len;  // string checkpoint length
   unsigned cap;  // string checkpoint capacity
-  union
-  {
+  union {
     double d; // numeric checkpoint
-    char* s;  // string checkpoint
+    char *s;  // string checkpoint
   } value;
 } hs_ip_checkpoint;
 
@@ -47,34 +46,35 @@ typedef struct hs_checkpoint_pair
 } hs_checkpoint_pair;
 
 typedef struct hs_checkpoint_reader {
-  lua_State* values;
+  lua_State *values;
   pthread_mutex_t lock;
 } hs_checkpoint_reader;
 
-void hs_init_checkpoint_reader(hs_checkpoint_reader* cpr, const char* path);
-void hs_free_checkpoint_reader(hs_checkpoint_reader* cpr);
+void hs_init_checkpoint_reader(hs_checkpoint_reader *cpr, const char *path);
 
-bool hs_load_checkpoint(lua_State* L, int idx, hs_ip_checkpoint* cp);
+void hs_free_checkpoint_reader(hs_checkpoint_reader *cpr);
 
-void hs_lookup_checkpoint(hs_checkpoint_reader* cpr,
-                          const char* key,
-                          hs_ip_checkpoint* cp);
+bool hs_load_checkpoint(lua_State *L, int idx, hs_ip_checkpoint *cp);
 
-void hs_update_checkpoint(hs_checkpoint_reader* cpr,
-                          const char* key,
-                          const hs_ip_checkpoint* cp);
+void hs_lookup_checkpoint(hs_checkpoint_reader *cpr,
+                          const char *key,
+                          hs_ip_checkpoint *cp);
 
-void hs_lookup_input_checkpoint(hs_checkpoint_reader* cpr,
-                                const char* key,
-                                const char* path,
-                                const char* subdir,
-                                hs_checkpoint* cp);
+void hs_update_checkpoint(hs_checkpoint_reader *cpr,
+                          const char *key,
+                          const hs_ip_checkpoint *cp);
 
-void hs_update_input_checkpoint(hs_checkpoint_reader* cpr,
-                                const char* subdir,
-                                const char* key,
-                                const hs_checkpoint* cp);
+void hs_lookup_input_checkpoint(hs_checkpoint_reader *cpr,
+                                const char *key,
+                                const char *path,
+                                const char *subdir,
+                                hs_checkpoint *cp);
 
-void hs_output_checkpoints(hs_checkpoint_reader* cpr, FILE* fh);
+void hs_update_input_checkpoint(hs_checkpoint_reader *cpr,
+                                const char *subdir,
+                                const char *key,
+                                const hs_checkpoint *cp);
+
+void hs_output_checkpoints(hs_checkpoint_reader *cpr, FILE *fh);
 
 #endif

@@ -12,7 +12,7 @@ set(CPACK_PACKAGE_VERSION_PATCH 0)
 set(PROJECT_PATH "${CMAKE_BINARY_DIR}/${PROJECT_NAME}")
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 include(trink)
-find_package(luasandbox REQUIRED)
+find_package(luasandbox 0.12.0 REQUIRED CONFIG)
 
 if(CMAKE_HOST_UNIX)
   find_library(PTHREAD_LIBRARY pthread)

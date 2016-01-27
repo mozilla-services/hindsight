@@ -10,35 +10,28 @@
 #define hs_config_h_
 
 #include <luasandbox/lua.h>
+#include <luasandbox/util/output_buffer.h>
 #include <stdbool.h>
 
 #include "hs_checkpoint_reader.h"
 
 #define HS_EXT_LEN 4
 
-extern const char* hs_input_dir;
-extern const char* hs_analysis_dir;
-extern const char* hs_output_dir;
-extern const char* hs_lua_ext;
-extern const char* hs_cfg_ext;
-extern const char* hs_off_ext;
-
-typedef enum {
-  HS_SB_TYPE_UNKNOWN,
-  HS_SB_TYPE_INPUT,
-  HS_SB_TYPE_ANALYSIS,
-  HS_SB_TYPE_OUTPUT
-} hs_sb_type;
+extern const char *hs_input_dir;
+extern const char *hs_analysis_dir;
+extern const char *hs_output_dir;
+extern const char *hs_lua_ext;
+extern const char *hs_cfg_ext;
+extern const char *hs_off_ext;
 
 typedef struct hs_sandbox_config
 {
-  hs_sb_type type;
-  char* dir;
-  char* filename;
-  char* cfg_name;
-  lua_State* custom_config;
+  char *dir;
+  char *filename;
+  char *cfg_name;
+  char *cfg_lua;
 
-  char* message_matcher; // analysis/output sandbox only
+  char *message_matcher; // analysis/output sandbox only
   unsigned thread; // analysis sandbox only
   unsigned async_buffer_size; // output sandbox only
 
@@ -51,14 +44,14 @@ typedef struct hs_sandbox_config
 
 typedef struct hs_config
 {
-  char* run_path;
-  char* load_path;
-  char* output_path;
-  char* io_lua_path;
-  char* io_lua_cpath;
-  char* analysis_lua_path;
-  char* analysis_lua_cpath;
-  char* hostname;
+  char *run_path;
+  char *load_path;
+  char *output_path;
+  char *io_lua_path;
+  char *io_lua_cpath;
+  char *analysis_lua_path;
+  char *analysis_lua_cpath;
+  char *hostname;
   unsigned max_message_size;
   unsigned output_size;
   unsigned analysis_threads;
@@ -77,7 +70,7 @@ typedef struct hs_config
  * @param cfg Configuration structure to free
  *
  */
-void hs_free_sandbox_config(hs_sandbox_config* cfg);
+void hs_free_sandbox_config(hs_sandbox_config *cfg);
 
 /**
  * Free any memory allocated by the configuration
@@ -85,7 +78,7 @@ void hs_free_sandbox_config(hs_sandbox_config* cfg);
  * @param cfg Configuration structure to free
  *
  */
-void hs_free_config(hs_config* cfg);
+void hs_free_config(hs_config *cfg);
 
 /**
  * Loads the sandbox configuration from a file
@@ -96,11 +89,11 @@ void hs_free_config(hs_config* cfg);
  *
  * @return bool false on failure
  */
-bool hs_load_sandbox_config(const char* dir,
-                            const char* fn,
-                            hs_sandbox_config* cfg,
-                            const hs_sandbox_config* dflt,
-                            hs_sb_type mode);
+bool hs_load_sandbox_config(const char *dir,
+                            const char *fn,
+                            hs_sandbox_config *cfg,
+                            const hs_sandbox_config *dflt,
+                            char type);
 
 /**
  * Loads the Hinsight configuration from a file
@@ -110,13 +103,17 @@ bool hs_load_sandbox_config(const char* dir,
  *
  * @return int 0 on success
  */
-int hs_load_config(const char* fn, hs_config* cfg);
+int hs_load_config(const char *fn, hs_config *cfg);
 
-bool hs_get_config_fqfn(const char* path,
-                        const char* name,
-                        char* fqfn,
+bool hs_get_config_fqfn(const char *path,
+                        const char *name,
+                        char *fqfn,
                         size_t fqfn_len);
 
-int hs_process_load_cfg(const char* lpath, const char* rpath, const char* name);
+int hs_process_load_cfg(const char *lpath, const char *rpath, const char *name);
+
+
+bool hs_get_full_config(lsb_output_buffer *ob, char type, const hs_config *cfg,
+                        hs_sandbox_config *sbc);
 
 #endif

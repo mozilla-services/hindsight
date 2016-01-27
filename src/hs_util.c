@@ -11,11 +11,9 @@
 #include <stdio.h>
 #include <string.h>
 
-#define MAX_VARINT_BYTES 10
-
-bool hs_file_exists(const char* fn)
+bool hs_file_exists(const char *fn)
 {
-  FILE* fh = fopen(fn, "r");
+  FILE *fh = fopen(fn, "r");
   if (fh) {
     fclose(fh);
     return 1;
@@ -24,9 +22,9 @@ bool hs_file_exists(const char* fn)
 }
 
 
-bool hs_get_fqfn(const char* path,
-                 const char* name,
-                 char* fqfn,
+bool hs_get_fqfn(const char *path,
+                 const char *name,
+                 char *fqfn,
                  size_t fqfn_len)
 {
   int ret = snprintf(fqfn, fqfn_len, "%s/%s", path, name);
@@ -37,7 +35,7 @@ bool hs_get_fqfn(const char* path,
 }
 
 
-void hs_output_lua_string(FILE* fh, const char* s)
+void hs_output_lua_string(FILE *fh, const char *s)
 {
   size_t len = strlen(s);
   for (unsigned i = 0; i < len; ++i) {
@@ -62,53 +60,7 @@ void hs_output_lua_string(FILE* fh, const char* s)
 }
 
 
-int hs_write_varint(unsigned char* buf, unsigned long long i)
-{
-  int pos = 0;
-  if (i == 0) {
-    buf[pos] = 0;
-    return 1;
-  }
-
-  while (i) {
-    buf[pos++] = (i & 0x7F) | 0x80;
-    i >>= 7;
-  }
-  buf[pos - 1] &= 0x7F; // end the varint
-  return pos;
-}
-
-
-unsigned const char*
-hs_read_varint(unsigned const char* p, unsigned const char* e, long long* vi)
-{
-  *vi = 0;
-  unsigned i, shift = 0;
-  for (i = 0; p != e && i < MAX_VARINT_BYTES; i++) {
-    *vi |= ((unsigned long long)p[i] & 0x7f) << shift;
-    shift += 7;
-    if ((p[i] & 0x80) == 0) break;
-  }
-  if (i == MAX_VARINT_BYTES) {
-    return NULL;
-  }
-  return p + i + 1;
-}
-
-
-double hs_timespec_delta(const struct timespec* s, const struct timespec* e)
-{
-  double delta;
-  if (e->tv_nsec - s->tv_nsec < 0) {
-    delta = e->tv_sec - s->tv_sec - 1 + (e->tv_nsec - s->tv_nsec) / -1e9;
-  } else {
-    delta = e->tv_sec - s->tv_sec + (e->tv_nsec - s->tv_nsec) / 1e9;
-  }
-  return delta;
-}
-
-
-bool hs_has_ext(const char* fn, const char* ext)
+bool hs_has_ext(const char *fn, const char *ext)
 {
   size_t flen = strlen(fn);
   size_t elen = strlen(ext);

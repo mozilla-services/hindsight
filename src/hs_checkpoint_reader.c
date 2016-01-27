@@ -22,7 +22,7 @@
 
 static const char g_module[] = "checkpoint_reader";
 
-static bool extract_id(const char* fn, unsigned long long* id)
+static bool extract_id(const char *fn, unsigned long long *id)
 {
   size_t l = strlen(fn);
   size_t i = 0;
@@ -35,10 +35,10 @@ static bool extract_id(const char* fn, unsigned long long* id)
 }
 
 
-static size_t find_first_id(const char* path)
+static size_t find_first_id(const char *path)
 {
-  struct dirent* entry;
-  DIR* dp = opendir(path);
+  struct dirent *entry;
+  DIR *dp = opendir(path);
   if (dp == NULL) {
     hs_log(g_module, 0, "path does not exist: %s", path);
     exit(EXIT_FAILURE);
@@ -57,7 +57,7 @@ static size_t find_first_id(const char* path)
 }
 
 
-void hs_init_checkpoint_reader(hs_checkpoint_reader* cpr, const char* path)
+void hs_init_checkpoint_reader(hs_checkpoint_reader *cpr, const char *path)
 {
   char fqfn[HS_MAX_PATH];
   if (!hs_get_fqfn(path, "hindsight.cp", fqfn, sizeof(fqfn))) {
@@ -90,7 +90,7 @@ void hs_init_checkpoint_reader(hs_checkpoint_reader* cpr, const char* path)
 }
 
 
-void hs_free_checkpoint_reader(hs_checkpoint_reader* cpr)
+void hs_free_checkpoint_reader(hs_checkpoint_reader *cpr)
 {
   if (cpr->values) lua_close(cpr->values);
   cpr->values = NULL;
@@ -98,7 +98,7 @@ void hs_free_checkpoint_reader(hs_checkpoint_reader* cpr)
 }
 
 
-bool hs_load_checkpoint(lua_State* L, int idx, hs_ip_checkpoint* cp)
+bool hs_load_checkpoint(lua_State *L, int idx, hs_ip_checkpoint *cp)
 {
   size_t len;
   switch (lua_type(L, idx)) {
@@ -107,7 +107,7 @@ bool hs_load_checkpoint(lua_State* L, int idx, hs_ip_checkpoint* cp)
     if (cp->type == HS_CP_NUMERIC) cp->value.s = NULL;
     cp->type = HS_CP_STRING;
 
-    const char* tmp = lua_tolstring(L, idx, &len);
+    const char *tmp = lua_tolstring(L, idx, &len);
     cp->len = (unsigned)len;
     ++len;
     if (tmp && len <= HS_MAX_IP_CHECKPOINT) {
@@ -152,9 +152,9 @@ bool hs_load_checkpoint(lua_State* L, int idx, hs_ip_checkpoint* cp)
 }
 
 
-void hs_lookup_checkpoint(hs_checkpoint_reader* cpr,
-                          const char* key,
-                          hs_ip_checkpoint* cp)
+void hs_lookup_checkpoint(hs_checkpoint_reader *cpr,
+                          const char *key,
+                          hs_ip_checkpoint *cp)
 {
   pthread_mutex_lock(&cpr->lock);
   lua_getglobal(cpr->values, key);
@@ -164,9 +164,9 @@ void hs_lookup_checkpoint(hs_checkpoint_reader* cpr,
 }
 
 
-void hs_update_checkpoint(hs_checkpoint_reader* cpr,
-                          const char* key,
-                          const hs_ip_checkpoint* cp)
+void hs_update_checkpoint(hs_checkpoint_reader *cpr,
+                          const char *key,
+                          const hs_ip_checkpoint *cp)
 {
   pthread_mutex_lock(&cpr->lock);
   switch (cp->type) {
@@ -185,18 +185,18 @@ void hs_update_checkpoint(hs_checkpoint_reader* cpr,
 }
 
 
-void hs_lookup_input_checkpoint(hs_checkpoint_reader* cpr,
-                                const char* subdir,
-                                const char* key,
-                                const char* path,
-                                hs_checkpoint* cp)
+void hs_lookup_input_checkpoint(hs_checkpoint_reader *cpr,
+                                const char *subdir,
+                                const char *key,
+                                const char *path,
+                                hs_checkpoint *cp)
 {
-  const char* pos = NULL;
+  const char *pos = NULL;
   pthread_mutex_lock(&cpr->lock);
   lua_pushfstring(cpr->values, "%s->%s", subdir, key);
   lua_gettable(cpr->values, LUA_GLOBALSINDEX);
   if (lua_type(cpr->values, -1) == LUA_TSTRING) {
-    const char* tmp = lua_tostring(cpr->values, -1);
+    const char *tmp = lua_tostring(cpr->values, -1);
     if (tmp) {
       pos = strchr(tmp, ':');
       if (pos) {
@@ -220,10 +220,10 @@ void hs_lookup_input_checkpoint(hs_checkpoint_reader* cpr,
 }
 
 
-void hs_update_input_checkpoint(hs_checkpoint_reader* cpr,
-                                const char* subdir,
-                                const char* key,
-                                const hs_checkpoint* cp)
+void hs_update_input_checkpoint(hs_checkpoint_reader *cpr,
+                                const char *subdir,
+                                const char *key,
+                                const hs_checkpoint *cp)
 {
   pthread_mutex_lock(&cpr->lock);
   lua_pushfstring(cpr->values, "%s->%s", subdir, key);
@@ -234,9 +234,9 @@ void hs_update_input_checkpoint(hs_checkpoint_reader* cpr,
 }
 
 
-void hs_output_checkpoints(hs_checkpoint_reader* cpr, FILE* fh)
+void hs_output_checkpoints(hs_checkpoint_reader *cpr, FILE *fh)
 {
-  const char* key;
+  const char *key;
   pthread_mutex_lock(&cpr->lock);
   lua_pushnil(cpr->values);
   while (lua_next(cpr->values, LUA_GLOBALSINDEX) != 0) {

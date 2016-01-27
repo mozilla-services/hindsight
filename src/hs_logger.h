@@ -30,6 +30,6 @@ void hs_free_log();
  * @param level
  * @param fmt
  */
-void hs_log(const char* plugin, int level, const char* fmt, ...);
+void hs_log(const char *plugin, int level, const char *fmt, ...);
 
 #endif

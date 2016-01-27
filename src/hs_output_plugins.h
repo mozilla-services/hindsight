@@ -9,6 +9,10 @@
 #ifndef hs_output_plugins_h_
 #define hs_output_plugins_h_
 
+#include <luasandbox/heka/sandbox.h>
+#include <luasandbox/heka/message_matcher.h>
+#include <luasandbox/util/heka_message.h>
+#include <luasandbox/util/running_stats.h>
 #include <pthread.h>
 #include <semaphore.h>
 #include <stdbool.h>
@@ -16,21 +20,41 @@
 #include <time.h>
 
 #include "hs_config.h"
-#include "hs_heka_message.h"
 #include "hs_input.h"
-#include "hs_message_matcher.h"
 #include "hs_output.h"
-#include "hs_sandbox.h"
 
-typedef struct hs_output_plugins hs_output_plugins;
 typedef struct hs_output_plugin hs_output_plugin;
+typedef struct hs_output_plugins hs_output_plugins;
 
+struct hs_output_plugin {
+  char                *name;
+  lsb_heka_sandbox    *hsb;
+  lsb_message_matcher *mm;
+  hs_output_plugins   *plugins;
+  unsigned long long  sequence_id;
+  lsb_running_stats   mms;
+  int                 ticker_interval;
+  time_t              ticker_expires;
 
-struct hs_output_plugins
-{
-  hs_output_plugin** list;
-  hs_config* cfg;
-  hs_message_match_builder* mmb;
+  pthread_t thread;
+  int       list_index;
+  bool      batching;
+  bool      stop;
+  bool      sample;
+  hs_input input;
+  hs_input analysis;
+
+  pthread_mutex_t     cp_lock;
+  hs_checkpoint_pair  cp;
+  hs_checkpoint_pair  cur;
+  hs_checkpoint_pair  *async_cp;
+  int                 async_len;
+};
+
+struct hs_output_plugins {
+  hs_output_plugin **list;
+  hs_config *cfg;
+  lsb_message_match_builder *mmb;
 
   int list_cnt;
   int list_cap;
@@ -38,44 +62,18 @@ struct hs_output_plugins
   pthread_mutex_t list_lock;
 };
 
+void hs_init_output_plugins(hs_output_plugins *plugins,
+                            hs_config *cfg,
+                            lsb_message_match_builder *mmb);
 
-struct hs_output_plugin
-{
-  hs_sandbox* sb;
-  hs_output_plugins* plugins;
-  hs_heka_message* msg;
+void hs_free_output_plugins(hs_output_plugins *plugins);
 
-  pthread_t thread;
-  int list_index;
-  bool matched;
-  bool sample;
-  bool batching;
-  bool stop;
-
-  hs_input input;
-  hs_input analysis;
-
-  pthread_mutex_t cp_lock;
-  hs_checkpoint_pair cp;
-  hs_checkpoint_pair cur;
-  hs_checkpoint_pair *async_cp;
-  int async_len;
-};
-
-
-void hs_init_output_plugins(hs_output_plugins* plugins,
-                            hs_config* cfg,
-                            hs_message_match_builder* mmb);
-void hs_free_output_plugins(hs_output_plugins* plugins);
-void hs_load_output_plugins(hs_output_plugins* plugins,
-                            const hs_config* cfg,
+void hs_load_output_plugins(hs_output_plugins *plugins,
+                            const hs_config *cfg,
                             bool dynamic);
-void hs_stop_output_plugins(hs_output_plugins* plugins);
-void hs_wait_output_plugins(hs_output_plugins* plugins);
 
-hs_sandbox* hs_create_output_sandbox(void* parent,
-                                     const hs_config* cfg,
-                                     hs_sandbox_config* sbc);
+void hs_stop_output_plugins(hs_output_plugins *plugins);
 
-int hs_init_output_sandbox(hs_sandbox* sb);
+void hs_wait_output_plugins(hs_output_plugins *plugins);
+
 #endif

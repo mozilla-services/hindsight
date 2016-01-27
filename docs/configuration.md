@@ -29,6 +29,7 @@
   backpressure is applied  (message injection will be slowed) until the writer and reader
   are both on the same file (count, default 0 (no backpressure))
   e.g. backpressure = 10 [writer = 100.log, slowest reader = 89.log, delta = 11]
+* **hostname** - hostname used in logging/messages (default gethostname())
 
 ```lua
 output_path             = "hs_output"
@@ -73,9 +74,20 @@ plugins](input_plugins.md#polling)
 
 * **filename** - plugin source file (must have no path component and a `.lua` extension)
 
-##### Reserved
+##### Reserved (Hindsight populates the following variables in the configuration)
 
-* **cfg_name** - configuration filename without the `.cfg` extension (set by Hindsight) e.g., `myplugin`
+* **Logger** - configuration filename without the `.cfg` extension prefixed with the sandbox type e.g., `analysis.myplugin`
+* **Pid** - process ID
+* **Hostname** - configuration hostname.
+* **path** - Lua module search path (corresponding to the type of plugin)
+* **cpath** - Lua C module search path (corresponding to the type of plugin)
+
+###### For input/output plugins these additional Hindsight configuration options are available from read_config()
+* **output_path**
+* **output_size**
+* **max_message_size**
+* **sandbox_load_path**
+* **sandbox_run_path**
 
 ##### User Defined
 

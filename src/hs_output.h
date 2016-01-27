@@ -17,16 +17,18 @@
 
 typedef struct hs_output
 {
-  FILE* fh;
-  char* path;
+  FILE *fh;
+  char *path;
   unsigned long long min_cp_id;
   pthread_mutex_t lock;
   hs_checkpoint cp;
 } hs_output;
 
 
-void hs_init_output(hs_output* output, const char* path, const char* subdir);
-void hs_free_output(hs_output* output);
+void hs_init_output(hs_output *output, const char *path, const char *subdir);
 
-void hs_open_output_file(hs_output* output);
+void hs_free_output(hs_output *output);
+
+void hs_open_output_file(hs_output *output);
+
 #endif

@@ -9,6 +9,7 @@
 #ifndef hs_input_plugins_h_
 #define hs_input_plugins_h_
 
+#include <luasandbox/heka/sandbox.h>
 #include <pthread.h>
 #include <semaphore.h>
 #include <stddef.h>
@@ -16,25 +17,24 @@
 #include "hs_config.h"
 #include "hs_checkpoint_reader.h"
 #include "hs_output.h"
-#include "hs_sandbox.h"
 
 typedef struct hs_input_plugin hs_input_plugin;
 typedef struct hs_input_plugins hs_input_plugins;
 
-struct hs_input_plugin
-{
-  hs_sandbox* sb;
-  hs_input_plugins* plugins;
-  pthread_t thread;
-  int list_index;
-  hs_ip_checkpoint cp;
-  sem_t shutdown;
+struct hs_input_plugin {
+  char              *name;
+  lsb_heka_sandbox  *hsb;
+  hs_input_plugins  *plugins;
+  int               ticker_interval;
+  pthread_t         thread;
+  int               list_index;
+  hs_ip_checkpoint  cp;
+  sem_t             shutdown;
 };
 
-struct hs_input_plugins
-{
-  hs_input_plugin** list;
-  hs_config* cfg;
+struct hs_input_plugins {
+  hs_input_plugin **list;
+  hs_config *cfg;
 
   pthread_mutex_t list_lock;
   int list_cnt;
@@ -43,20 +43,16 @@ struct hs_input_plugins
   hs_output output;
 };
 
-void hs_init_input_plugins(hs_input_plugins* plugins,
-                           hs_config* cfg);
-void hs_free_input_plugins(hs_input_plugins* plugins);
+void hs_init_input_plugins(hs_input_plugins *plugins,
+                           hs_config *cfg);
 
-void hs_load_input_plugins(hs_input_plugins* plugins, const hs_config* cfg,
+void hs_free_input_plugins(hs_input_plugins *plugins);
+
+void hs_load_input_plugins(hs_input_plugins *plugins, const hs_config *cfg,
                            bool dynamic);
 
-void hs_stop_input_plugins(hs_input_plugins* plugins);
-void hs_wait_input_plugins(hs_input_plugins* plugins);
+void hs_stop_input_plugins(hs_input_plugins *plugins);
 
-hs_sandbox* hs_create_input_sandbox(void* parent,
-                                    const hs_config* cfg,
-                                    hs_sandbox_config* sbc);
-
-int hs_init_input_sandbox(hs_sandbox* sb, lua_CFunction im_fp);
+void hs_wait_input_plugins(hs_input_plugins *plugins);
 
 #endif

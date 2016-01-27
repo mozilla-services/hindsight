@@ -9,33 +9,38 @@
 #ifndef hs_analysis_plugins_h_
 #define hs_analysis_plugins_h_
 
+#include <luasandbox/heka/message_matcher.h>
+#include <luasandbox/heka/sandbox.h>
+#include <luasandbox/util/heka_message.h>
+#include <luasandbox/util/running_stats.h>
 #include <pthread.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <time.h>
 
 #include "hs_config.h"
-#include "hs_heka_message.h"
 #include "hs_input.h"
-#include "hs_message_matcher.h"
 #include "hs_output.h"
-#include "hs_sandbox.h"
 
+typedef struct hs_analysis_plugin hs_analysis_plugin;
 typedef struct hs_analysis_plugins hs_analysis_plugins;
 typedef struct hs_analysis_thread hs_analysis_thread;
 
-typedef struct hs_analysis_plugin
-{
-  hs_sandbox* sb;
-  hs_analysis_thread* at;
-} hs_analysis_plugin;
+struct hs_analysis_plugin {
+  char                *name;
+  lsb_heka_sandbox    *hsb;
+  lsb_message_matcher *mm;
+  hs_analysis_thread  *at;
+  lsb_running_stats   mms;
+  int                 ticker_interval;
+  time_t              ticker_expires;
+};
 
-struct hs_analysis_plugins
-{
-  hs_analysis_thread* list;
-  pthread_t* threads;
-  hs_config* cfg;
-  hs_message_match_builder* mmb;
+struct hs_analysis_plugins {
+  hs_analysis_thread *list;
+  pthread_t *threads;
+  hs_config *cfg;
+  lsb_message_match_builder *mmb;
 
   int thread_cnt;
   bool stop;
@@ -44,11 +49,10 @@ struct hs_analysis_plugins
   hs_output output;
 };
 
-struct hs_analysis_thread
-{
-  hs_analysis_plugins* plugins;
-  hs_analysis_plugin** list;
-  hs_heka_message* msg;
+struct hs_analysis_thread {
+  hs_analysis_plugins *plugins;
+  hs_analysis_plugin **list;
+  lsb_heka_message *msg;
 
   pthread_mutex_t list_lock;
   pthread_mutex_t cp_lock;
@@ -58,27 +62,24 @@ struct hs_analysis_thread
   int list_cap;
   int list_cnt;
   int tid;
-  bool matched;
 
   hs_input input;
 };
 
-void hs_init_analysis_plugins(hs_analysis_plugins* plugins,
-                              hs_config* cfg,
-                              hs_message_match_builder* mmb);
-void hs_free_analysis_plugins(hs_analysis_plugins* plugins);
+void hs_init_analysis_plugins(hs_analysis_plugins *plugins,
+                              hs_config *cfg,
+                              lsb_message_match_builder *mmb);
 
-void hs_start_analysis_threads(hs_analysis_plugins* plugins);
+void hs_free_analysis_plugins(hs_analysis_plugins *plugins);
 
-void hs_load_analysis_plugins(hs_analysis_plugins* plugins,
-                              const hs_config* cfg,
+void hs_start_analysis_threads(hs_analysis_plugins *plugins);
+
+void hs_load_analysis_plugins(hs_analysis_plugins *plugins,
+                              const hs_config *cfg,
                               bool dynamic);
 
-void hs_start_analysis_input(hs_analysis_plugins* plugins, pthread_t* t);
-void hs_wait_analysis_plugins(hs_analysis_plugins* plugins);
+void hs_start_analysis_input(hs_analysis_plugins *plugins, pthread_t *t);
 
-hs_sandbox* hs_create_analysis_sandbox(void* parent,
-                                       const hs_config* cfg,
-                                       hs_sandbox_config* sbc);
-int hs_init_analysis_sandbox(hs_sandbox* sb, lua_CFunction im_fp);
+void hs_wait_analysis_plugins(hs_analysis_plugins *plugins);
+
 #endif

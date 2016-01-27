@@ -20,8 +20,7 @@
  *
  * @return bool
  */
-bool hs_file_exists(const char* fn);
-
+bool hs_file_exists(const char *fn);
 
 /**
  * Constructs a fully qualified filename from the provided components
@@ -33,19 +32,13 @@ bool hs_file_exists(const char* fn);
  *
  * @return bool true if string was successfully constructed
  */
-bool hs_get_fqfn(const char* path,
-                 const char* name,
-                 char* fqfn,
+bool hs_get_fqfn(const char *path,
+                 const char *name,
+                 char *fqfn,
                  size_t fqfn_len);
 
-void hs_output_lua_string(FILE* fh, const char* s);
+void hs_output_lua_string(FILE *fh, const char *s);
 
-int hs_write_varint(unsigned char* buf, unsigned long long i);
+bool hs_has_ext(const char *fn, const char *ext);
 
-unsigned const char*
-hs_read_varint(unsigned const char* p, unsigned const char* e, long long* vi);
-
-double hs_timespec_delta(const struct timespec* s, const struct timespec* e);
-
-bool hs_has_ext(const char* fn, const char* ext);
 #endif

@@ -22,7 +22,7 @@
 static const char g_module[] = "output";
 
 
-static bool extract_id(const char* fn, unsigned long long* id)
+static bool extract_id(const char *fn, unsigned long long *id)
 {
   size_t l = strlen(fn);
   size_t i = 0;
@@ -35,11 +35,11 @@ static bool extract_id(const char* fn, unsigned long long* id)
 }
 
 
-static size_t find_last_id(const char* path)
+static size_t find_last_id(const char *path)
 {
   unsigned long long file_id = 0, current_id = 0;
-  struct dirent* entry;
-  DIR* dp = opendir(path);
+  struct dirent *entry;
+  DIR *dp = opendir(path);
   if (dp == NULL) return file_id;
 
   while ((entry = readdir(dp))) {
@@ -54,7 +54,7 @@ static size_t find_last_id(const char* path)
 }
 
 
-void hs_init_output(hs_output* output, const char* path, const char* subdir)
+void hs_init_output(hs_output *output, const char *path, const char *subdir)
 {
   output->fh = NULL;
   output->cp.offset = 0;
@@ -87,7 +87,7 @@ void hs_init_output(hs_output* output, const char* path, const char* subdir)
 }
 
 
-void hs_free_output(hs_output* output)
+void hs_free_output(hs_output *output)
 {
   if (output->fh) fclose(output->fh);
   output->fh = NULL;
@@ -99,7 +99,7 @@ void hs_free_output(hs_output* output)
 }
 
 
-void hs_open_output_file(hs_output* output)
+void hs_open_output_file(hs_output *output)
 {
   static char fqfn[260];
   if (output->fh) {

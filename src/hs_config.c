@@ -10,6 +10,7 @@
 
 #include <luasandbox/lauxlib.h>
 #include <luasandbox/lua.h>
+#include <luasandbox/util/util.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,44 +20,43 @@
 #include "hs_logger.h"
 #include "hs_util.h"
 
-const char* hs_input_dir = "input";
-const char* hs_analysis_dir = "analysis";
-const char* hs_output_dir = "output";
-const char* hs_lua_ext = ".lua";
-const char* hs_cfg_ext = ".cfg";
-const char* hs_off_ext = ".off";
+const char *hs_input_dir = "input";
+const char *hs_analysis_dir = "analysis";
+const char *hs_output_dir = "output";
+const char *hs_lua_ext = ".lua";
+const char *hs_cfg_ext = ".cfg";
+const char *hs_off_ext = ".off";
 
 static const char g_module[] = "config_parser";
 
-static const char* cfg_output_path = "output_path";
-static const char* cfg_output_size = "output_size";
-static const char* cfg_load_path = "sandbox_load_path";
-static const char* cfg_run_path = "sandbox_run_path";
-static const char* cfg_threads = "analysis_threads";
-static const char* cfg_analysis_lua_path = "analysis_lua_path";
-static const char* cfg_analysis_lua_cpath = "analysis_lua_cpath";
-static const char* cfg_io_lua_path = "io_lua_path";
-static const char* cfg_io_lua_cpath = "io_lua_cpath";
-static const char* cfg_max_message_size = "max_message_size";
-static const char* cfg_hostname = "hostname";
-static const char* cfg_backpressure = "backpressure";
+static const char *cfg_output_path = "output_path";
+static const char *cfg_output_size = "output_size";
+static const char *cfg_load_path = "sandbox_load_path";
+static const char *cfg_run_path = "sandbox_run_path";
+static const char *cfg_threads = "analysis_threads";
+static const char *cfg_analysis_lua_path = "analysis_lua_path";
+static const char *cfg_analysis_lua_cpath = "analysis_lua_cpath";
+static const char *cfg_io_lua_path = "io_lua_path";
+static const char *cfg_io_lua_cpath = "io_lua_cpath";
+static const char *cfg_max_message_size = "max_message_size";
+static const char *cfg_hostname = "hostname";
+static const char *cfg_backpressure = "backpressure";
 
-static const char* cfg_sb_ipd = "input_defaults";
-static const char* cfg_sb_apd = "analysis_defaults";
-static const char* cfg_sb_opd = "output_defaults";
-static const char* cfg_sb_output = "output_limit";
-static const char* cfg_sb_memory = "memory_limit";
-static const char* cfg_sb_instruction = "instruction_limit";
-static const char* cfg_sb_preserve = "preserve_data";
-static const char* cfg_sb_filename = "filename";
-static const char* cfg_sb_ticker_interval = "ticker_interval";
-static const char* cfg_sb_thread = "thread";
-static const char* cfg_sb_async_buffer = "async_buffer_size";
-static const char* cfg_sb_matcher = "message_matcher";
+static const char *cfg_sb_ipd = "input_defaults";
+static const char *cfg_sb_apd = "analysis_defaults";
+static const char *cfg_sb_opd = "output_defaults";
+static const char *cfg_sb_output = "output_limit";
+static const char *cfg_sb_memory = "memory_limit";
+static const char *cfg_sb_instruction = "instruction_limit";
+static const char *cfg_sb_preserve = "preserve_data";
+static const char *cfg_sb_filename = "filename";
+static const char *cfg_sb_ticker_interval = "ticker_interval";
+static const char *cfg_sb_thread = "thread";
+static const char *cfg_sb_async_buffer = "async_buffer_size";
+static const char *cfg_sb_matcher = "message_matcher";
 
-static void init_sandbox_config(hs_sandbox_config* cfg)
+static void init_sandbox_config(hs_sandbox_config *cfg)
 {
-  cfg->type = HS_SB_TYPE_UNKNOWN;
   cfg->output_limit = 1024 * 64;
   cfg->memory_limit = 1024 * 1024 * 8;
   cfg->instruction_limit = 1000000;
@@ -64,7 +64,7 @@ static void init_sandbox_config(hs_sandbox_config* cfg)
   cfg->dir = NULL;
   cfg->filename = NULL;
   cfg->cfg_name = NULL;
-  cfg->custom_config = NULL;
+  cfg->cfg_lua = NULL;
   cfg->message_matcher = NULL;
   cfg->ticker_interval = 0;
   cfg->thread = 0;
@@ -72,7 +72,7 @@ static void init_sandbox_config(hs_sandbox_config* cfg)
 }
 
 
-static void init_config(hs_config* cfg)
+static void init_config(hs_config *cfg)
 {
   cfg->run_path = NULL;
   cfg->load_path = NULL;
@@ -93,7 +93,7 @@ static void init_config(hs_config* cfg)
 }
 
 
-static int check_for_unknown_options(lua_State* L, int idx, const char* parent)
+static int check_for_unknown_options(lua_State *L, int idx, const char *parent)
 {
   lua_pushnil(L);
   while (lua_next(L, idx) != 0) {
@@ -115,7 +115,7 @@ static int check_for_unknown_options(lua_State* L, int idx, const char* parent)
 }
 
 
-static void remove_item(lua_State* L, int idx, const char* name)
+static void remove_item(lua_State *L, int idx, const char *name)
 {
   lua_pop(L, 1);
   lua_pushnil(L);
@@ -123,12 +123,12 @@ static void remove_item(lua_State* L, int idx, const char* name)
 }
 
 
-static int get_string_item(lua_State* L, int idx, const char* name, char** val,
-                           const char* dflt)
+static int get_string_item(lua_State *L, int idx, const char *name, char **val,
+                           const char *dflt)
 {
   size_t len;
   lua_getfield(L, idx, name);
-  const char* tmp = lua_tolstring(L, -1, &len);
+  const char *tmp = lua_tolstring(L, -1, &len);
   if (!tmp) {
     if (!dflt) {
       lua_pushfstring(L, "%s must be set to a string", name);
@@ -145,8 +145,8 @@ static int get_string_item(lua_State* L, int idx, const char* name, char** val,
 }
 
 
-static int get_numeric_item(lua_State* L, int idx, const char* name,
-                            unsigned* val)
+static int get_numeric_item(lua_State *L, int idx, const char *name,
+                            unsigned *val)
 {
   lua_getfield(L, idx, name);
   int t = lua_type(L, -1);
@@ -173,7 +173,7 @@ static int get_numeric_item(lua_State* L, int idx, const char* name,
 }
 
 
-static int get_bool_item(lua_State* L, int idx, const char* name, bool* val)
+static int get_bool_item(lua_State *L, int idx, const char *name, bool *val)
 {
   lua_getfield(L, idx, name);
   int t = lua_type(L, -1);
@@ -193,9 +193,9 @@ static int get_bool_item(lua_State* L, int idx, const char* name, bool* val)
 }
 
 
-static int load_sandbox_defaults(lua_State* L,
-                                 const char* key,
-                                 hs_sandbox_config* cfg)
+static int load_sandbox_defaults(lua_State *L,
+                                 const char *key,
+                                 hs_sandbox_config *cfg)
 {
   lua_getglobal(L, key);
   if (!lua_istable(L, -1)) {
@@ -215,12 +215,11 @@ static int load_sandbox_defaults(lua_State* L,
   if (check_for_unknown_options(L, 1, key)) return 1;
 
   remove_item(L, LUA_GLOBALSINDEX, key);
-
   return 0;
 }
 
 
-void hs_free_sandbox_config(hs_sandbox_config* cfg)
+void hs_free_sandbox_config(hs_sandbox_config *cfg)
 {
   free(cfg->dir);
   cfg->dir = NULL;
@@ -231,17 +230,15 @@ void hs_free_sandbox_config(hs_sandbox_config* cfg)
   free(cfg->filename);
   cfg->filename = NULL;
 
-  if (cfg->custom_config) {
-    lua_close(cfg->custom_config);
-    cfg->custom_config = NULL;
-  }
+  free(cfg->cfg_lua);
+  cfg->cfg_lua = NULL;
 
   free(cfg->message_matcher);
   cfg->message_matcher = NULL;
 }
 
 
-void hs_free_config(hs_config* cfg)
+void hs_free_config(hs_config *cfg)
 {
   free(cfg->run_path);
   cfg->run_path = NULL;
@@ -275,22 +272,36 @@ void hs_free_config(hs_config* cfg)
 }
 
 
+static char* create_name(const char *prefix, const char *fn)
+{
+  size_t ne_len = strlen(fn) - HS_EXT_LEN;
+  size_t len = strlen(prefix) + ne_len + 2;
+  char *name = malloc(len);
+  if (!name) return NULL;
+
+  int ret = snprintf(name, len, "%s.%.*s", prefix, (int)ne_len, fn);
+  if (ret < 0 || ret > (int)len - 1) {
+    return NULL;
+  }
+  return name;
+}
 
 
-bool hs_load_sandbox_config(const char* dir,
-                            const char* fn,
-                            hs_sandbox_config* cfg,
-                            const hs_sandbox_config* dflt,
-                            hs_sb_type mode)
+bool hs_load_sandbox_config(const char *dir,
+                            const char *fn,
+                            hs_sandbox_config *cfg,
+                            const hs_sandbox_config *dflt,
+                            char type)
 {
   if (!cfg) return false;
   init_sandbox_config(cfg);
 
   char fqfn[HS_MAX_PATH];
   if (!hs_get_config_fqfn(dir, fn, fqfn, sizeof(fqfn))) return false;
-  if (!hs_file_exists(fqfn)) return false;
+  cfg->cfg_lua = lsb_read_file(fqfn);
+  if (!cfg->cfg_lua) return false;
 
-  lua_State* L = luaL_newstate();
+  lua_State *L = luaL_newstate();
   if (!L) {
     hs_log(g_module, 3, "luaL_newstate failed: %s", fn);
     return false;
@@ -304,18 +315,29 @@ bool hs_load_sandbox_config(const char* dir,
     cfg->preserve_data = dflt->preserve_data;
   }
 
-  int ret = luaL_dofile(L, fqfn);
+  int ret = luaL_dostring(L, cfg->cfg_lua);
   if (ret) goto cleanup;
 
   size_t len = strlen(dir) + 1;
   cfg->dir = malloc(len);
+  if (!cfg->dir) {
+    ret = 1;
+    goto cleanup;
+  }
   memcpy(cfg->dir, dir, len);
 
-  // remove the extension and leave room for the NUL
-  len = strlen(fn) - HS_EXT_LEN + 1;
-  cfg->cfg_name = malloc(len);
-  memcpy(cfg->cfg_name, fn, len);
-  cfg->cfg_name[len - 1] = 0;
+  if (type == 'i') {
+    cfg->cfg_name = create_name("input", fn);
+  } else if (type == 'o') {
+    cfg->cfg_name = create_name("output", fn);
+  } else {
+    cfg->cfg_name = create_name("analysis", fn);
+  }
+  if (!cfg->cfg_name) {
+    lua_pushstring(L, "name allocation failed");
+    ret = 1;
+    goto cleanup;
+  }
 
   ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_sb_output,
                          &cfg->output_limit);
@@ -352,43 +374,40 @@ bool hs_load_sandbox_config(const char* dir,
                       &cfg->preserve_data);
   if (ret) goto cleanup;
 
-  if (mode == HS_SB_TYPE_ANALYSIS || mode == HS_SB_TYPE_OUTPUT) {
+  if (type == 'a' || type == 'o') {
     ret = get_string_item(L, LUA_GLOBALSINDEX, cfg_sb_matcher,
                           &cfg->message_matcher, NULL);
     if (ret) goto cleanup;
   }
 
-  if (mode == HS_SB_TYPE_ANALYSIS) {
+  if (type == 'a') {
     ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_sb_thread,
                            &cfg->thread);
     if (ret) goto cleanup;
   }
 
-  if (mode == HS_SB_TYPE_OUTPUT) {
+  if (type == 'o') {
     ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_sb_async_buffer,
                            &cfg->async_buffer_size);
     if (ret) goto cleanup;
   }
 
 cleanup:
+  lua_close(L);
   if (ret) {
     hs_log(g_module, 3, "loading %s failed: %s", fn, lua_tostring(L, -1));
-    lua_close(L);
     hs_free_sandbox_config(cfg);
     return false;
   }
-
-  cfg->type = mode;
-  cfg->custom_config = L;
   return true;
 }
 
 
-int hs_load_config(const char* fn, hs_config* cfg)
+int hs_load_config(const char *fn, hs_config *cfg)
 {
   if (!cfg) return 1;
 
-  lua_State* L = luaL_newstate();
+  lua_State *L = luaL_newstate();
   if (!L) {
     hs_log(g_module, 3, "luaL_newstate failed: %s", fn);
     return 1;
@@ -491,9 +510,9 @@ cleanup:
 }
 
 
-bool hs_get_config_fqfn(const char* path,
-                        const char* name,
-                        char* fqfn,
+bool hs_get_config_fqfn(const char *path,
+                        const char *name,
+                        char *fqfn,
                         size_t fqfn_len)
 {
   if (!hs_has_ext(name, hs_cfg_ext)) return false;
@@ -506,7 +525,7 @@ bool hs_get_config_fqfn(const char* path,
 }
 
 
-int hs_process_load_cfg(const char* lpath, const char* rpath, const char* name)
+int hs_process_load_cfg(const char *lpath, const char *rpath, const char *name)
 {
   if (hs_has_ext(name, hs_cfg_ext)) {
     char cfg_lpath[HS_MAX_PATH];
@@ -569,3 +588,47 @@ int hs_process_load_cfg(const char* lpath, const char* rpath, const char* name)
   }
   return -1;
 }
+
+
+bool hs_get_full_config(lsb_output_buffer *ob, char type, const hs_config *cfg,
+                        hs_sandbox_config *sbc)
+{
+  lsb_outputf(ob, "-- original configuration\n");
+  lsb_outputf(ob, "%s\n", sbc->cfg_lua);
+
+  lsb_outputf(ob, "-- Hindsight defaults and overrides\n");
+  lsb_outputf(ob, "Hostname = [[%s]]\n", cfg->hostname);
+  lsb_outputf(ob, "Pid = %d\n", cfg->pid);
+  if (type == 'a') {
+    lsb_outputf(ob, "path = [[%s]]\n", cfg->analysis_lua_path);
+    lsb_outputf(ob, "cpath = [[%s]]\n", cfg->analysis_lua_cpath);
+  } else {
+    lsb_outputf(ob, "path = [[%s]]\n", cfg->io_lua_path);
+    lsb_outputf(ob, "cpath = [[%s]]\n", cfg->io_lua_cpath);
+    lsb_outputf(ob, "output_path = [[%s]]\n", cfg->output_path);
+    lsb_outputf(ob, "output_size = %u\n", cfg->output_size);
+    lsb_outputf(ob, "max_message_size = %u\n", cfg->max_message_size);
+    lsb_outputf(ob, "sandbox_load_path = [[%s]]\n", cfg->load_path);
+    lsb_outputf(ob, "sandbox_run_path = [[%s]]\n", cfg->run_path);
+  }
+
+  lsb_outputf(ob, "\n-- Sandbox defaults and overrides\n");
+  lsb_outputf(ob, "Logger = [[%s]]\n", sbc->cfg_name);
+  lsb_outputf(ob, "output_limit = %u\n", sbc->output_limit);
+  lsb_outputf(ob, "memory_limit = %u\n", sbc->memory_limit);
+  lsb_outputf(ob, "instruction_limit = %u\n", sbc->instruction_limit);
+  lsb_outputf(ob, "ticker_interval = %u\n", sbc->ticker_interval);
+  lsb_outputf(ob, "preserve_data = %s\n",
+              sbc->preserve_data ? "true" : "false");
+
+  if (type == 'a') {
+    lsb_outputf(ob, "thread = %u\n", sbc->thread);
+  }
+
+  if (type == 'o') {
+    lsb_outputf(ob, "async_buffer_size = %u\n", sbc->async_buffer_size);
+  }
+
+  return ob->err ? false : true;
+}
+
