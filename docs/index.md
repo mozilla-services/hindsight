@@ -14,16 +14,16 @@ So how much lighter and faster? see: [Performance](performance.md)
 
 * [Architecture](architecture.md)
 * [Configuration](configuration.md)
-* [Message Matcher](https://github.com/mozilla-services/lua_sandbox/blob/unification/docs/heka/message_matcher.md)
-* [Input Plugins](https://github.com/mozilla-services/lua_sandbox/blob/unification/docs/heka/input.md)
-  * [Heka Stream Reader](https://github.com/mozilla-services/lua_sandbox/blob/unification/docs/heka/stream_reader.md)
-* [Analysis Plugins](https://github.com/mozilla-services/lua_sandbox/blob/unification/docs/heka/analysis.md)
-* [Output Plugins](https://github.com/mozilla-services/lua_sandbox/blob/unification/docs/heka/output.md)
+* [Message Matcher](https://github.com/mozilla-services/lua_sandbox/blob/master/docs/heka/message_matcher.md)
+* [Input Plugins](https://github.com/mozilla-services/lua_sandbox/blob/master/docs/heka/input.md)
+  * [Heka Stream Reader](https://github.com/mozilla-services/lua_sandbox/blob/master/docs/heka/stream_reader.md)
+* [Analysis Plugins](https://github.com/mozilla-services/lua_sandbox/blob/master/docs/heka/analysis.md)
+* [Output Plugins](https://github.com/mozilla-services/lua_sandbox/blob/master/docs/heka/output.md)
 
 
 ### Differences from Heka
 
-1. [Sandbox API Differences](https://github.com/mozilla-services/lua_sandbox/blob/unification/docs/heka/index.md#sandbox-api-changes-from-the-go-heka-sandbox)
+1. [Sandbox API Differences](https://github.com/mozilla-services/lua_sandbox/blob/master/docs/heka/index.md#sandbox-api-changes-from-the-go-heka-sandbox)
 1. The message matcher now uses Lua string match patterns instead of RE2 expressions.
 1. Looping messages in Heka (injecting messages back to an earlier point in the 
    pipeline) has always been a bad idea so it was removed. Most looping 

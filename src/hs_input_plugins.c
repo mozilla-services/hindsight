@@ -251,7 +251,7 @@ create_input_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
   free(state_file);
   if (!p->hsb) {
     destroy_input_plugin(p);
-    hs_log(g_module, 3, "%s lsb_heka_create_input: %s/%s", sbc->cfg_name);
+    hs_log(g_module, 3, "%s lsb_heka_create_input failed", sbc->cfg_name);
     return NULL;
   }
 

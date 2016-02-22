@@ -67,7 +67,7 @@ output_defaults = {
 * **preserve_data** - flag indicating if all global data should be saved on shutdown (bool, default false)
 * **ticker_interval** (default 0)
   * For input plugins it is the poll interval when `process_message` is called see: [polling input
-plugins](input_plugins.md#polling)
+plugins](https://github.com/mozilla-services/lua_sandbox/blob/master/docs/heka/input.md#polling)
   * For analysis and output plugins it is the amount of time between `timer_event` function calls.
 
 #### Common Plugin Configuration Variables
@@ -105,13 +105,13 @@ plugins](input_plugins.md#polling)
 
 * [Default Configuration Variables](#default-sandbox-configuration-variables)
 * [Common Plugin Configuration Variables](#common-plugin-configuration-variables)
-* **message_matcher** - filter to select which messages this plugin receives see: [Message Matcher](message_matcher.md)
+* **message_matcher** - filter to select which messages this plugin receives see: [Message Matcher](https://github.com/mozilla-services/lua_sandbox/blob/master/docs/heka/message_matcher.md)
 * **thread** - analysis thread the plugin will be run on (`thread % analysis_threads`)
 
 #### Output Plugin Configuration Variables
 
 * [Default Configuration Variables](#default-sandbox-configuration-variables)
 * [Common Plugin Configuration Variables](#common-plugin-configuration-variables)
-* **message_matcher** - filter to select which messages this plugin receives see: [Message Matcher](message_matcher.md)
+* **message_matcher** - filter to select which messages this plugin receives see: [Message Matcher](https://github.com/mozilla-services/lua_sandbox/blob/master/docs/heka/message_matcher.md)
 * **async_buffer_size** - when using asynchronous output this controls the number of message checkpoints to hold in
 memory. i.e., if the output can have 1000 messages in flight the async_buffer_size should be set to 1000

@@ -191,7 +191,7 @@ create_output_plugin(lsb_message_match_builder *mmb, const hs_config *cfg,
   free(state_file);
   if (!p->hsb) {
     destroy_output_plugin(p);
-    hs_log(g_module, 3, "%s lsb_heka_create_output: %s/%s", sbc->cfg_name);
+    hs_log(g_module, 3, "%s lsb_heka_create_output failed", sbc->cfg_name);
     return NULL;
   }
 
