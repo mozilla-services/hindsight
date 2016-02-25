@@ -393,12 +393,13 @@ bool hs_load_sandbox_config(const char *dir,
   }
 
 cleanup:
-  lua_close(L);
   if (ret) {
     hs_log(g_module, 3, "loading %s failed: %s", fn, lua_tostring(L, -1));
     hs_free_sandbox_config(cfg);
     return false;
   }
+  lua_close(L);
+
   return true;
 }
 

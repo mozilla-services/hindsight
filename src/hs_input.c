@@ -9,6 +9,7 @@
 #include "hs_input.h"
 
 #include <errno.h>
+#include <luasandbox/util/heka_message.h>
 #include <luasandbox/lauxlib.h>
 #include <limits.h>
 #include <stdlib.h>
@@ -78,16 +79,25 @@ int hs_open_file(hs_input *hsi, const char *subdir, unsigned long long id)
 
 size_t hs_read_file(hs_input *hsi)
 {
-  if (lsb_expand_input_buffer(&hsi->ib, 0)) {
+  lsb_input_buffer *ib = &hsi->ib;
+  size_t need;
+  if (ib->msglen) {
+    need = ib->msglen + (size_t)ib->buf[ib->scanpos + 1] + LSB_HDR_FRAME_SIZE
+        - (ib->readpos - ib->scanpos);
+  } else {
+    need = ib->scanpos + ib->size - ib->readpos;
+  }
+
+  if (lsb_expand_input_buffer(ib, need)) {
     hs_log(g_module, 0, "%s buffer reallocation failed", hsi->name);
     exit(EXIT_FAILURE);
   }
-  size_t nread = fread(hsi->ib.buf + hsi->ib.readpos,
+  size_t nread = fread(ib->buf + ib->readpos,
                        1,
-                       hsi->ib.size - hsi->ib.readpos,
+                       ib->size - ib->readpos,
                        hsi->fh);
   hsi->cp.offset += nread;
-  hsi->ib.readpos += nread;
+  ib->readpos += nread;
   return nread;
 }
 
