@@ -87,9 +87,9 @@ void hs_write_checkpoints(hs_checkpoint_writer *cpw, hs_checkpoint_reader *cpr)
               "Process Message Count\tProcess Message Failures\t"
               "Current Memory\t"
               "Max Memory\tMax Output\tMax Instructions\t"
-              "Message Matcher Avg (s)\tMessage Matcher SD (s)\t"
-              "Process Message Avg (s)\tProcess Message SD (s)\t"
-              "Timer Event Avg (s)\tTimer Event SD (s)\n");
+              "Message Matcher Avg (ns)\tMessage Matcher SD (ns)\t"
+              "Process Message Avg (ns)\tProcess Message SD (ns)\t"
+              "Timer Event Avg (ns)\tTimer Event SD (ns)\n");
     }
   }
   if (cpw->input_plugins) {
@@ -110,8 +110,8 @@ void hs_write_checkpoints(hs_checkpoint_writer *cpw, hs_checkpoint_reader *cpr)
                   "%llu\t%llu\t"
                   "%llu\t%llu\t%llu\t%llu\t"
                   "0\t0\t"
-                  "%g\t%g\t"
-                  "%g\t%g\t\n",
+                  "%.0f\t%.0f\t"
+                  "%.0f\t%.0f\t\n",
                   p->name,
                   stats.im_cnt, stats.im_bytes,
                   stats.pm_cnt, stats.pm_failures,
@@ -160,9 +160,9 @@ void hs_write_checkpoints(hs_checkpoint_writer *cpw, hs_checkpoint_reader *cpr)
                   "%llu\t%llu\t"
                   "%llu\t%llu\t"
                   "%llu\t%llu\t%llu\t%llu\t"
-                  "%g\t%g\t"
-                  "%g\t%g\t"
-                  "%g\t%g\t\n",
+                  "%.0f\t%.0f\t"
+                  "%.0f\t%.0f\t"
+                  "%.0f\t%.0f\t\n",
                   p->name,
                   stats.im_cnt, stats.im_bytes,
                   stats.pm_cnt, stats.pm_failures,
@@ -206,9 +206,9 @@ void hs_write_checkpoints(hs_checkpoint_writer *cpw, hs_checkpoint_reader *cpr)
                 "%llu\t%llu\t"
                 "%llu\t%llu\t"
                 "%llu\t%llu\t%llu\t%llu\t"
-                "%g\t%g\t"
-                "%g\t%g\t"
-                "%g\t%g\t\n",
+                "%.0f\t%.0f\t"
+                "%.0f\t%.0f\t"
+                "%.0f\t%.0f\t\n",
                 p->name,
                 stats.im_cnt, stats.im_bytes,
                 stats.pm_cnt, stats.pm_failures,
