@@ -14,11 +14,7 @@ So how much lighter and faster? see: [Performance](performance.md)
 
 * [Architecture](architecture.md)
 * [Configuration](configuration.md)
-* [Message Matcher](https://github.com/mozilla-services/lua_sandbox/blob/master/docs/heka/message_matcher.md)
-* [Input Plugins](https://github.com/mozilla-services/lua_sandbox/blob/master/docs/heka/input.md)
-  * [Heka Stream Reader](https://github.com/mozilla-services/lua_sandbox/blob/master/docs/heka/stream_reader.md)
-* [Analysis Plugins](https://github.com/mozilla-services/lua_sandbox/blob/master/docs/heka/analysis.md)
-* [Output Plugins](https://github.com/mozilla-services/lua_sandbox/blob/master/docs/heka/output.md)
+* [Sandbox Documentation](https://github.com/mozilla-services/lua_sandbox/blob/master/docs/heka/index.md#heka-sandbox)
 
 
 ### Differences from Heka
@@ -34,5 +30,5 @@ So how much lighter and faster? see: [Performance](performance.md)
    broken out into Lua modules to allow for re-use in different plugins.
 1. Checkpoint are all managed by the Hindsight infrastructure (so much of the 
    burden is removed from the plugin writer, this also alters the plugin API
-   slightly and should greatly lower the checkpoint relate IOPS when compared
+   slightly and should greatly lower the checkpoint related IOPS when compared
    to Heka).

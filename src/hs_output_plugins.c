@@ -222,7 +222,7 @@ static int output_message(hs_output_plugin *p, lsb_heka_message *msg)
     if (sample) start = lsb_get_time();
     bool matched = lsb_eval_message_matcher(p->mm, msg);
     if (sample) {
-      mmdelta = start - lsb_get_time();
+      mmdelta = lsb_get_time() - start;
     }
     if (matched) {
       if (p->async_len) {

@@ -32,8 +32,8 @@ being delivered first.
 
 ##### Durability
 
-The durability of the data is equal to durability of storage where the `output_path` (data stream files) and
-`sandbox_run_path` (sandbox state preservation files) are configured.
+The durability of the data is equal to durability of storage where the `output_path` (data stream files and state
+preservation files) is configured.
 
 ##### Delivery Guarantee
 
