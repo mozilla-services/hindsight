@@ -18,6 +18,13 @@
 void hs_init_log(int loglevel);
 
 /**
+ * Returns the current log level value
+ *
+ * @return int syslog severity level
+ */
+int hs_get_log_level();
+
+/**
  * Destroy the log mutex
  *
  */

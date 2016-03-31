@@ -27,6 +27,12 @@ void hs_init_log(int loglevel)
 }
 
 
+int hs_get_log_level()
+{
+  return g_loglevel;
+}
+
+
 void hs_free_log()
 {
   pthread_mutex_destroy(&g_logger);

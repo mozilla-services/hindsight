@@ -621,6 +621,7 @@ bool hs_get_full_config(lsb_output_buffer *ob, char type, const hs_config *cfg,
   lsb_outputf(ob, "ticker_interval = %u\n", sbc->ticker_interval);
   lsb_outputf(ob, "preserve_data = %s\n",
               sbc->preserve_data ? "true" : "false");
+  lsb_outputf(ob, "log_level = %d\n", hs_get_log_level());
 
   if (type == 'a') {
     lsb_outputf(ob, "thread = %u\n", sbc->thread);

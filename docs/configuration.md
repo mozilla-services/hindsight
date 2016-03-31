@@ -68,7 +68,7 @@ output_defaults = {
 * **ticker_interval** (default 0)
   * For input plugins it is the poll interval when `process_message` is called see: [polling input
 plugins](https://github.com/mozilla-services/lua_sandbox/blob/master/docs/heka/input.md#polling)
-  * For analysis and output plugins it is the amount of time between `timer_event` function calls.
+  * For analysis and output plugins it is the amount of time between `timer_event` function calls
 
 #### Common Plugin Configuration Variables
 
@@ -81,6 +81,8 @@ plugins](https://github.com/mozilla-services/lua_sandbox/blob/master/docs/heka/i
 * **Hostname** - configuration hostname.
 * **path** - Lua module search path (corresponding to the type of plugin)
 * **cpath** - Lua C module search path (corresponding to the type of plugin)
+* **log_level** - Integer specifying the syslog severity level, when set to debug (7)
+  the sandbox print function will be wired into the Hindsight logger
 
 ###### For input/output plugins these additional Hindsight configuration options are available from read_config()
 * **output_path**
