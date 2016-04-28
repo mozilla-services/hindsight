@@ -95,7 +95,7 @@ create_output_plugin(lsb_message_match_builder *mmb, const hs_config *cfg,
   char *state_file = NULL;
   char lua_file[HS_MAX_PATH];
   if (!hs_get_fqfn(sbc->dir, sbc->filename, lua_file, sizeof(lua_file))) {
-    hs_log(g_module, 3, "% failed to construct the lua_file path ",
+    hs_log(g_module, 3, "%s failed to construct the lua_file path",
            sbc->cfg_name);
     return NULL;
   }
