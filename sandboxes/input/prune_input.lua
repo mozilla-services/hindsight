@@ -17,7 +17,6 @@ ticker_interval = 60
 input = true
 analysis = true
 
-output_path   = "output" -- Path to the hindsight.cp file.
 exit_on_stall = false -- When true, causes the plugin to stop/abort when the checkpoints are no longer advancing.
                       -- Use this option to allow hindsight_cli to exit when the inputs are finished. This plugin/option
                       -- is typically used when streaming a large data set from something like s3 i.e., running
@@ -31,7 +30,7 @@ require "math"
 local l = require "lpeg"
 l.locale(l)
 
-local output_path   = read_config("output_path") or error("output_path must be set")
+local output_path   = read_config("output_path") -- provided by Hindsight
 local exit_on_stall = read_config("exit_on_stall")
 local input = read_config("input") and l.P"input"
 local analysis = read_config("analysis") and l.P"analysis"

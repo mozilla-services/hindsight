@@ -61,7 +61,7 @@ void hs_init_output(hs_output *output, const char *path, const char *subdir)
   size_t len = strlen(path) + strlen(subdir) + 2;
   output->path = malloc(len);
   if (!output->path) {
-    hs_log(g_module, 0, "output path malloc failed");
+    hs_log(NULL, g_module, 0, "output path malloc failed");
     exit(EXIT_FAILURE);
   }
   snprintf(output->path, len, "%s/%s", path, subdir);
@@ -69,13 +69,13 @@ void hs_init_output(hs_output *output, const char *path, const char *subdir)
 
   int ret = mkdir(path, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP);
   if (ret && errno != EEXIST) {
-    hs_log(g_module, 0, "output path could not be created: %s", path);
+    hs_log(NULL, g_module, 0, "output path could not be created: %s", path);
     exit(EXIT_FAILURE);
   }
 
   ret = mkdir(output->path, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IXGRP);
   if (ret && errno != EEXIST) {
-    hs_log(g_module, 0, "output path could not be created: %s", output->path);
+    hs_log(NULL, g_module, 0, "output path could not be created: %s", output->path);
     exit(EXIT_FAILURE);
   }
 
@@ -109,12 +109,12 @@ void hs_open_output_file(hs_output *output)
   int ret = snprintf(fqfn, sizeof(fqfn), "%s/%llu.log", output->path,
                      output->cp.id);
   if (ret < 0 || ret > (int)sizeof(fqfn) - 1) {
-    hs_log(g_module, 0, "output filename exceeds %zu", sizeof(fqfn));
+    hs_log(NULL, g_module, 0, "output filename exceeds %zu", sizeof(fqfn));
     exit(EXIT_FAILURE);
   }
   output->fh = fopen(fqfn, "ab+");
   if (!output->fh) {
-    hs_log(g_module, 0, "%s: %s", fqfn, strerror(errno));
+    hs_log(NULL, g_module, 0, "%s: %s", fqfn, strerror(errno));
     exit(EXIT_FAILURE);
   } else {
     fseek(output->fh, 0, SEEK_END);

@@ -303,7 +303,7 @@ bool hs_load_sandbox_config(const char *dir,
 
   lua_State *L = luaL_newstate();
   if (!L) {
-    hs_log(g_module, 3, "luaL_newstate failed: %s", fn);
+    hs_log(NULL, g_module, 3, "luaL_newstate failed: %s", fn);
     return false;
   }
 
@@ -394,7 +394,7 @@ bool hs_load_sandbox_config(const char *dir,
 
 cleanup:
   if (ret) {
-    hs_log(g_module, 3, "loading %s failed: %s", fn, lua_tostring(L, -1));
+    hs_log(NULL, g_module, 3, "loading %s failed: %s", fn, lua_tostring(L, -1));
     hs_free_sandbox_config(cfg);
     return false;
   }
@@ -410,7 +410,7 @@ int hs_load_config(const char *fn, hs_config *cfg)
 
   lua_State *L = luaL_newstate();
   if (!L) {
-    hs_log(g_module, 3, "luaL_newstate failed: %s", fn);
+    hs_log(NULL, g_module, 3, "luaL_newstate failed: %s", fn);
     return 1;
   }
 
@@ -466,7 +466,8 @@ int hs_load_config(const char *fn, hs_config *cfg)
   char hostname[65] = { 0 };
   if (gethostname(hostname, sizeof(hostname))) {
     hostname[sizeof(hostname) - 1] = 0;
-    hs_log(g_module, 4, "the system hostname was trucated to: %s", hostname);
+    hs_log(NULL, g_module, 4, "the system hostname was trucated to: %s",
+           hostname);
   }
 
   ret = get_string_item(L, LUA_GLOBALSINDEX, cfg_hostname,
@@ -475,7 +476,7 @@ int hs_load_config(const char *fn, hs_config *cfg)
 
   if (strlen(cfg->hostname) > sizeof(hostname) - 1) {
     cfg->hostname[sizeof(hostname) - 1] = 0;
-    hs_log(g_module, 4, "the configured hostname was trucated to: %s",
+    hs_log(NULL, g_module, 4, "the configured hostname was trucated to: %s",
            cfg->hostname);
   }
 
@@ -503,7 +504,7 @@ int hs_load_config(const char *fn, hs_config *cfg)
 
 cleanup:
   if (ret) {
-    hs_log(g_module, 3, "loading %s failed: %s", fn, lua_tostring(L, -1));
+    hs_log(NULL, g_module, 3, "loading %s failed: %s", fn, lua_tostring(L, -1));
   }
   lua_close(L);
 
@@ -531,12 +532,12 @@ int hs_process_load_cfg(const char *lpath, const char *rpath, const char *name)
   if (hs_has_ext(name, hs_cfg_ext)) {
     char cfg_lpath[HS_MAX_PATH];
     if (!hs_get_fqfn(lpath, name, cfg_lpath, sizeof(cfg_lpath))) {
-      hs_log(g_module, 0, "load cfg path too long");
+      hs_log(NULL, g_module, 0, "load cfg path too long");
       exit(EXIT_FAILURE);
     }
     char cfg_rpath[HS_MAX_PATH];
     if (!hs_get_fqfn(rpath, name, cfg_rpath, sizeof(cfg_rpath))) {
-      hs_log(g_module, 0, "run cfg path too long");
+      hs_log(NULL, g_module, 0, "run cfg path too long");
       exit(EXIT_FAILURE);
     }
 
@@ -546,7 +547,7 @@ int hs_process_load_cfg(const char *lpath, const char *rpath, const char *name)
     strcpy(off_rpath + strlen(off_rpath) - HS_EXT_LEN, hs_off_ext);
     if (hs_file_exists(off_rpath)) {
       if (unlink(off_rpath)) {
-        hs_log(g_module, 3, "failed to delete: %s errno: %d", off_rpath,
+        hs_log(NULL, g_module, 3, "failed to delete: %s errno: %d", off_rpath,
                errno);
         return -1;
       }
@@ -554,7 +555,7 @@ int hs_process_load_cfg(const char *lpath, const char *rpath, const char *name)
 
     // move the cfg to the run directory and prepare for start/restart
     if (rename(cfg_lpath, cfg_rpath)) {
-      hs_log(g_module, 3, "failed to move: %s to %s errno: %d", cfg_lpath,
+      hs_log(NULL, g_module, 3, "failed to move: %s to %s errno: %d", cfg_lpath,
              cfg_rpath, errno);
       return -1;
     }
@@ -562,11 +563,11 @@ int hs_process_load_cfg(const char *lpath, const char *rpath, const char *name)
   } else if (hs_has_ext(name, hs_off_ext)) {
     char off_lpath[HS_MAX_PATH];
     if (!hs_get_fqfn(lpath, name, off_lpath, sizeof(off_lpath))) {
-      hs_log(g_module, 0, "load off path too long");
+      hs_log(NULL, g_module, 0, "load off path too long");
       exit(EXIT_FAILURE);
     }
     if (unlink(off_lpath)) {
-      hs_log(g_module, 3, "failed to delete: %s errno: %d", off_lpath,
+      hs_log(NULL, g_module, 3, "failed to delete: %s errno: %d", off_lpath,
              errno);
       return -1;
     }
@@ -574,14 +575,14 @@ int hs_process_load_cfg(const char *lpath, const char *rpath, const char *name)
     // move the current cfg to .off and shutdown the plugin
     char off_rpath[HS_MAX_PATH];
     if (!hs_get_fqfn(rpath, name, off_rpath, sizeof(off_rpath))) {
-      hs_log(g_module, 0, "run off path too long");
+      hs_log(NULL, g_module, 0, "run off path too long");
       exit(EXIT_FAILURE);
     }
     char cfg_rpath[HS_MAX_PATH];
     strcpy(cfg_rpath, off_rpath);
     strcpy(cfg_rpath + strlen(cfg_rpath) - HS_EXT_LEN, hs_cfg_ext);
     if (rename(cfg_rpath, off_rpath)) {
-      hs_log(g_module, 4, "failed to move: %s to %s errno: %d", cfg_rpath,
+      hs_log(NULL, g_module, 4, "failed to move: %s to %s errno: %d", cfg_rpath,
              off_rpath, errno);
       return -1;
     }

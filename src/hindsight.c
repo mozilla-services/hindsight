@@ -71,7 +71,7 @@ int main(int argc, char *argv[])
     return EXIT_FAILURE;
   }
 
-  hs_log(g_module, 6, "starting");
+  hs_log(NULL, g_module, 6, "starting");
   signal(SIGINT, stop_signal);
 
   lsb_message_match_builder *mmb;
@@ -97,7 +97,7 @@ int main(int argc, char *argv[])
   int cnt = 0;
   while (true) {
     if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
-      hs_log(g_module, 3, "clock_gettime failed");
+      hs_log(NULL, g_module, 3, "clock_gettime failed");
       ts.tv_sec = time(NULL);
       ts.tv_nsec = 0;
     }
@@ -107,8 +107,9 @@ int main(int argc, char *argv[])
       break; // shutting down
     }
     hs_write_checkpoints(&cpw, &cfg.cp_reader);
-    if (cfg.load_path[0] != 0 && ++cnt == 59) { // scan just before emitting the stats
-      hs_log(g_module, 7, "scan load directories");
+    if (cfg.load_path[0] != 0 && ++cnt == 59) {
+      // scan just before emitting the stats
+      hs_log(NULL, g_module, 7, "scan load directories");
       hs_load_input_plugins(&ips, &cfg, true);
       hs_load_analysis_plugins(&aps, &cfg, true);
       hs_load_output_plugins(&ops, &cfg, true);
@@ -116,7 +117,7 @@ int main(int argc, char *argv[])
     }
 #ifdef HINDSIGHT_CLI
     if (ips.list_cnt == 0) {
-      hs_log(g_module, 6, "input plugins have exited; "
+      hs_log(NULL, g_module, 6, "input plugins have exited; "
              "cascading shutdown initiated");
       break; // when all the inputs are done, exit
     }
@@ -160,7 +161,7 @@ int main(int argc, char *argv[])
   hs_free_config(&cfg);
   hs_free_log();
 
-  hs_log(g_module, 6, "exiting");
+  hs_log(NULL, g_module, 6, "exiting");
   sem_destroy(&g_shutdown);
   return 0;
 }

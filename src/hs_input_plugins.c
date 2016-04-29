@@ -84,7 +84,7 @@ static bool update_checkpoint(double d, const char *s, hs_ip_checkpoint *cp)
           cp->len = 0;
           cp->cap = 0;
           pthread_mutex_unlock(&cp->lock);
-          hs_log(g_module, 0, "malloc failed");
+          hs_log(NULL, g_module, 0, "malloc failed");
           return false;
         }
         cp->cap = cp->len;
@@ -92,7 +92,8 @@ static bool update_checkpoint(double d, const char *s, hs_ip_checkpoint *cp)
       memcpy(cp->value.s, s, cp->len);
     } else {
       pthread_mutex_unlock(&cp->lock);
-      hs_log(g_module, 3, "chepoint string exceeds %d", HS_MAX_IP_CHECKPOINT);
+      hs_log(NULL, g_module, 3, "checkpoint string exceeds %d",
+             HS_MAX_IP_CHECKPOINT);
       return false;
     }
     pthread_mutex_unlock(&cp->lock);
@@ -135,14 +136,14 @@ static int inject_message(void *parent,
           && p->plugins->output.cp.id - p->plugins->output.min_cp_id
           > p->plugins->cfg->backpressure) {
         backpressure = true;
-        hs_log(g_module, 4, "applying backpressure");
+        hs_log(NULL, g_module, 4, "applying backpressure");
       }
     }
   }
   if (backpressure) {
     if (p->plugins->output.cp.id == p->plugins->output.min_cp_id) {
       backpressure = false;
-      hs_log(g_module, 4, "releasing backpressure");
+      hs_log(NULL, g_module, 4, "releasing backpressure");
     }
   }
   pthread_mutex_unlock(&p->plugins->output.lock);
@@ -159,7 +160,7 @@ static void destroy_input_plugin(hs_input_plugin *p)
   if (!p) return;
   char *msg = lsb_heka_destroy_sandbox(p->hsb);
   if (msg) {
-    hs_log(g_module, 3, "%s lsb_heka_destroy_sandbox failed: %s", p->name, msg);
+    hs_log(NULL, p->name, 3, "lsb_heka_destroy_sandbox failed: %s", msg);
     free(msg);
   }
   free(p->name);
@@ -175,14 +176,14 @@ create_input_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
   char *state_file = NULL;
   char lua_file[HS_MAX_PATH];
   if (!hs_get_fqfn(sbc->dir, sbc->filename, lua_file, sizeof(lua_file))) {
-    hs_log(g_module, 3, "%s failed to construct the lua_file path",
+    hs_log(NULL, g_module, 3, "%s failed to construct the lua_file path",
            sbc->cfg_name);
     return NULL;
   }
 
   hs_input_plugin *p = calloc(1, sizeof(hs_input_plugin));
   if (!p) {
-    hs_log(g_module, 2, "%s hs_input_plugin memory allocation failed",
+    hs_log(NULL, g_module, 2, "%s hs_input_plugin memory allocation failed",
            sbc->cfg_name);
     return NULL;
   }
@@ -192,19 +193,20 @@ create_input_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
 
   if (sem_init(&p->shutdown, 0, 1)) {
     free(p);
-    hs_log(g_module, 3, "%s sem_init failed", sbc->cfg_name);
+    hs_log(NULL, g_module, 3, "%s sem_init failed", sbc->cfg_name);
     return NULL;
   }
   if (sem_wait(&p->shutdown)) {
     destroy_input_plugin(p);
-    hs_log(g_module, 3, "%s sem_wait failed", sbc->cfg_name);
+    hs_log(NULL, g_module, 3, "%s sem_wait failed", sbc->cfg_name);
     return NULL;
   }
 
   size_t len = strlen(sbc->cfg_name) + 1;
   p->name = malloc(len);
   if (!p->name) {
-    hs_log(g_module, 2, "%s name memory allocation failed", sbc->cfg_name);
+    hs_log(NULL, g_module, 2, "%s name memory allocation failed",
+           sbc->cfg_name);
     destroy_input_plugin(p);
   }
   memcpy(p->name, sbc->cfg_name, len);
@@ -213,7 +215,7 @@ create_input_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
     size_t len = strlen(cfg->output_path) + strlen(sbc->cfg_name) + 7;
     state_file = malloc(len);
     if (!state_file) {
-      hs_log(g_module, 2, "%s state_file memory allocation failed",
+      hs_log(NULL, g_module, 2, "%s state_file memory allocation failed",
              sbc->cfg_name);
       destroy_input_plugin(p);
       return NULL;
@@ -221,7 +223,7 @@ create_input_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
     int ret = snprintf(state_file, len, "%s/%s.data", cfg->output_path,
                        sbc->cfg_name);
     if (ret < 0 || ret > (int)len - 1) {
-      hs_log(g_module, 3, "%s failed to construct the state_file path",
+      hs_log(NULL, g_module, 3, "%s failed to construct the state_file path",
              sbc->cfg_name);
       free(state_file);
       destroy_input_plugin(p);
@@ -230,20 +232,21 @@ create_input_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
   }
   lsb_output_buffer ob;
   if (lsb_init_output_buffer(&ob, 8 * 1024)) {
-    hs_log(g_module, 3, "%s configuration memory allocation failed",
+    hs_log(NULL, g_module, 3, "%s configuration memory allocation failed",
            sbc->cfg_name);
     free(state_file);
     destroy_input_plugin(p);
     return NULL;
   }
   if (!hs_get_full_config(&ob, 'i', cfg, sbc)) {
-    hs_log(g_module, 3, "%s hs_get_full_config failed", sbc->cfg_name);
+    hs_log(NULL, g_module, 3, "%s hs_get_full_config failed", sbc->cfg_name);
     lsb_free_output_buffer(&ob);
     free(state_file);
     destroy_input_plugin(p);
     return NULL;
   }
-  p->hsb = lsb_heka_create_input(p, lua_file, state_file, ob.buf, hs_log,
+  lsb_logger logger = {.context = NULL, .cb = hs_log};
+  p->hsb = lsb_heka_create_input(p, lua_file, state_file, ob.buf, &logger,
                                  inject_message);
   lsb_free_output_buffer(&ob);
   free(sbc->cfg_lua);
@@ -251,7 +254,7 @@ create_input_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
   free(state_file);
   if (!p->hsb) {
     destroy_input_plugin(p);
-    hs_log(g_module, 3, "%s lsb_heka_create_input failed", sbc->cfg_name);
+    hs_log(NULL, g_module, 3, "%s lsb_heka_create_input failed", sbc->cfg_name);
     return NULL;
   }
 
@@ -269,7 +272,7 @@ static void* input_thread(void *arg)
   double ncp = NAN;
   const char *scp = NULL;
 
-  hs_log(g_module, 6, "starting: %s", p->name);
+  hs_log(NULL, p->name, 6, "starting");
   while (true) {
     switch (p->cp.type) {
     case HS_CP_STRING:
@@ -290,7 +293,7 @@ static void* input_thread(void *arg)
       if (p->ticker_interval == 0) break; // run once
 
       if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
-        hs_log(g_module, 3, "clock_gettime failed: %s", p->name);
+        hs_log(NULL, p->name, 3, "clock_gettime failed");
         ts.tv_sec = time(NULL);
         ts.tv_nsec = 0;
       }
@@ -316,15 +319,15 @@ static void* input_thread(void *arg)
   hs_update_checkpoint(&p->plugins->cfg->cp_reader, p->name, &p->cp);
 
   if (shutdown) {
-    hs_log(g_module, 6, "shutting down: %s", p->name);
+    hs_log(NULL, p->name, 6, "shutting down");
   } else {
-    hs_log(g_module, 6, "detaching: %s received: %d msg: %s",
-           p->name, ret, lsb_heka_get_error(p->hsb));
+    hs_log(NULL, p->name, 6, "detaching received: %d msg: %s", ret,
+           lsb_heka_get_error(p->hsb));
     pthread_mutex_lock(&p->plugins->list_lock);
     hs_input_plugins *plugins = p->plugins;
     plugins->list[p->list_index] = NULL;
     if (pthread_detach(p->thread)) {
-      hs_log(g_module, 3, "thread could not be detached");
+      hs_log(NULL, p->name, 3, "thread could not be detached");
     }
     destroy_input_plugin(p);
     --plugins->list_cnt;
@@ -338,7 +341,7 @@ static void join_thread(hs_input_plugins *plugins, hs_input_plugin *p)
 {
   struct timespec ts;
   if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
-    hs_log(g_module, 3, "%s clock_gettime failed", p->name);
+    hs_log(NULL, p->name, 3, "clock_gettime failed");
     ts.tv_sec = time(NULL);
     ts.tv_nsec = 0;
   }
@@ -353,14 +356,14 @@ static void join_thread(hs_input_plugins *plugins, hs_input_plugin *p)
       // rather risk the core and have to restart the process instead of leaking
       // the memory or hanging on a plugin stop and having to kill the process
       // anyway (todo: more investigation)
-      hs_log(g_module, 2, "%s join timed out, cancelling the thread", p->name);
+      hs_log(NULL, p->name, 2, "join timed out, cancelling the thread");
       pthread_cancel(p->thread);
       if (pthread_join(p->thread, NULL)) {
-        hs_log(g_module, 2, "%s cancelled thread could not be joined", p->name);
+        hs_log(NULL, p->name, 2, "cancelled thread could not be joined");
       }
       lsb_heka_terminate_sandbox(p->hsb, "thread cancelled");
     } else {
-      hs_log(g_module, 2, "%s thread could not be joined", p->name);
+      hs_log(NULL, p->name, 2, "thread could not be joined");
       lsb_heka_terminate_sandbox(p->hsb, "thread join error");
     }
   }
@@ -436,7 +439,7 @@ static void add_to_input_plugins(hs_input_plugins *plugins, hs_input_plugin *p)
       plugins->list = tmp;
       add_plugin(plugins, p, idx);
     } else {
-      hs_log(g_module, 0, "plugins realloc failed");
+      hs_log(NULL, g_module, 0, "plugins realloc failed");
       exit(EXIT_FAILURE);
     }
   }
@@ -511,16 +514,16 @@ static void process_lua(hs_input_plugins *plugins, const char *lpath,
     if (hs_has_ext(entry->d_name, hs_lua_ext)) {
       // move the Lua to the run directory
       if (!hs_get_fqfn(lpath, entry->d_name, lua_lpath, sizeof(lua_lpath))) {
-        hs_log(g_module, 0, "load lua path too long");
+        hs_log(NULL, g_module, 0, "load lua path too long");
         exit(EXIT_FAILURE);
       }
       if (!hs_get_fqfn(rpath, entry->d_name, lua_rpath, sizeof(lua_rpath))) {
-        hs_log(g_module, 0, "run lua path too long");
+        hs_log(NULL, g_module, 0, "run lua path too long");
         exit(EXIT_FAILURE);
       }
       if (rename(lua_lpath, lua_rpath)) {
-        hs_log(g_module, 3, "failed to move: %s to %s errno: %d", lua_lpath,
-               lua_rpath, errno);
+        hs_log(NULL, g_module, 3, "failed to move: %s to %s errno: %d",
+               lua_lpath, lua_rpath, errno);
         continue;
       }
 
@@ -534,14 +537,14 @@ static void process_lua(hs_input_plugins *plugins, const char *lpath,
           int ret = snprintf(cfg_lpath, HS_MAX_PATH, "%s/%s%s", lpath,
                              p->name + tlen, hs_cfg_ext);
           if (ret < 0 || ret > HS_MAX_PATH - 1) {
-            hs_log(g_module, 0, "load cfg path too long");
+            hs_log(NULL, g_module, 0, "load cfg path too long");
             exit(EXIT_FAILURE);
           }
 
           ret = snprintf(cfg_rpath, HS_MAX_PATH, "%s/%s%s", rpath,
                          p->name + tlen, hs_cfg_ext);
           if (ret < 0 || ret > HS_MAX_PATH - 1) {
-            hs_log(g_module, 0, "run cfg path too long");
+            hs_log(NULL, g_module, 0, "run cfg path too long");
             exit(EXIT_FAILURE);
           }
 
@@ -549,7 +552,7 @@ static void process_lua(hs_input_plugins *plugins, const char *lpath,
           // directory
           if (!hs_file_exists(cfg_lpath)) {
             if (rename(cfg_rpath, cfg_lpath)) {
-              hs_log(g_module, 3, "failed to move: %s to %s errno: %d",
+              hs_log(NULL, g_module, 3, "failed to move: %s to %s errno: %d",
                      cfg_rpath, cfg_lpath, errno);
             }
           }
@@ -568,18 +571,18 @@ void hs_load_input_plugins(hs_input_plugins *plugins, const hs_config *cfg,
   char lpath[HS_MAX_PATH];
   char rpath[HS_MAX_PATH];
   if (!hs_get_fqfn(cfg->load_path, hs_input_dir, lpath, sizeof(lpath))) {
-    hs_log(g_module, 0, "load path too long");
+    hs_log(NULL, g_module, 0, "load path too long");
     exit(EXIT_FAILURE);
   }
   if (!hs_get_fqfn(cfg->run_path, hs_input_dir, rpath, sizeof(rpath))) {
-    hs_log(g_module, 0, "run path too long");
+    hs_log(NULL, g_module, 0, "run path too long");
     exit(EXIT_FAILURE);
   }
 
   const char *dir = dynamic ? lpath : rpath;
   DIR *dp = opendir(dir);
   if (dp == NULL) {
-    hs_log(g_module, 0, "%s: %s", dir, strerror(errno));
+    hs_log(NULL, g_module, 0, "%s: %s", dir, strerror(errno));
     exit(EXIT_FAILURE);
   }
 
@@ -606,7 +609,8 @@ void hs_load_input_plugins(hs_input_plugins *plugins, const hs_config *cfg,
         p->plugins = plugins;
         add_to_input_plugins(plugins, p);
       } else {
-        hs_log(g_module, 3, "%s create_inputs_plugin failed", sbc.cfg_name);
+        hs_log(NULL, g_module, 3, "%s create_inputs_plugin failed",
+               sbc.cfg_name);
       }
       hs_free_sandbox_config(&sbc);
     }

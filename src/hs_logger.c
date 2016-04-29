@@ -39,8 +39,10 @@ void hs_free_log()
 }
 
 
-void hs_log(const char *plugin, int severity, const char *fmt, ...)
+void
+hs_log(void *context, const char *plugin, int severity, const char *fmt, ...)
 {
+  (void)context;
   if (severity > g_loglevel) return;
 
   struct timespec ts;

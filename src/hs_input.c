@@ -26,7 +26,7 @@ int hs_open_file(hs_input *hsi, const char *subdir, unsigned long long id)
   int ret = snprintf(fqfn, sizeof(fqfn), "%s/%s/%llu.log", hsi->path, subdir,
                      id);
   if (ret < 0 || ret > (int)sizeof(fqfn) - 1) {
-    hs_log(g_module, 0, "%s file: %llu.log: fully qualiifed path is"
+    hs_log(NULL, g_module, 0, "%s file: %llu.log: fully qualiifed path is"
            " greater than %zu", hsi->name, hsi->cp.id, sizeof(fqfn));
     exit(EXIT_FAILURE);
   }
@@ -39,18 +39,18 @@ int hs_open_file(hs_input *hsi, const char *subdir, unsigned long long id)
     }
 
     if (hsi->cp.id == id && hsi->cp.offset) {
-      hs_log(g_module, 7, "%s opened file: %s offset: %zu", hsi->name,
+      hs_log(NULL, g_module, 7, "%s opened file: %s offset: %zu", hsi->name,
              fqfn,
              hsi->cp.offset);
       if (fseek(fh, hsi->cp.offset, SEEK_SET)) {
-        hs_log(g_module, 2, "%s file: %s invalid offset: %zu error: %d",
+        hs_log(NULL, g_module, 2, "%s file: %s invalid offset: %zu error: %d",
                hsi->name,
                fqfn,
                hsi->cp.offset,
                ferror(fh));
       }
     } else {
-      hs_log(g_module, 7, "%s opened file: %s", hsi->name, fqfn);
+      hs_log(NULL, g_module, 7, "%s opened file: %s", hsi->name, fqfn);
     }
 
     if (hsi->fh) {
@@ -65,7 +65,7 @@ int hs_open_file(hs_input *hsi, const char *subdir, unsigned long long id)
       hsi->fn_size = (size_t)(ret + 1);
       hsi->fn = malloc(hsi->fn_size);
       if (!hsi->fn) {
-        hs_log(g_module, 2, "%s file: %s malloc failed", hsi->name,
+        hs_log(NULL, g_module, 2, "%s file: %s malloc failed", hsi->name,
                fqfn);
         exit(EXIT_FAILURE);
       }
@@ -89,7 +89,7 @@ size_t hs_read_file(hs_input *hsi)
   }
 
   if (lsb_expand_input_buffer(ib, need)) {
-    hs_log(g_module, 0, "%s buffer reallocation failed", hsi->name);
+    hs_log(NULL, g_module, 0, "%s buffer reallocation failed", hsi->name);
     exit(EXIT_FAILURE);
   }
   size_t nread = fread(ib->buf + ib->readpos,
@@ -111,20 +111,20 @@ void hs_init_input(hs_input *hsi, size_t max_message_size, const char *path,
   hsi->cp.id = 0;
   hsi->cp.offset = 0;
   if (strlen(path) > HS_MAX_PATH - 30) {
-    hs_log(g_module, 0, "path too long");
+    hs_log(NULL, g_module, 0, "path too long");
     exit(EXIT_FAILURE);
   }
 
   hsi->path = malloc(strlen(path) + 1);
   if (!hsi->path) {
-    hs_log(g_module, 0, "path malloc failed");
+    hs_log(NULL, g_module, 0, "path malloc failed");
     exit(EXIT_FAILURE);
   }
   strcpy(hsi->path, path);
 
   hsi->name = malloc(strlen(name) + 1);
   if (!hsi->name) {
-    hs_log(g_module, 0, "name malloc failed");
+    hs_log(NULL, g_module, 0, "name malloc failed");
     exit(EXIT_FAILURE);
   }
   strcpy(hsi->name, name);

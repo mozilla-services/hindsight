@@ -35,25 +35,25 @@ void hs_init_checkpoint_writer(hs_checkpoint_writer *cpw,
 
   char fqfn[HS_MAX_PATH];
   if (!hs_get_fqfn(path, "hindsight.cp", fqfn, sizeof(fqfn))) {
-    hs_log(g_module, 0, "checkpoint name exceeds the max length: %d",
+    hs_log(NULL, g_module, 0, "checkpoint name exceeds the max length: %d",
            sizeof(fqfn));
     exit(EXIT_FAILURE);
   }
 
   cpw->fh = fopen(fqfn, "wb");
   if (!cpw->fh) {
-    hs_log(g_module, 0, "%s: %s", fqfn, strerror(errno));
+    hs_log(NULL, g_module, 0, "%s: %s", fqfn, strerror(errno));
     exit(EXIT_FAILURE);
   }
 
   if (!hs_get_fqfn(path, "hindsight.tsv", fqfn, sizeof(fqfn))) {
-    hs_log(g_module, 0, "tsv name exceeds the max length: %d",
+    hs_log(NULL, g_module, 0, "tsv name exceeds the max length: %d",
            sizeof(fqfn));
     exit(EXIT_FAILURE);
   }
   cpw->tsv_path = malloc(strlen(fqfn) + 1);
   if (!cpw->tsv_path) {
-    hs_log(g_module, 0, "tsv_path malloc failed");
+    hs_log(NULL, g_module, 0, "tsv_path malloc failed");
     exit(EXIT_FAILURE);
   }
   strcpy(cpw->tsv_path, fqfn);
@@ -234,7 +234,7 @@ void hs_write_checkpoints(hs_checkpoint_writer *cpw, hs_checkpoint_reader *cpr)
 
   cpw->fh = freopen(NULL, "wb", cpw->fh);
   if (!cpw->fh) {
-    hs_log(g_module, 0, "checkpoint_writer freopen() error: %d",
+    hs_log(NULL, g_module, 0, "checkpoint_writer freopen() error: %d",
            ferror(cpw->fh));
     exit(EXIT_FAILURE);
   }

@@ -33,10 +33,11 @@ void hs_free_log();
 /**
  * Hindsight log writer
  *
+ * @param context
  * @param plugin
  * @param level
  * @param fmt
  */
-void hs_log(const char *plugin, int level, const char *fmt, ...);
+void hs_log(void *context, const char *plugin, int level, const char *fmt, ...);
 
 #endif

@@ -40,7 +40,7 @@ static size_t find_first_id(const char *path)
   struct dirent *entry;
   DIR *dp = opendir(path);
   if (dp == NULL) {
-    hs_log(g_module, 0, "path does not exist: %s", path);
+    hs_log(NULL, g_module, 0, "path does not exist: %s", path);
     exit(EXIT_FAILURE);
   }
 
@@ -61,14 +61,14 @@ void hs_init_checkpoint_reader(hs_checkpoint_reader *cpr, const char *path)
 {
   char fqfn[HS_MAX_PATH];
   if (!hs_get_fqfn(path, "hindsight.cp", fqfn, sizeof(fqfn))) {
-    hs_log(g_module, 0, "checkpoint name exceeds the max length: %d",
+    hs_log(NULL, g_module, 0, "checkpoint name exceeds the max length: %d",
            sizeof(fqfn));
     exit(EXIT_FAILURE);
   }
 
   cpr->values = luaL_newstate();
   if (!cpr->values) {
-    hs_log(g_module, 0, "checkpoint_reader luaL_newstate failed");
+    hs_log(NULL, g_module, 0, "checkpoint_reader luaL_newstate failed");
     exit(EXIT_FAILURE);
   } else {
     lua_pushvalue(cpr->values, LUA_GLOBALSINDEX);
@@ -77,7 +77,7 @@ void hs_init_checkpoint_reader(hs_checkpoint_reader *cpr, const char *path)
 
   if (hs_file_exists(fqfn)) {
     if (luaL_dofile(cpr->values, fqfn)) {
-      hs_log(g_module, 0, "loading %s failed: %s", fqfn,
+      hs_log(NULL, g_module, 0, "loading %s failed: %s", fqfn,
              lua_tostring(cpr->values, -1));
       exit(EXIT_FAILURE);
     }
@@ -117,7 +117,7 @@ bool hs_load_checkpoint(lua_State *L, int idx, hs_ip_checkpoint *cp)
         if (!cp->value.s) {
           cp->len = 0;
           cp->cap = 0;
-          hs_log(g_module, 0, "malloc failed");
+          hs_log(NULL, g_module, 0, "malloc failed");
           pthread_mutex_unlock(&cp->lock);
           return false;
         }
@@ -211,7 +211,7 @@ void hs_lookup_input_checkpoint(hs_checkpoint_reader *cpr,
   if (!pos) {
     char fqfn[HS_MAX_PATH];
     if (!hs_get_fqfn(path, subdir, fqfn, sizeof(fqfn))) {
-      hs_log(g_module, 0, "checkpoint name exceeds the max length: %d",
+      hs_log(NULL, g_module, 0, "checkpoint name exceeds the max length: %d",
              sizeof(fqfn));
       exit(EXIT_FAILURE);
     }
