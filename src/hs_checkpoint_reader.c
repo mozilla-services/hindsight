@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "hs_config.h"
 #include "hs_logger.h"
 #include "hs_util.h"
 
@@ -54,6 +55,15 @@ static size_t find_first_id(const char *path)
   }
   closedir(dp);
   return file_id == ULLONG_MAX ? 0 : file_id;
+}
+
+
+static void remove_checkpoint(hs_checkpoint_reader *cpr,
+                              const char *key)
+{
+  lua_pushnil(cpr->values);
+  lua_setfield(cpr->values, LUA_GLOBALSINDEX, key);
+  hs_log(NULL, g_module, 6, "checkpoint removed: %s", key);
 }
 
 
@@ -251,6 +261,58 @@ void hs_output_checkpoints(hs_checkpoint_reader *cpr, FILE *fh)
       case LUA_TNUMBER:
         fprintf(fh, "_G['%s'] = %.17g\n", key, lua_tonumber(cpr->values, -1));
         break;
+      }
+    }
+    lua_pop(cpr->values, 1);
+  }
+  pthread_mutex_unlock(&cpr->lock);
+}
+
+
+void hs_remove_checkpoint(hs_checkpoint_reader *cpr,
+                          const char *key)
+{
+  pthread_mutex_lock(&cpr->lock);
+  remove_checkpoint(cpr, key);
+  pthread_mutex_unlock(&cpr->lock);
+}
+
+
+void hs_cleanup_checkpoints(hs_checkpoint_reader *cpr,
+                            const char *run_path,
+                            int analysis_threads)
+{
+  const char *key;
+  const char *subkey;
+  int analysis_thread;
+  char type[HS_MAX_PATH];
+  char name[HS_MAX_PATH];
+  char path[HS_MAX_PATH];
+
+  pthread_mutex_lock(&cpr->lock);
+  lua_pushnil(cpr->values);
+  while (lua_next(cpr->values, LUA_GLOBALSINDEX) != 0) {
+    if (lua_type(cpr->values, -2) == LUA_TSTRING) {
+      key = lua_tostring(cpr->values, -2);
+      subkey = strstr(key, "->");
+      subkey = subkey ? subkey + strlen("->") : key;
+      if (sscanf(subkey, "analysis%d", &analysis_thread) == 1) {
+        if (analysis_thread >= analysis_threads) {
+          // analysis thread does not exist anymore
+          remove_checkpoint(cpr, key);
+        }
+      }
+      else if (sscanf(subkey, "%[^.].%s", type, name) == 2) {
+        int ret = snprintf(path, HS_MAX_PATH, "%s/%s/%s%s", run_path,
+                           type, name, hs_cfg_ext);
+        if (ret < 0 || ret > (int)sizeof(path) - 1) {
+          hs_log(NULL, g_module, 0, "path too long");
+          exit(EXIT_FAILURE);
+        }
+        if (!hs_file_exists(path)) {
+          // plugin does not exist anymore
+          remove_checkpoint(cpr, key);
+        }
       }
     }
     lua_pop(cpr->values, 1);
