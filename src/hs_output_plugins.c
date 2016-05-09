@@ -89,8 +89,7 @@ static int update_checkpoint_callback(void *parent, void *sequence_id)
 
 
 static hs_output_plugin*
-create_output_plugin(lsb_message_match_builder *mmb, const hs_config *cfg,
-                     hs_sandbox_config *sbc)
+create_output_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
 {
   char *state_file = NULL;
   char lua_file[HS_MAX_PATH];
@@ -133,7 +132,7 @@ create_output_plugin(lsb_message_match_builder *mmb, const hs_config *cfg,
     }
   }
 
-  p->mm = lsb_create_message_matcher(mmb, sbc->message_matcher);
+  p->mm = lsb_create_message_matcher(sbc->message_matcher);
   if (!p->mm) {
     hs_log(NULL, g_module, 3, "%s invalid message_matcher: %s", sbc->cfg_name,
            sbc->message_matcher);
@@ -552,12 +551,9 @@ static void add_to_output_plugins(hs_output_plugins *plugins,
 }
 
 
-void hs_init_output_plugins(hs_output_plugins *plugins,
-                            hs_config *cfg,
-                            lsb_message_match_builder *mmb)
+void hs_init_output_plugins(hs_output_plugins *plugins, hs_config *cfg)
 {
   plugins->cfg = cfg;
-  plugins->mmb = mmb;
   plugins->list = NULL;
   plugins->list_cnt = 0;
   plugins->list_cap = 0;
@@ -708,7 +704,7 @@ void hs_load_output_plugins(hs_output_plugins *plugins, const hs_config *cfg,
     }
     hs_sandbox_config sbc;
     if (hs_load_sandbox_config(rpath, entry->d_name, &sbc, &cfg->opd, 'o')) {
-      hs_output_plugin *p = create_output_plugin(plugins->mmb, cfg, &sbc);
+      hs_output_plugin *p = create_output_plugin(cfg, &sbc);
       if (p) {
         p->plugins = plugins;
         hs_init_input(&p->input, cfg->max_message_size, cfg->output_path,

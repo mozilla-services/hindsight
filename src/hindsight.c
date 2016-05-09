@@ -74,20 +74,17 @@ int main(int argc, char *argv[])
   hs_log(NULL, g_module, 6, "starting");
   signal(SIGINT, stop_signal);
 
-  lsb_message_match_builder *mmb;
-  mmb = lsb_create_message_match_builder(cfg.analysis_lua_path,
-                                         cfg.analysis_lua_cpath);
   hs_input_plugins ips;
   hs_init_input_plugins(&ips, &cfg);
   hs_load_input_plugins(&ips, &cfg, false);
 
   hs_analysis_plugins aps;
-  hs_init_analysis_plugins(&aps, &cfg, mmb);
+  hs_init_analysis_plugins(&aps, &cfg);
   hs_load_analysis_plugins(&aps, &cfg, false);
   hs_start_analysis_threads(&aps);
 
   hs_output_plugins ops;
-  hs_init_output_plugins(&ops, &cfg, mmb);
+  hs_init_output_plugins(&ops, &cfg);
   hs_load_output_plugins(&ops, &cfg, false);
 
   hs_checkpoint_writer cpw;
@@ -156,7 +153,6 @@ int main(int argc, char *argv[])
   hs_free_output_plugins(&ops);
 #endif
 
-  lsb_destroy_message_match_builder(mmb);
   hs_free_checkpoint_writer(&cpw);
   hs_free_config(&cfg);
   hs_free_log();

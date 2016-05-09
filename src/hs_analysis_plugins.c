@@ -85,8 +85,7 @@ static void destroy_analysis_plugin(hs_analysis_plugin *p)
 
 
 static hs_analysis_plugin*
-create_analysis_plugin(lsb_message_match_builder *mmb, const hs_config *cfg,
-                       hs_sandbox_config *sbc)
+create_analysis_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
 {
   char *state_file = NULL;
 
@@ -111,7 +110,7 @@ create_analysis_plugin(lsb_message_match_builder *mmb, const hs_config *cfg,
     p->ticker_expires = time(NULL) + rand() % stagger;
   }
 
-  p->mm = lsb_create_message_matcher(mmb, sbc->message_matcher);
+  p->mm = lsb_create_message_matcher(sbc->message_matcher);
   if (!p->mm) {
     hs_log(NULL, g_module, 3, "%s invalid message_matcher: %s", sbc->cfg_name,
            sbc->message_matcher);
@@ -465,9 +464,7 @@ static void* input_thread(void *arg)
 }
 
 
-void hs_init_analysis_plugins(hs_analysis_plugins *plugins,
-                              hs_config *cfg,
-                              lsb_message_match_builder *mmb)
+void hs_init_analysis_plugins(hs_analysis_plugins *plugins, hs_config *cfg)
 {
   hs_init_output(&plugins->output, cfg->output_path, hs_analysis_dir);
 
@@ -475,7 +472,6 @@ void hs_init_analysis_plugins(hs_analysis_plugins *plugins,
   plugins->cfg = cfg;
   plugins->stop = false;
   plugins->sample = false;
-  plugins->mmb = mmb;
 
   plugins->list = malloc(sizeof(hs_analysis_thread) * cfg->analysis_threads);
   for (unsigned i = 0; i < cfg->analysis_threads; ++i) {
@@ -688,7 +684,7 @@ void hs_load_analysis_plugins(hs_analysis_plugins *plugins,
 
     hs_sandbox_config sbc;
     if (hs_load_sandbox_config(rpath, entry->d_name, &sbc, &cfg->apd, 'a')) {
-      hs_analysis_plugin *p = create_analysis_plugin(plugins->mmb, cfg, &sbc);
+      hs_analysis_plugin *p = create_analysis_plugin(cfg, &sbc);
       if (p) {
         add_to_analysis_plugins(&sbc, plugins, p);
       } else {

@@ -9,9 +9,9 @@
 #ifndef hs_analysis_plugins_h_
 #define hs_analysis_plugins_h_
 
-#include <luasandbox/heka/message_matcher.h>
 #include <luasandbox/heka/sandbox.h>
 #include <luasandbox/util/heka_message.h>
+#include <luasandbox/util/heka_message_matcher.h>
 #include <luasandbox/util/running_stats.h>
 #include <pthread.h>
 #include <stdbool.h>
@@ -40,7 +40,6 @@ struct hs_analysis_plugins {
   hs_analysis_thread *list;
   pthread_t *threads;
   hs_config *cfg;
-  lsb_message_match_builder *mmb;
 
   int thread_cnt;
   bool stop;
@@ -66,9 +65,7 @@ struct hs_analysis_thread {
   hs_input input;
 };
 
-void hs_init_analysis_plugins(hs_analysis_plugins *plugins,
-                              hs_config *cfg,
-                              lsb_message_match_builder *mmb);
+void hs_init_analysis_plugins(hs_analysis_plugins *plugins, hs_config *cfg);
 
 void hs_free_analysis_plugins(hs_analysis_plugins *plugins);
 

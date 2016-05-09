@@ -17,6 +17,7 @@ the same lua sandbox offering 'at least once' delivery semantics.
 
 * Clang 3.1 or GCC 4.7+
 * CMake (3.0+) - http://cmake.org/cmake/resources/software.html
+* lua_sandbox (0.19.0+) - https://github.com/mozilla-services/lua_sandbox
 
 ### CMake Build Instructions
 

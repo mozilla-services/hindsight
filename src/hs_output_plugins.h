@@ -10,8 +10,8 @@
 #define hs_output_plugins_h_
 
 #include <luasandbox/heka/sandbox.h>
-#include <luasandbox/heka/message_matcher.h>
 #include <luasandbox/util/heka_message.h>
+#include <luasandbox/util/heka_message_matcher.h>
 #include <luasandbox/util/running_stats.h>
 #include <pthread.h>
 #include <semaphore.h>
@@ -54,7 +54,6 @@ struct hs_output_plugin {
 struct hs_output_plugins {
   hs_output_plugin **list;
   hs_config *cfg;
-  lsb_message_match_builder *mmb;
 
   int list_cnt;
   int list_cap;
@@ -62,9 +61,7 @@ struct hs_output_plugins {
   pthread_mutex_t list_lock;
 };
 
-void hs_init_output_plugins(hs_output_plugins *plugins,
-                            hs_config *cfg,
-                            lsb_message_match_builder *mmb);
+void hs_init_output_plugins(hs_output_plugins *plugins, hs_config *cfg);
 
 void hs_free_output_plugins(hs_output_plugins *plugins);
 
