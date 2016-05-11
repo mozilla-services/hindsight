@@ -55,6 +55,7 @@ static const char *cfg_sb_ticker_interval = "ticker_interval";
 static const char *cfg_sb_thread = "thread";
 static const char *cfg_sb_async_buffer = "async_buffer_size";
 static const char *cfg_sb_matcher = "message_matcher";
+static const char *cfg_sb_checkpoint_newest = "initial_checkpoint_newest";
 
 static void init_sandbox_config(hs_sandbox_config *cfg)
 {
@@ -70,6 +71,7 @@ static void init_sandbox_config(hs_sandbox_config *cfg)
   cfg->ticker_interval = 0;
   cfg->thread = 0;
   cfg->async_buffer_size = 0;
+  cfg->checkpoint_newest = false;
 }
 
 
@@ -391,6 +393,10 @@ bool hs_load_sandbox_config(const char *dir,
   if (type == 'o') {
     ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_sb_async_buffer,
                            &cfg->async_buffer_size);
+    if (ret) goto cleanup;
+
+    ret = get_bool_item(L, LUA_GLOBALSINDEX, cfg_sb_checkpoint_newest,
+                        &cfg->checkpoint_newest);
     if (ret) goto cleanup;
   }
 
