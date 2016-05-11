@@ -419,12 +419,13 @@ static void* input_thread(void *arg)
   lsb_free_heka_message(&im);
 
   // hold the current checkpoints in memory incase we restart it
-  hs_update_input_checkpoint(&p->plugins->cfg->cp_reader,
+  hs_output_plugins *plugins = p->plugins;
+  hs_update_input_checkpoint(&plugins->cfg->cp_reader,
                              hs_input_dir,
                              p->name,
                              &p->cp.input);
 
-  hs_update_input_checkpoint(&p->plugins->cfg->cp_reader,
+  hs_update_input_checkpoint(&plugins->cfg->cp_reader,
                              hs_analysis_dir,
                              p->name,
                              &p->cp.analysis);
@@ -434,8 +435,14 @@ static void* input_thread(void *arg)
   } else {
     hs_log(NULL, p->name, 6, "detaching received: %d msg: %s", ret,
            lsb_heka_get_error(p->hsb));
-    pthread_mutex_lock(&p->plugins->list_lock);
-    hs_output_plugins *plugins = p->plugins;
+    if (plugins->cfg->rm_checkpoint) {
+      char key[HS_MAX_PATH];
+      snprintf(key, HS_MAX_PATH, "%s->%s", hs_input_dir, p->name);
+      hs_remove_checkpoint(&plugins->cfg->cp_reader, key);
+      snprintf(key, HS_MAX_PATH, "%s->%s", hs_analysis_dir, p->name);
+      hs_remove_checkpoint(&plugins->cfg->cp_reader, key);
+    }
+    pthread_mutex_lock(&plugins->list_lock);
     plugins->list[p->list_index] = NULL;
     if (pthread_detach(p->thread)) {
       hs_log(NULL, p->name, 3, "thread could not be detached");
@@ -465,13 +472,24 @@ static void remove_from_output_plugins(hs_output_plugins *plugins,
                                        const char *name)
 {
   const size_t tlen = strlen(hs_output_dir) + 1;
+  hs_output_plugin *p;
   pthread_mutex_lock(&plugins->list_lock);
   for (int i = 0; i < plugins->list_cap; ++i) {
-    if (!plugins->list[i]) continue;
+    p = plugins->list[i];
+    if (!p) continue;
 
-    char *pos = plugins->list[i]->name + tlen;
+    char *pos = p->name + tlen;
     if (strstr(name, pos) && strlen(pos) == strlen(name) - HS_EXT_LEN) {
       remove_plugin(plugins, i);
+      if (plugins->cfg->rm_checkpoint) {
+        char key[HS_MAX_PATH];
+        snprintf(key, HS_MAX_PATH, "%s->%s.%.*s", hs_input_dir,
+                 hs_output_dir, (int)strlen(name) - HS_EXT_LEN, name);
+        hs_remove_checkpoint(&plugins->cfg->cp_reader, key);
+        snprintf(key, HS_MAX_PATH, "%s->%s.%.*s", hs_analysis_dir,
+                 hs_output_dir, (int)strlen(name) - HS_EXT_LEN, name);
+        hs_remove_checkpoint(&plugins->cfg->cp_reader, key);
+      }
       break;
     }
   }

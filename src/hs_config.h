@@ -56,6 +56,7 @@ typedef struct hs_config
   unsigned output_size;
   unsigned analysis_threads;
   unsigned backpressure;
+  bool rm_checkpoint;
   int pid;
   hs_checkpoint_reader cp_reader;
   hs_sandbox_config ipd; // input plugin defaults

@@ -30,6 +30,8 @@
   are both on the same file (count, default 0 (no backpressure))
   e.g. backpressure = 10 [writer = 100.log, slowest reader = 89.log, delta = 11]
 * **hostname** - hostname used in logging/messages (default gethostname())
+* **remove_checkpoint_on_stop** - removes the checkpoint entry when the plugin
+  is stopped, terminated, or has been manually removed (default false)
 
 ```lua
 output_path             = "output"

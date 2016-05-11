@@ -71,6 +71,11 @@ int main(int argc, char *argv[])
     return EXIT_FAILURE;
   }
 
+  if (cfg.rm_checkpoint) {
+    hs_cleanup_checkpoints(&cfg.cp_reader, cfg.run_path,
+                           cfg.analysis_threads);
+  }
+
   hs_log(NULL, g_module, 6, "starting");
   signal(SIGINT, stop_signal);
 

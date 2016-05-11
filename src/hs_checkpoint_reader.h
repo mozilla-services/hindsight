@@ -77,4 +77,11 @@ void hs_update_input_checkpoint(hs_checkpoint_reader *cpr,
 
 void hs_output_checkpoints(hs_checkpoint_reader *cpr, FILE *fh);
 
+void hs_remove_checkpoint(hs_checkpoint_reader *cpr,
+                                const char *key);
+
+void hs_cleanup_checkpoints(hs_checkpoint_reader *cpr,
+                                  const char *run_path,
+                                  int analysis_threads);
+
 #endif
