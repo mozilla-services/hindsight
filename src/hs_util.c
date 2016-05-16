@@ -13,7 +13,7 @@
 
 bool hs_file_exists(const char *fn)
 {
-  FILE *fh = fopen(fn, "r");
+  FILE *fh = fopen(fn, "re");
   if (fh) {
     fclose(fh);
     return 1;

@@ -18,11 +18,13 @@
 #include "hs_output.h"
 
 typedef struct hs_checkpoint_writer {
-  FILE *fh;
   hs_analysis_plugins *analysis_plugins;
   hs_input_plugins *input_plugins;
   hs_output_plugins *output_plugins;
+  char *cp_path;
   char *tsv_path;
+  char *cp_path_tmp;
+  char *tsv_path_tmp;
 } hs_checkpoint_writer;
 
 void hs_init_checkpoint_writer(hs_checkpoint_writer *cpw,

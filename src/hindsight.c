@@ -32,11 +32,25 @@ static const char g_module[] = "hindsight";
 static sem_t g_shutdown;
 
 
-static void stop_signal(int sig)
+void* sig_handler(void *arg)
 {
-  fprintf(stderr, "stop signal received %d\n", sig);
-  signal(SIGINT, SIG_DFL);
-  sem_post(&g_shutdown);
+  (void)arg;
+  int sig;
+  sigset_t signal_set;
+  sigemptyset(&signal_set);
+  sigaddset(&signal_set, SIGINT);
+
+  for (;;) {
+    sigwait(&signal_set, &sig);
+    if (sig == SIGINT) {
+      hs_log(NULL, g_module, 6, "stop signal received");
+      sem_post(&g_shutdown);
+      break;
+    } else {
+      hs_log(NULL, g_module, 6, "unexpected signal received %d", sig);
+    }
+  }
+  return (void *)0;
 }
 
 
@@ -77,7 +91,17 @@ int main(int argc, char *argv[])
   }
 
   hs_log(NULL, g_module, 6, "starting");
-  signal(SIGINT, stop_signal);
+  sigset_t signal_set;
+  sigfillset(&signal_set);
+  if (pthread_sigmask(SIG_SETMASK, &signal_set, NULL)) {
+    perror("pthread_sigmask failed");
+    exit(EXIT_FAILURE);
+  }
+  pthread_t sig_thread;
+  if (pthread_create(&sig_thread, NULL, sig_handler, NULL)) {
+    hs_log(NULL, g_module, 1, "signal handler could not be setup");
+    return EXIT_FAILURE;
+  }
 
   hs_input_plugins ips;
   hs_init_input_plugins(&ips, &cfg);
@@ -121,7 +145,7 @@ int main(int argc, char *argv[])
     if (ips.list_cnt == 0) {
       hs_log(NULL, g_module, 6, "input plugins have exited; "
              "cascading shutdown initiated");
-      break; // when all the inputs are done, exit
+      pthread_kill(sig_thread, SIGINT); // when all the inputs are done, exit
     }
 #endif
   }
@@ -162,6 +186,7 @@ int main(int argc, char *argv[])
   hs_free_config(&cfg);
   hs_free_log();
 
+  pthread_join(sig_thread, NULL);
   hs_log(NULL, g_module, 6, "exiting");
   sem_destroy(&g_shutdown);
   return 0;

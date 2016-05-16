@@ -23,6 +23,24 @@
 static const char g_module[] = "checkpoint_writer";
 
 
+static void
+allocate_filename(const char *path, const char *name, char **filename)
+{
+  char fqfn[HS_MAX_PATH];
+  if (!hs_get_fqfn(path, name, fqfn, sizeof(fqfn))) {
+    hs_log(NULL, g_module, 0, "%s/%s exceeds the max length: %d", path, name,
+           sizeof(fqfn));
+    exit(EXIT_FAILURE);
+  }
+  *filename = malloc(strlen(fqfn) + 1);
+  if (!*filename) {
+    hs_log(NULL, g_module, 0, "%s/%s malloc failed", path, name);
+    exit(EXIT_FAILURE);
+  }
+  strcpy(*filename, fqfn);
+}
+
+
 void hs_init_checkpoint_writer(hs_checkpoint_writer *cpw,
                                hs_input_plugins *ip,
                                hs_analysis_plugins *ap,
@@ -32,43 +50,26 @@ void hs_init_checkpoint_writer(hs_checkpoint_writer *cpw,
   cpw->input_plugins = ip;
   cpw->analysis_plugins = ap;
   cpw->output_plugins = op;
-
-  char fqfn[HS_MAX_PATH];
-  if (!hs_get_fqfn(path, "hindsight.cp", fqfn, sizeof(fqfn))) {
-    hs_log(NULL, g_module, 0, "checkpoint name exceeds the max length: %d",
-           sizeof(fqfn));
-    exit(EXIT_FAILURE);
-  }
-
-  cpw->fh = fopen(fqfn, "wb");
-  if (!cpw->fh) {
-    hs_log(NULL, g_module, 0, "%s: %s", fqfn, strerror(errno));
-    exit(EXIT_FAILURE);
-  }
-
-  if (!hs_get_fqfn(path, "hindsight.tsv", fqfn, sizeof(fqfn))) {
-    hs_log(NULL, g_module, 0, "tsv name exceeds the max length: %d",
-           sizeof(fqfn));
-    exit(EXIT_FAILURE);
-  }
-  cpw->tsv_path = malloc(strlen(fqfn) + 1);
-  if (!cpw->tsv_path) {
-    hs_log(NULL, g_module, 0, "tsv_path malloc failed");
-    exit(EXIT_FAILURE);
-  }
-  strcpy(cpw->tsv_path, fqfn);
+  allocate_filename(path, "hindsight.cp", &cpw->cp_path);
+  allocate_filename(path, "hindsight.cp.tmp", &cpw->cp_path_tmp);
+  allocate_filename(path, "hindsight.tsv", &cpw->tsv_path);
+  allocate_filename(path, "hindsight.tsv.tmp", &cpw->tsv_path_tmp);
 }
 
 
 void hs_free_checkpoint_writer(hs_checkpoint_writer *cpw)
 {
-  if (cpw->fh) fclose(cpw->fh);
-  cpw->fh = NULL;
   cpw->analysis_plugins = NULL;
   cpw->input_plugins = NULL;
   cpw->output_plugins = NULL;
+  free(cpw->cp_path);
+  cpw->cp_path = NULL;
   free(cpw->tsv_path);
   cpw->tsv_path = NULL;
+  free(cpw->cp_path_tmp);
+  cpw->cp_path_tmp = NULL;
+  free(cpw->tsv_path_tmp);
+  cpw->tsv_path_tmp = NULL;
 }
 
 
@@ -80,7 +81,7 @@ void hs_write_checkpoints(hs_checkpoint_writer *cpw, hs_checkpoint_reader *cpr)
   FILE *tsv = NULL;
   bool sample = (cnt % 6 == 0); // sample performance 10 times a minute
   if (cnt == 0) { // write the stats once a minute just after the load
-    tsv = fopen(cpw->tsv_path, "wb");
+    tsv = fopen(cpw->tsv_path_tmp, "we");
     if (tsv) {
       fprintf(tsv, "Plugin\t"
               "Inject Message Count\tInject Message Bytes\t"
@@ -221,7 +222,10 @@ void hs_write_checkpoints(hs_checkpoint_writer *cpw, hs_checkpoint_reader *cpr)
     }
     pthread_mutex_unlock(&cpw->output_plugins->list_lock);
   }
-  if (tsv) fclose(tsv);
+  if (tsv) {
+    fclose(tsv);
+    rename(cpw->tsv_path_tmp, cpw->tsv_path);
+  }
   if (++cnt == 60) cnt = 0;
 
   if (cpw->input_plugins) {
@@ -232,12 +236,12 @@ void hs_write_checkpoints(hs_checkpoint_writer *cpw, hs_checkpoint_reader *cpr)
     cpw->analysis_plugins->output.min_cp_id = min_analysis_id;
   }
 
-  cpw->fh = freopen(NULL, "wb", cpw->fh);
-  if (!cpw->fh) {
-    hs_log(NULL, g_module, 0, "checkpoint_writer freopen() error: %d",
-           ferror(cpw->fh));
+  FILE *cp = fopen(cpw->cp_path_tmp, "we");
+  if (!cp) {
+    hs_log(NULL, g_module, 0, "%s: %s", cpw->cp_path_tmp, strerror(errno));
     exit(EXIT_FAILURE);
   }
-  hs_output_checkpoints(cpr, cpw->fh);
-  fflush(cpw->fh);
+  hs_output_checkpoints(cpr, cp);
+  fclose(cp);
+  rename(cpw->cp_path_tmp, cpw->cp_path);
 }

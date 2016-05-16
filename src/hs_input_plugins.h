@@ -30,11 +30,12 @@ struct hs_input_plugin {
   int               list_index;
   hs_ip_checkpoint  cp;
   sem_t             shutdown;
+  bool              orphaned;
 };
 
 struct hs_input_plugins {
   hs_input_plugin **list;
-  hs_config *cfg;
+  hs_config       *cfg;
 
   pthread_mutex_t list_lock;
   int list_cnt;
@@ -43,8 +44,7 @@ struct hs_input_plugins {
   hs_output output;
 };
 
-void hs_init_input_plugins(hs_input_plugins *plugins,
-                           hs_config *cfg);
+void hs_init_input_plugins(hs_input_plugins *plugins, hs_config *cfg);
 
 void hs_free_input_plugins(hs_input_plugins *plugins);
 

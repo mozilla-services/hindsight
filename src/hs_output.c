@@ -112,7 +112,7 @@ void hs_open_output_file(hs_output *output)
     hs_log(NULL, g_module, 0, "output filename exceeds %zu", sizeof(fqfn));
     exit(EXIT_FAILURE);
   }
-  output->fh = fopen(fqfn, "ab+");
+  output->fh = fopen(fqfn, "a+e");
   if (!output->fh) {
     hs_log(NULL, g_module, 0, "%s: %s", fqfn, strerror(errno));
     exit(EXIT_FAILURE);

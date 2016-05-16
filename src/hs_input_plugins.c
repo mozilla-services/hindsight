@@ -31,6 +31,7 @@
 
 static const char g_module[] = "input_plugins";
 
+
 static void init_ip_checkpoint(hs_ip_checkpoint *cp)
 {
   if (pthread_mutex_init(&cp->lock, NULL)) {
@@ -245,7 +246,7 @@ create_input_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
     destroy_input_plugin(p);
     return NULL;
   }
-  lsb_logger logger = {.context = NULL, .cb = hs_log};
+  lsb_logger logger = { .context = NULL, .cb = hs_log };
   p->hsb = lsb_heka_create_input(p, lua_file, state_file, ob.buf, &logger,
                                  inject_message);
   lsb_free_output_buffer(&ob);
@@ -308,15 +309,18 @@ static void* input_thread(void *arg)
       if (!sem_trywait(&p->shutdown)) {
         sem_post(&p->shutdown);
         shutdown = true;
-        break; // shutting down
       }
       break; // exiting due to error
     }
   }
 
+  if (p->orphaned) {
+    pthread_exit(NULL);
+  }
+
   hs_input_plugins *plugins = p->plugins;
-  // hold the current checkpoint in memory until we shutdown
-  // to facilitate resuming where it left off
+  // hold the current checkpoint in memory until we shutdown to facilitate
+  // resuming where it left off
   hs_update_checkpoint(&plugins->cfg->cp_reader, p->name, &p->cp);
 
   if (shutdown) {
@@ -340,7 +344,7 @@ static void* input_thread(void *arg)
 }
 
 
-static void join_thread(hs_input_plugins *plugins, hs_input_plugin *p)
+static bool join_thread(hs_input_plugins *plugins, hs_input_plugin *p)
 {
   struct timespec ts;
   if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
@@ -349,45 +353,32 @@ static void join_thread(hs_input_plugins *plugins, hs_input_plugin *p)
     ts.tv_nsec = 0;
   }
   ts.tv_sec += 2;
-  int ret = pthread_timedjoin_np(p->thread, NULL, &ts);
-  if (ret) {
-    if (ret == ETIMEDOUT) {
-      // The plugin is blocked on a C function call so we are in a known state
-      // but there is no guarantee cancelling the thread and interacting with
-      // the Lua state at that point is safe.  The lsb_terminate limits the
-      // interaction but lua_close will still be called. At this point I would
-      // rather risk the core and have to restart the process instead of leaking
-      // the memory or hanging on a plugin stop and having to kill the process
-      // anyway (todo: more investigation)
-      hs_log(NULL, p->name, 2, "join timed out, cancelling the thread");
-      pthread_cancel(p->thread);
-      if (pthread_join(p->thread, NULL)) {
-        hs_log(NULL, p->name, 2, "cancelled thread could not be joined");
-      }
-      lsb_heka_terminate_sandbox(p->hsb, "thread cancelled");
-    } else {
-      hs_log(NULL, p->name, 2, "thread could not be joined");
-      lsb_heka_terminate_sandbox(p->hsb, "thread join error");
-    }
+
+  if (pthread_timedjoin_np(p->thread, NULL, &ts)) {
+    p->orphaned = true;
+    hs_log(NULL, p->name, 4, "plugin is blocked on a system call");
+    return false;
   }
   destroy_input_plugin(p);
   --plugins->list_cnt;
+  return true;
 }
 
 
-static void remove_plugin(hs_input_plugins *plugins, int idx)
+static bool remove_plugin(hs_input_plugins *plugins, int idx)
 {
   hs_input_plugin *p = plugins->list[idx];
   plugins->list[idx] = NULL;
   sem_post(&p->shutdown);
   lsb_heka_stop_sandbox(p->hsb);
-  join_thread(plugins, p);
+  return join_thread(plugins, p);
 }
 
 
-static void remove_from_input_plugins(hs_input_plugins *plugins,
+static bool remove_from_input_plugins(hs_input_plugins *plugins,
                                       const char *name)
 {
+  bool removed = true;
   const size_t tlen = strlen(hs_input_dir) + 1;
   pthread_mutex_lock(&plugins->list_lock);
   for (int i = 0; i < plugins->list_cap; ++i) {
@@ -395,17 +386,19 @@ static void remove_from_input_plugins(hs_input_plugins *plugins,
 
     char *pos = plugins->list[i]->name + tlen;
     if (strstr(name, pos) && strlen(pos) == strlen(name) - HS_EXT_LEN) {
-      remove_plugin(plugins, i);
-      if (plugins->cfg->rm_checkpoint) {
-        char key[HS_MAX_PATH];
-        snprintf(key, HS_MAX_PATH, "%s.%.*s", hs_input_dir,
-                 (int)strlen(name) - HS_EXT_LEN, name);
-        hs_remove_checkpoint(&plugins->cfg->cp_reader, key);
+      if ((removed = remove_plugin(plugins, i))) {
+        if (plugins->cfg->rm_checkpoint) {
+          char key[HS_MAX_PATH];
+          snprintf(key, HS_MAX_PATH, "%s.%.*s", hs_input_dir,
+                   (int)strlen(name) - HS_EXT_LEN, name);
+          hs_remove_checkpoint(&plugins->cfg->cp_reader, key);
+        }
       }
       break;
     }
   }
   pthread_mutex_unlock(&plugins->list_lock);
+  return removed;
 }
 
 
@@ -428,7 +421,9 @@ static void add_to_input_plugins(hs_input_plugins *plugins, hs_input_plugin *p)
       idx = i;
     } else if (strcmp(plugins->list[i]->name, p->name) == 0) {
       idx = i;
-      remove_plugin(plugins, idx);
+      if (!remove_plugin(plugins, idx)) {
+        continue; // skip
+      }
       add_plugin(plugins, p, idx);
       added = true;
       break;
@@ -603,8 +598,13 @@ void hs_load_input_plugins(hs_input_plugins *plugins, const hs_config *cfg,
       int ret = hs_process_load_cfg(lpath, rpath, entry->d_name);
       switch (ret) {
       case 0:
-        remove_from_input_plugins(plugins, entry->d_name);
-        break;
+        if (remove_from_input_plugins(plugins, entry->d_name)) {
+          break;
+        } else {
+          hs_log(NULL, g_module, 3, "%s dynamic load request ignored",
+                 entry->d_name);
+          continue;
+        }
       case 1: // proceed to load
         break;
       default: // ignore
@@ -614,14 +614,14 @@ void hs_load_input_plugins(hs_input_plugins *plugins, const hs_config *cfg,
     hs_sandbox_config sbc;
     if (hs_load_sandbox_config(rpath, entry->d_name, &sbc, &cfg->ipd, 'i')) {
       hs_input_plugin *p = create_input_plugin(cfg, &sbc);
+      hs_free_sandbox_config(&sbc);
       if (p) {
         p->plugins = plugins;
         add_to_input_plugins(plugins, p);
       } else {
         hs_log(NULL, g_module, 3, "%s create_inputs_plugin failed",
-               sbc.cfg_name);
+               entry->d_name);
       }
-      hs_free_sandbox_config(&sbc);
     }
   }
   closedir(dp);
