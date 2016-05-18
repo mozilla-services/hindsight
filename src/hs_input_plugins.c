@@ -368,10 +368,13 @@ static bool join_thread(hs_input_plugins *plugins, hs_input_plugin *p)
 static bool remove_plugin(hs_input_plugins *plugins, int idx)
 {
   hs_input_plugin *p = plugins->list[idx];
-  plugins->list[idx] = NULL;
   sem_post(&p->shutdown);
   lsb_heka_stop_sandbox(p->hsb);
-  return join_thread(plugins, p);
+  if (join_thread(plugins, p)) {
+    plugins->list[idx] = NULL;
+    return true;
+  }
+  return false;
 }
 
 
@@ -410,7 +413,7 @@ static void add_plugin(hs_input_plugins *plugins, hs_input_plugin *p, int idx)
 }
 
 
-static void add_to_input_plugins(hs_input_plugins *plugins, hs_input_plugin *p)
+static bool add_to_input_plugins(hs_input_plugins *plugins, hs_input_plugin *p)
 {
   bool added = false;
   int idx = -1;
@@ -422,7 +425,8 @@ static void add_to_input_plugins(hs_input_plugins *plugins, hs_input_plugin *p)
     } else if (strcmp(plugins->list[i]->name, p->name) == 0) {
       idx = i;
       if (!remove_plugin(plugins, idx)) {
-        continue; // skip
+        pthread_mutex_unlock(&plugins->list_lock);
+        return false;
       }
       add_plugin(plugins, p, idx);
       added = true;
@@ -460,6 +464,7 @@ static void add_to_input_plugins(hs_input_plugins *plugins, hs_input_plugin *p)
     perror("pthread_create failed");
     exit(EXIT_FAILURE);
   }
+  return true;
 }
 
 
@@ -601,8 +606,7 @@ void hs_load_input_plugins(hs_input_plugins *plugins, const hs_config *cfg,
         if (remove_from_input_plugins(plugins, entry->d_name)) {
           break;
         } else {
-          hs_log(NULL, g_module, 3, "%s dynamic load request ignored",
-                 entry->d_name);
+          hs_log(NULL, g_module, 4, "%s stop request pending", entry->d_name);
           continue;
         }
       case 1: // proceed to load
@@ -617,7 +621,11 @@ void hs_load_input_plugins(hs_input_plugins *plugins, const hs_config *cfg,
       hs_free_sandbox_config(&sbc);
       if (p) {
         p->plugins = plugins;
-        add_to_input_plugins(plugins, p);
+        if (!add_to_input_plugins(plugins, p)) {
+          destroy_input_plugin(p);
+          hs_log(NULL, g_module, 3, "%s dynamic load request denied",
+                 entry->d_name);
+        }
       } else {
         hs_log(NULL, g_module, 3, "%s create_inputs_plugin failed",
                entry->d_name);
