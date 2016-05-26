@@ -183,7 +183,7 @@ create_output_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
     destroy_output_plugin(p);
     return NULL;
   }
-  lsb_logger logger = {.context = NULL, .cb = hs_log};
+  lsb_logger logger = { .context = NULL, .cb = hs_log };
   p->hsb = lsb_heka_create_output(p, lua_file, state_file, ob.buf, &logger,
                                   update_checkpoint_callback);
   lsb_free_output_buffer(&ob);
@@ -240,10 +240,13 @@ static int output_message(hs_output_plugin *p, lsb_heka_message *msg)
           p->batching = false;
         } else if (ret == LSB_HEKA_PM_BATCH) {
           p->batching = true;
-        } else if (ret == LSB_HEKA_PM_SENT && !p->async_len) {
-          lsb_heka_terminate_sandbox(p->hsb,  "cannot use async checkpointing "
-                                     "without a configured buffer");
-          ret = 1;
+        } else if (ret == LSB_HEKA_PM_ASYNC) {
+          if (!p->async_len) {
+            lsb_heka_terminate_sandbox(p->hsb, "cannot use async checkpointing "
+                                       "without a configured buffer");
+            ret = 1;
+          }
+          p->batching = true;
         } else if (ret == LSB_HEKA_PM_FAIL) {
           const char *err = lsb_heka_get_error(p->hsb);
           if (strlen(err) > 0) {
@@ -298,7 +301,7 @@ static void* input_thread(void *arg)
   size_t discarded_bytes;
   size_t bytes_read[2] = { 0 };
   int ret = 0;
-  lsb_logger logger = {.context = NULL, .cb = hs_log};
+  lsb_logger logger = { .context = NULL, .cb = hs_log };
 #ifdef HINDSIGHT_CLI
   bool input_stop = false, analysis_stop = false;
   while (!(p->stop && input_stop && analysis_stop)) {
