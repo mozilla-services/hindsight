@@ -39,10 +39,11 @@ void* sig_handler(void *arg)
   sigset_t signal_set;
   sigemptyset(&signal_set);
   sigaddset(&signal_set, SIGINT);
+  sigaddset(&signal_set, SIGTERM);
 
   for (;;) {
     sigwait(&signal_set, &sig);
-    if (sig == SIGINT) {
+    if (sig == SIGINT || sig == SIGTERM) {
       hs_log(NULL, g_module, 6, "stop signal received");
       sem_post(&g_shutdown);
       break;
