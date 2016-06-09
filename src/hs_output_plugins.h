@@ -18,6 +18,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <time.h>
+#include <stdint.h>
 
 #include "hs_config.h"
 #include "hs_input.h"
@@ -31,7 +32,7 @@ struct hs_output_plugin {
   lsb_heka_sandbox    *hsb;
   lsb_message_matcher *mm;
   hs_output_plugins   *plugins;
-  unsigned long long  sequence_id;
+  uintptr_t  sequence_id;
   lsb_running_stats   mms;
   int                 ticker_interval;
   time_t              ticker_expires;

@@ -67,7 +67,7 @@ static int update_checkpoint_callback(void *parent, void *sequence_id)
   hs_output_plugin *p = parent;
 
   if (sequence_id && p->async_cp) {
-    int i = (unsigned long long)sequence_id % p->async_len;
+    int i = (uintptr_t)sequence_id % p->async_len;
     pthread_mutex_lock(&p->cp_lock);
     if (p->async_cp[i].input.id >= p->cp.input.id
         && p->async_cp[i].input.offset > p->cp.input.offset) {
