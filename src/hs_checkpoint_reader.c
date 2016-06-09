@@ -36,7 +36,7 @@ static bool extract_id(const char *fn, unsigned long long *id)
 }
 
 
-static size_t find_first_id(const char *path)
+static size_t find_id(const char *path, bool checkpoint_newest)
 {
   struct dirent *entry;
   DIR *dp = opendir(path);
@@ -45,10 +45,14 @@ static size_t find_first_id(const char *path)
     exit(EXIT_FAILURE);
   }
 
-  unsigned long long file_id = ULLONG_MAX, current_id = 0;
+  unsigned long long file_id = ULLONG_MAX, current_id;
+  if (checkpoint_newest) {
+    file_id = 0;
+  }
   while ((entry = readdir(dp))) {
     if (extract_id(entry->d_name, &current_id)) {
-      if (current_id < file_id) {
+      if ((checkpoint_newest && current_id > file_id) ||
+          (!checkpoint_newest && current_id < file_id)) {
         file_id = current_id;
       }
     }
@@ -64,6 +68,25 @@ static void remove_checkpoint(hs_checkpoint_reader *cpr,
   lua_pushnil(cpr->values);
   lua_setfield(cpr->values, LUA_GLOBALSINDEX, key);
   hs_log(NULL, g_module, 6, "checkpoint removed: %s", key);
+}
+
+
+static size_t find_last_offset(const char *path, unsigned long long id)
+{
+  char fqfn[HS_MAX_PATH];
+  size_t offset = 0;
+  int ret = snprintf(fqfn, sizeof(fqfn), "%s/%llu.log", path, id);
+  if (ret < 0 || ret > (int)sizeof(fqfn) - 1) {
+    hs_log(NULL, g_module, 0, "input filename exceeds %zu", sizeof(fqfn));
+    exit(EXIT_FAILURE);
+  }
+  FILE *fh = fopen(fqfn, "rb");
+  if (fh) {
+    fseek(fh, 0, SEEK_END);
+    offset = ftell(fh);
+    fclose(fh);
+  }
+  return offset;
 }
 
 
@@ -199,7 +222,8 @@ void hs_lookup_input_checkpoint(hs_checkpoint_reader *cpr,
                                 const char *subdir,
                                 const char *key,
                                 const char *path,
-                                hs_checkpoint *cp)
+                                hs_checkpoint *cp,
+                                bool checkpoint_newest)
 {
   const char *pos = NULL;
   pthread_mutex_lock(&cpr->lock);
@@ -225,7 +249,10 @@ void hs_lookup_input_checkpoint(hs_checkpoint_reader *cpr,
              sizeof(fqfn));
       exit(EXIT_FAILURE);
     }
-    cp->id = find_first_id(fqfn);
+    cp->id = find_id(fqfn, checkpoint_newest);
+    if (checkpoint_newest) {
+      cp->offset = find_last_offset(fqfn, cp->id);
+    }
   }
 }
 

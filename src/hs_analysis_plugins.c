@@ -393,7 +393,8 @@ static void* input_thread(void *arg)
                              hs_input_dir,
                              at->input.name,
                              cfg->output_path,
-                             &at->input.cp);
+                             &at->input.cp,
+                             false);
   at->cp.id = at->input.cp.id;
   at->cp.offset = at->input.cp.offset;
   size_t discarded_bytes;

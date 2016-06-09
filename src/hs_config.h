@@ -40,6 +40,7 @@ typedef struct hs_sandbox_config
   unsigned instruction_limit;
   unsigned ticker_interval;
   bool preserve_data;
+  bool checkpoint_newest;
 } hs_sandbox_config;
 
 typedef struct hs_config

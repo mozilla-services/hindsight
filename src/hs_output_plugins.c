@@ -508,7 +508,8 @@ static void add_plugin(hs_output_plugins *plugins, hs_output_plugin *p, int idx)
 }
 
 static void add_to_output_plugins(hs_output_plugins *plugins,
-                                  hs_output_plugin *p)
+                                  hs_output_plugin *p,
+                                  bool checkpoint_newest)
 {
   bool added = false;
   int idx = -1;
@@ -552,7 +553,8 @@ static void add_to_output_plugins(hs_output_plugins *plugins,
                              hs_input_dir,
                              p->name,
                              cfg->output_path,
-                             &p->input.cp);
+                             &p->input.cp,
+                             checkpoint_newest);
   p->cur.input.id = p->cp.input.id = p->input.cp.id;
   p->cur.input.offset = p->cp.input.offset = p->input.cp.offset;
 
@@ -560,7 +562,8 @@ static void add_to_output_plugins(hs_output_plugins *plugins,
                              hs_analysis_dir,
                              p->name,
                              cfg->output_path,
-                             &p->analysis.cp);
+                             &p->analysis.cp,
+                             checkpoint_newest);
   p->cur.analysis.id = p->cp.analysis.id = p->analysis.cp.id;
   p->cur.analysis.offset = p->cp.analysis.offset = p->analysis.cp.offset;
 
@@ -732,7 +735,7 @@ void hs_load_output_plugins(hs_output_plugins *plugins, const hs_config *cfg,
                       p->name);
         hs_init_input(&p->analysis, cfg->max_message_size, cfg->output_path,
                       p->name);
-        add_to_output_plugins(plugins, p);
+        add_to_output_plugins(plugins, p, sbc.checkpoint_newest);
       } else {
         hs_log(NULL, g_module, 3, "%s create_output_plugin failed",
                sbc.cfg_name);

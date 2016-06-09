@@ -68,7 +68,8 @@ void hs_lookup_input_checkpoint(hs_checkpoint_reader *cpr,
                                 const char *key,
                                 const char *path,
                                 const char *subdir,
-                                hs_checkpoint *cp);
+                                hs_checkpoint *cp,
+                                bool checkpoint_newest);
 
 void hs_update_input_checkpoint(hs_checkpoint_reader *cpr,
                                 const char *subdir,
