@@ -176,9 +176,10 @@ void hs_lookup_checkpoint(hs_checkpoint_reader *cpr,
 
 void hs_update_checkpoint(hs_checkpoint_reader *cpr,
                           const char *key,
-                          const hs_ip_checkpoint *cp)
+                          hs_ip_checkpoint *cp)
 {
   pthread_mutex_lock(&cpr->lock);
+  pthread_mutex_lock(&cp->lock);
   switch (cp->type) {
   case HS_CP_STRING:
     lua_pushlstring(cpr->values, cp->value.s, cp->len);
@@ -191,6 +192,7 @@ void hs_update_checkpoint(hs_checkpoint_reader *cpr,
     break;
   }
   lua_setglobal(cpr->values, key);
+  pthread_mutex_unlock(&cp->lock);
   pthread_mutex_unlock(&cpr->lock);
 }
 

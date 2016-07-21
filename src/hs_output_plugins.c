@@ -30,7 +30,6 @@
 #include "hs_util.h"
 
 static const char g_module[] = "output_plugins";
-static const char g_output[] = "output";
 
 static void destroy_output_plugin(hs_output_plugin *p)
 {

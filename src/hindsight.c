@@ -185,10 +185,10 @@ int main(int argc, char *argv[])
 
   hs_free_checkpoint_writer(&cpw);
   hs_free_config(&cfg);
-  hs_free_log();
 
   pthread_join(sig_thread, NULL);
   hs_log(NULL, g_module, 6, "exiting");
+  hs_free_log();
   sem_destroy(&g_shutdown);
   return 0;
 }

@@ -99,10 +99,7 @@ void hs_write_checkpoints(hs_checkpoint_writer *cpw, hs_checkpoint_reader *cpr)
     for (int i = 0; i < cpw->input_plugins->list_cap; ++i) {
       p = cpw->input_plugins->list[i];
       if (p) {
-        pthread_mutex_lock(&p->cp.lock);
         hs_update_checkpoint(cpr, p->name, &p->cp);
-        pthread_mutex_unlock(&p->cp.lock);
-
         if (tsv) {
           pthread_mutex_lock(&cpw->input_plugins->output.lock);
           lsb_heka_stats stats = lsb_heka_get_stats(p->hsb);

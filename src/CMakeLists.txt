@@ -20,11 +20,6 @@ set(HINDSIGHT_LIBS
 ${LUASANDBOX_LIBRARIES}
 ${UNIX_LIBRARIES})
 
-set(CMAKE_SKIP_BUILD_RPATH FALSE CACHE STRING "" FORCE)
-set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE CACHE STRING "" FORCE)
-set(CPACK_RPM_PACKAGE_LICENSE "MPLv2.0")
-set(CPACK_STRIP_FILES TRUE)
-
 add_executable(hindsight ${HINDSIGHT_SRC})
 set(HINDSIGHT_LIBS
 ${LUASANDBOX_LIBRARIES}
@@ -37,7 +32,7 @@ add_executable(hindsight_cli ${HINDSIGHT_SRC})
 target_compile_definitions(hindsight_cli PUBLIC "-DHINDSIGHT_CLI")
 target_link_libraries(hindsight_cli ${HINDSIGHT_LIBS})
 
-install(TARGETS hindsight DESTINATION bin)
-install(TARGETS hindsight_cli DESTINATION bin)
+install(TARGETS hindsight DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS hindsight_cli DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 add_subdirectory(test)

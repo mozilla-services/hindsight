@@ -48,11 +48,12 @@ backpressure            = 2
 
 input_defaults = {
   -- see: Default Sandbox Configuration Variables
-  -- output_limit      = 64 * 1024
-  -- memory_limit      = 8 * 1024 * 1024
-  -- instruction_limit = 1e6
-  -- preserve_data     = false
-  -- ticker_interval   = 0
+  -- output_limit       = 64 * 1024
+  -- memory_limit       = 8 * 1024 * 1024
+  -- instruction_limit  = 1e6
+  -- preserve_data      = false
+  -- restricted_headers = false
+  -- ticker_interval    = 0
 }
 
 analysis_defaults = {
@@ -73,6 +74,8 @@ output_defaults = {
 * **instruction_limit** - the maximum number of Lua instructions a plugin can execute in a single `process_message` or
 `timer_event` function call (count, default 1MM)
 * **preserve_data** - flag indicating if all global data should be saved on shutdown (bool, default false)
+* **restricted_headers** - flag indicating that the following header fields are not user modifiable
+  `Hostname` and `Logger` (bool, default true (analysis), false (input/output))
 * **ticker_interval** (default 0)
   * For input plugins it is the poll interval when `process_message` is called see: [polling input
 plugins](https://github.com/mozilla-services/lua_sandbox/blob/master/docs/heka/input.md#polling)

@@ -160,7 +160,7 @@ create_analysis_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
     destroy_analysis_plugin(p);
     return NULL;
   }
-  lsb_logger logger = {.context = NULL, .cb = hs_log};
+  lsb_logger logger = { .context = NULL, .cb = hs_log };
   p->hsb = lsb_heka_create_analysis(p, lua_file, state_file, ob.buf, &logger,
                                     inject_message);
   lsb_free_output_buffer(&ob);
@@ -388,18 +388,9 @@ static void* input_thread(void *arg)
   lsb_heka_message msg;
   lsb_init_heka_message(&msg, 8);
 
-  hs_config *cfg = at->plugins->cfg;
-  hs_lookup_input_checkpoint(&cfg->cp_reader,
-                             hs_input_dir,
-                             at->input.name,
-                             cfg->output_path,
-                             &at->input.cp);
-  at->cp.id = at->input.cp.id;
-  at->cp.offset = at->input.cp.offset;
   size_t discarded_bytes;
-
   size_t bytes_read = 0;
-  lsb_logger logger = {.context = NULL, .cb = hs_log};
+  lsb_logger logger = { .context = NULL, .cb = hs_log };
 #ifdef HINDSIGHT_CLI
   bool input_stop = false;
   while (!(at->plugins->stop && input_stop)) {
@@ -701,8 +692,17 @@ void hs_load_analysis_plugins(hs_analysis_plugins *plugins,
 void hs_start_analysis_threads(hs_analysis_plugins *plugins)
 {
   for (int i = 0; i < plugins->thread_cnt; ++i) {
+    hs_analysis_thread *at = &plugins->list[i];
+    hs_config *cfg = at->plugins->cfg;
+    hs_lookup_input_checkpoint(&cfg->cp_reader,
+                               hs_input_dir,
+                               at->input.name,
+                               cfg->output_path,
+                               &at->input.cp);
+    at->cp.id = at->input.cp.id;
+    at->cp.offset = at->input.cp.offset;
     if (pthread_create(&plugins->threads[i], NULL, input_thread,
-                       (void *)&plugins->list[i])) {
+                       (void *)at)) {
       perror("hs_start_analysis_threads pthread_create failed");
       exit(EXIT_FAILURE);
     }

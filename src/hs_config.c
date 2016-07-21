@@ -50,6 +50,7 @@ static const char *cfg_sb_output = "output_limit";
 static const char *cfg_sb_memory = "memory_limit";
 static const char *cfg_sb_instruction = "instruction_limit";
 static const char *cfg_sb_preserve = "preserve_data";
+static const char *cfg_sb_restricted_headers = "restricted_headers";
 static const char *cfg_sb_filename = "filename";
 static const char *cfg_sb_ticker_interval = "ticker_interval";
 static const char *cfg_sb_thread = "thread";
@@ -62,6 +63,7 @@ static void init_sandbox_config(hs_sandbox_config *cfg)
   cfg->memory_limit = 1024 * 1024 * 8;
   cfg->instruction_limit = 1000000;
   cfg->preserve_data = false;
+  cfg->restricted_headers = true;
   cfg->dir = NULL;
   cfg->filename = NULL;
   cfg->cfg_name = NULL;
@@ -92,6 +94,9 @@ static void init_config(hs_config *cfg)
   init_sandbox_config(&cfg->ipd);
   init_sandbox_config(&cfg->apd);
   init_sandbox_config(&cfg->opd);
+
+  cfg->ipd.restricted_headers = false;
+  cfg->opd.restricted_headers = false;
 }
 
 
@@ -214,6 +219,11 @@ static int load_sandbox_defaults(lua_State *L,
   }
   if (get_bool_item(L, 1, cfg_sb_preserve, &cfg->preserve_data)) return 1;
 
+  if (get_bool_item(L, 1, cfg_sb_restricted_headers,
+                    &cfg->restricted_headers)) {
+    return 1;
+  }
+
   if (check_for_unknown_options(L, 1, key)) return 1;
 
   remove_item(L, LUA_GLOBALSINDEX, key);
@@ -315,6 +325,7 @@ bool hs_load_sandbox_config(const char *dir,
     cfg->instruction_limit = dflt->instruction_limit;
     cfg->ticker_interval = dflt->ticker_interval;
     cfg->preserve_data = dflt->preserve_data;
+    cfg->restricted_headers = dflt->restricted_headers;
   }
 
   int ret = luaL_dostring(L, cfg->cfg_lua);
@@ -374,6 +385,10 @@ bool hs_load_sandbox_config(const char *dir,
 
   ret = get_bool_item(L, LUA_GLOBALSINDEX, cfg_sb_preserve,
                       &cfg->preserve_data);
+  if (ret) goto cleanup;
+
+  ret = get_bool_item(L, LUA_GLOBALSINDEX, cfg_sb_restricted_headers,
+                      &cfg->restricted_headers);
   if (ret) goto cleanup;
 
   if (type == 'a' || type == 'o') {
@@ -607,6 +622,7 @@ bool hs_get_full_config(lsb_output_buffer *ob, char type, const hs_config *cfg,
   lsb_outputf(ob, "-- Hindsight defaults and overrides\n");
   lsb_outputf(ob, "Hostname = [[%s]]\n", cfg->hostname);
   lsb_outputf(ob, "Pid = %d\n", cfg->pid);
+  lsb_outputf(ob, "log_level = %d\n", hs_get_log_level());
   if (type == 'a') {
     lsb_outputf(ob, "path = [[%s]]\n", cfg->analysis_lua_path);
     lsb_outputf(ob, "cpath = [[%s]]\n", cfg->analysis_lua_cpath);
@@ -628,7 +644,8 @@ bool hs_get_full_config(lsb_output_buffer *ob, char type, const hs_config *cfg,
   lsb_outputf(ob, "ticker_interval = %u\n", sbc->ticker_interval);
   lsb_outputf(ob, "preserve_data = %s\n",
               sbc->preserve_data ? "true" : "false");
-  lsb_outputf(ob, "log_level = %d\n", hs_get_log_level());
+  lsb_outputf(ob, "restricted_headers = %s\n",
+              sbc->restricted_headers ? "true" : "false");
 
   if (type == 'a') {
     lsb_outputf(ob, "thread = %u\n", sbc->thread);
