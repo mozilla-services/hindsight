@@ -32,37 +32,35 @@ struct hs_analysis_plugin {
   lsb_message_matcher *mm;
   hs_analysis_thread  *at;
   lsb_running_stats   mms;
+  lsb_heka_stats      stats;
   int                 ticker_interval;
   time_t              ticker_expires;
 };
 
 struct hs_analysis_plugins {
-  hs_analysis_thread *list;
-  pthread_t *threads;
-  hs_config *cfg;
-
-  int thread_cnt;
-  bool stop;
-  bool sample;
-
-  hs_output output;
+  hs_analysis_thread  *list;
+  pthread_t           *threads;
+  hs_config           *cfg;
+  int                 thread_cnt;
+  hs_output           output;
 };
 
 struct hs_analysis_thread {
   hs_analysis_plugins *plugins;
-  hs_analysis_plugin **list;
-  lsb_heka_message *msg;
+  hs_analysis_plugin  **list;
+  lsb_heka_message    *msg;
 
   pthread_mutex_t list_lock;
   pthread_mutex_t cp_lock;
-  hs_checkpoint cp;
-  time_t current_t;
+  hs_checkpoint   cp;
+  time_t          current_t;
 
-  int list_cap;
-  int list_cnt;
-  int tid;
-
+  int      list_cap;
+  int      list_cnt;
+  int      tid;
   hs_input input;
+  bool     stop;
+  bool     sample;
 };
 
 void hs_init_analysis_plugins(hs_analysis_plugins *plugins, hs_config *cfg);
@@ -76,6 +74,8 @@ void hs_load_analysis_plugins(hs_analysis_plugins *plugins,
                               bool dynamic);
 
 void hs_start_analysis_input(hs_analysis_plugins *plugins, pthread_t *t);
+
+void hs_stop_analysis_plugins(hs_analysis_plugins *plugins);
 
 void hs_wait_analysis_plugins(hs_analysis_plugins *plugins);
 

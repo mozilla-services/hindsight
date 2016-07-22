@@ -61,7 +61,6 @@ static void free_ip_checkpoint(hs_ip_checkpoint *cp)
 static bool update_checkpoint(double d, const char *s, hs_ip_checkpoint *cp)
 {
   if (!isnan(d)) {
-    pthread_mutex_lock(&cp->lock);
     if (cp->type == HS_CP_STRING) {
       free(cp->value.s);
       cp->value.s = NULL;
@@ -70,9 +69,7 @@ static bool update_checkpoint(double d, const char *s, hs_ip_checkpoint *cp)
     }
     cp->type = HS_CP_NUMERIC;
     cp->value.d = d;
-    pthread_mutex_unlock(&cp->lock);
   } else if (s) {
-    pthread_mutex_lock(&cp->lock);
     if (cp->type == HS_CP_NUMERIC) cp->value.s = NULL;
     cp->type = HS_CP_STRING;
     cp->len = strlen(s);
@@ -84,7 +81,6 @@ static bool update_checkpoint(double d, const char *s, hs_ip_checkpoint *cp)
         if (!cp->value.s) {
           cp->len = 0;
           cp->cap = 0;
-          pthread_mutex_unlock(&cp->lock);
           hs_log(NULL, g_module, 0, "malloc failed");
           return false;
         }
@@ -92,12 +88,10 @@ static bool update_checkpoint(double d, const char *s, hs_ip_checkpoint *cp)
       }
       memcpy(cp->value.s, s, cp->len);
     } else {
-      pthread_mutex_unlock(&cp->lock);
       hs_log(NULL, g_module, 3, "checkpoint string exceeds %d",
              HS_MAX_IP_CHECKPOINT);
       return false;
     }
-    pthread_mutex_unlock(&cp->lock);
   }
   return true;
 }
@@ -114,7 +108,15 @@ static int inject_message(void *parent,
   static char header[14];
 
   hs_input_plugin *p = parent;
-  if (!update_checkpoint(cp_numeric, cp_string, &p->cp)) return false;
+  bool ok;
+  pthread_mutex_lock(&p->cp.lock);
+  ok = update_checkpoint(cp_numeric, cp_string, &p->cp);
+  if (p->sample) {
+    p->stats = lsb_heka_get_stats(p->hsb);
+    p->sample = false;
+  }
+  pthread_mutex_unlock(&p->cp.lock);
+  if (!ok) return 1;
 
   pthread_mutex_lock(&p->plugins->output.lock);
   int len = lsb_pb_output_varint(header + 3, pb_len);

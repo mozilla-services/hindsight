@@ -20,8 +20,8 @@ https://github.com/trink/hindsight/tree/master/benchmarks.
 * RSS: 3276
 * VIRT: 253148
 * SHR: 1140
-* Processing time: 10.10 seconds
-* Log Lines/sec: 99272
+* Processing time: 9.88 seconds
+* Log Lines/sec: 101482
 
 #### Heka (0.9)
 
@@ -50,8 +50,8 @@ https://github.com/trink/hindsight/tree/master/benchmarks.
 * RSS: 5488
 * VIRT: 327872
 * SHR: 1128
-* Processing time: 17.41 seconds
-* Log Lines/sec: 172,770
+* Processing time: 17.84 seconds
+* Log Lines/sec: 168,606
 
 #### Heka (0.9)
 

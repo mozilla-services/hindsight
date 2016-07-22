@@ -157,7 +157,7 @@ int main(int argc, char *argv[])
   hs_write_checkpoints(&cpw, &cfg.cp_reader);
   hs_free_input_plugins(&ips);
 
-  aps.stop = true;
+  hs_stop_analysis_plugins(&aps);
   hs_wait_analysis_plugins(&aps);
   hs_write_checkpoints(&cpw, &cfg.cp_reader);
   hs_free_analysis_plugins(&aps);
@@ -169,7 +169,7 @@ int main(int argc, char *argv[])
 #else
   // non CLI mode should shut everything down immediately
   hs_stop_input_plugins(&ips);
-  aps.stop = true;
+  hs_stop_analysis_plugins(&aps);
   hs_stop_output_plugins(&ops);
 
   hs_wait_input_plugins(&ips);

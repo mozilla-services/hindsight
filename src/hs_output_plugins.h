@@ -34,6 +34,7 @@ struct hs_output_plugin {
   hs_output_plugins   *plugins;
   uintptr_t  sequence_id;
   lsb_running_stats   mms;
+  lsb_heka_stats      stats;
   int                 ticker_interval;
   time_t              ticker_expires;
 

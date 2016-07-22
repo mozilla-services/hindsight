@@ -279,6 +279,8 @@ static void init_analysis_thread(hs_analysis_plugins *plugins, int tid)
   at->list_cap = 0;
   at->list_cnt = 0;
   at->tid = tid;
+  at->stop = false;
+  at->sample = false;
 
   char name[255];
   int n = snprintf(name, sizeof name, "%s%d", hs_analysis_dir, tid);
@@ -324,10 +326,9 @@ static void terminate_sandbox(hs_analysis_thread *at, int i)
 }
 
 
-static void analyze_message(hs_analysis_thread *at)
+static void analyze_message(hs_analysis_thread *at, bool sample)
 {
   hs_analysis_plugin *p = NULL;
-  bool sample = at->plugins->sample;
   int ret;
 
   pthread_mutex_lock(&at->list_lock);
@@ -343,6 +344,7 @@ static void analyze_message(hs_analysis_thread *at)
       bool matched = lsb_eval_message_matcher(p->mm, at->msg);
       if (sample) {
         lsb_update_running_stats(&p->mms, lsb_get_time() - start);
+        p->stats = lsb_heka_get_stats(p->hsb);
       }
       if (matched) {
         ret = lsb_heka_pm_analysis(p->hsb, at->msg, false);
@@ -391,25 +393,32 @@ static void* input_thread(void *arg)
   size_t discarded_bytes;
   size_t bytes_read = 0;
   lsb_logger logger = { .context = NULL, .cb = hs_log };
+  bool stop = false;
+  bool sample = false;
 #ifdef HINDSIGHT_CLI
   bool input_stop = false;
-  while (!(at->plugins->stop && input_stop)) {
+  while (!(stop && input_stop)) {
 #else
-  while (!at->plugins->stop) {
+  while (!stop) {
 #endif
+    pthread_mutex_lock(&at->cp_lock);
+    stop = at->stop;
+    sample = at->sample;
+    pthread_mutex_unlock(&at->cp_lock);
+
     if (at->input.fh) {
       if (lsb_find_heka_message(&msg, &at->input.ib, true, &discarded_bytes,
                                 &logger)) {
         at->msg = &msg;
         at->current_t = time(NULL);
-        analyze_message(at);
+        analyze_message(at, sample);
 
         // advance the checkpoint
         pthread_mutex_lock(&at->cp_lock);
-        at->plugins->sample = false;
         at->cp.id = at->input.cp.id;
         at->cp.offset = at->input.cp.offset -
             (at->input.ib.readpos - at->input.ib.scanpos);
+        if (sample) at->sample = false;
         pthread_mutex_unlock(&at->cp_lock);
       } else {
         bytes_read = hs_read_file(&at->input);
@@ -422,7 +431,7 @@ static void* input_thread(void *arg)
         // see if the next file is there yet
         hs_open_file(&at->input, hs_input_dir, at->input.cp.id + 1);
 #ifdef HINDSIGHT_CLI
-        if (cid == at->input.cp.id && at->plugins->stop) {
+        if (cid == at->input.cp.id && stop) {
           input_stop = true;
         }
 #endif
@@ -430,7 +439,7 @@ static void* input_thread(void *arg)
     } else { // still waiting on the first file
       hs_open_file(&at->input, hs_input_dir, at->input.cp.id);
 #ifdef HINDSIGHT_CLI
-      if (!at->input.fh && at->plugins->stop) {
+      if (!at->input.fh && stop) {
         input_stop = true;
       }
 #endif
@@ -443,7 +452,7 @@ static void* input_thread(void *arg)
       lsb_clear_heka_message(&msg); // create an idle/empty message
       at->msg = &msg;
       at->current_t = time(NULL);
-      analyze_message(at);
+      analyze_message(at, false);
       at->msg = NULL;
       sleep(1);
     }
@@ -461,14 +470,23 @@ void hs_init_analysis_plugins(hs_analysis_plugins *plugins, hs_config *cfg)
 
   plugins->thread_cnt = cfg->analysis_threads;
   plugins->cfg = cfg;
-  plugins->stop = false;
-  plugins->sample = false;
 
   plugins->list = malloc(sizeof(hs_analysis_thread) * cfg->analysis_threads);
   for (unsigned i = 0; i < cfg->analysis_threads; ++i) {
     init_analysis_thread(plugins, i);
   }
   plugins->threads = malloc(sizeof(pthread_t *) * (cfg->analysis_threads));
+}
+
+
+void hs_stop_analysis_plugins(hs_analysis_plugins *plugins)
+{
+  for (int i = 0; i < plugins->thread_cnt; ++i) {
+    hs_analysis_thread *at = &plugins->list[i];
+    pthread_mutex_lock(&at->cp_lock);
+    at->stop = true;
+    pthread_mutex_unlock(&at->cp_lock);
+  }
 }
 
 
@@ -497,7 +515,6 @@ void hs_free_analysis_plugins(hs_analysis_plugins *plugins)
 
   plugins->cfg = NULL;
   plugins->thread_cnt = 0;
-  plugins->sample = false;
 }
 
 

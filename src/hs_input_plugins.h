@@ -29,7 +29,9 @@ struct hs_input_plugin {
   pthread_t         thread;
   int               list_index;
   hs_ip_checkpoint  cp;
+  lsb_heka_stats    stats;
   sem_t             shutdown;
+  bool              sample;
   bool              orphaned;
 };
 

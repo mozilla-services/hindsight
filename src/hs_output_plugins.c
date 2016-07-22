@@ -210,10 +210,10 @@ static void shutdown_timer_event(hs_output_plugin *p)
 }
 
 
-static int output_message(hs_output_plugin *p, lsb_heka_message *msg)
+static int output_message(hs_output_plugin *p, lsb_heka_message *msg,
+                          bool sample)
 {
   int ret = 0, te_ret = 0;
-  bool sample = p->sample;
   time_t current_t = time(NULL);
   unsigned long long start;
 
@@ -262,9 +262,10 @@ static int output_message(hs_output_plugin *p, lsb_heka_message *msg)
       update_checkpoint(p);
     }
 
-    if (mmdelta) {
+    if (sample) {
       pthread_mutex_lock(&p->cp_lock);
       lsb_update_running_stats(&p->mms, mmdelta);
+      p->stats = lsb_heka_get_stats(p->hsb);
       p->sample = false;
       pthread_mutex_unlock(&p->cp_lock);
     }
@@ -300,13 +301,21 @@ static void* input_thread(void *arg)
   size_t discarded_bytes;
   size_t bytes_read[2] = { 0 };
   int ret = 0;
+  bool stop = false;
+  bool sample = false;
   lsb_logger logger = { .context = NULL, .cb = hs_log };
 #ifdef HINDSIGHT_CLI
-  bool input_stop = false, analysis_stop = false;
-  while (!(p->stop && input_stop && analysis_stop)) {
+  bool input_stop = false;
+  bool analysis_stop = false;
+  while (!(stop && input_stop && analysis_stop)) {
 #else
-  while (!p->stop) {
+  while (!stop) {
 #endif
+    pthread_mutex_lock(&p->cp_lock);
+    stop = p->stop;
+    sample = p->sample;
+    pthread_mutex_unlock(&p->cp_lock);
+
     if (p->input.fh && !pim) {
       if (lsb_find_heka_message(&im, &p->input.ib, true, &discarded_bytes,
                                 &logger)) {
@@ -322,7 +331,7 @@ static void* input_thread(void *arg)
         // see if the next file is there yet
         hs_open_file(&p->input, hs_input_dir, p->input.cp.id + 1);
 #ifdef HINDSIGHT_CLI
-        if (cid == p->input.cp.id && p->stop) {
+        if (cid == p->input.cp.id && stop) {
           input_stop = true;
         }
 #endif
@@ -330,7 +339,7 @@ static void* input_thread(void *arg)
     } else if (!p->input.fh) { // still waiting on the first file
       hs_open_file(&p->input, hs_input_dir, p->input.cp.id);
 #ifdef HINDSIGHT_CLI
-      if (!p->input.fh && p->stop) {
+      if (!p->input.fh && stop) {
         input_stop = true;
       }
 #endif
@@ -351,7 +360,7 @@ static void* input_thread(void *arg)
         // see if the next file is there yet
         hs_open_file(&p->analysis, hs_analysis_dir, p->analysis.cp.id + 1);
 #ifdef HINDSIGHT_CLI
-        if (cid == p->analysis.cp.id && p->stop) {
+        if (cid == p->analysis.cp.id && stop) {
           analysis_stop = true;
         }
 #endif
@@ -359,7 +368,7 @@ static void* input_thread(void *arg)
     } else if (!p->analysis.fh) { // still waiting on the first file
       hs_open_file(&p->analysis, hs_analysis_dir, p->analysis.cp.id);
 #ifdef HINDSIGHT_CLI
-      if (!p->analysis.fh && p->stop) {
+      if (!p->analysis.fh && stop) {
         analysis_stop = true;
       }
 #endif
@@ -381,6 +390,7 @@ static void* input_thread(void *arg)
     }
 
     if (msg) {
+      pthread_mutex_lock(&p->cp_lock);
       if (msg == pim) {
         pim = NULL;
         p->cur.input.id = p->input.cp.id;
@@ -392,14 +402,15 @@ static void* input_thread(void *arg)
         p->cur.analysis.offset = p->analysis.cp.offset -
             (p->analysis.ib.readpos - p->analysis.ib.scanpos);
       }
-      ret = output_message(p, msg);
+      pthread_mutex_unlock(&p->cp_lock);
+      ret = output_message(p, msg, sample);
       if (ret == LSB_HEKA_PM_RETRY) {
-        while (!p->stop && ret == LSB_HEKA_PM_RETRY) {
+        while (!stop && ret == LSB_HEKA_PM_RETRY) {
           const char *err = lsb_heka_get_error(p->hsb);
           hs_log(NULL, p->name, 7, "retry message %llu err: %s", p->sequence_id,
                  err);
           sleep(1);
-          ret = output_message(p, msg);
+          ret = output_message(p, msg, false);
         }
       }
       if (ret > 0) {
@@ -410,7 +421,7 @@ static void* input_thread(void *arg)
       // trigger any pending timer events
       lsb_clear_heka_message(&im); // create an idle/empty message
       msg = &im;
-      output_message(p, msg);
+      output_message(p, msg, false);
       msg = NULL;
       sleep(1);
     }
@@ -432,7 +443,7 @@ static void* input_thread(void *arg)
                              p->name,
                              &p->cp.analysis);
 
-  if (p->stop) {
+  if (stop) {
     hs_log(NULL, p->name, 6, "shutting down");
   } else {
     hs_log(NULL, p->name, 6, "detaching received: %d msg: %s", ret,
@@ -461,7 +472,9 @@ static void remove_plugin(hs_output_plugins *plugins, int idx)
 {
   hs_output_plugin *p = plugins->list[idx];
   plugins->list[idx] = NULL;
+  pthread_mutex_lock(&p->cp_lock);
   p->stop = true;
+  pthread_mutex_unlock(&p->cp_lock);
   if (pthread_join(p->thread, NULL)) {
     hs_log(NULL, p->name, 3, "remove_plugin could not pthread_join");
   }
@@ -748,7 +761,9 @@ void hs_stop_output_plugins(hs_output_plugins *plugins)
   pthread_mutex_lock(&plugins->list_lock);
   for (int i = 0; i < plugins->list_cap; ++i) {
     if (!plugins->list[i]) continue;
+    pthread_mutex_lock(&plugins->list[i]->cp_lock);
     plugins->list[i]->stop = true;
+    pthread_mutex_unlock(&plugins->list[i]->cp_lock);
   }
   pthread_mutex_unlock(&plugins->list_lock);
 }
