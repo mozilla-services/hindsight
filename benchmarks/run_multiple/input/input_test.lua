@@ -4,7 +4,7 @@
 
 require "io"
 
-local clf = require "common_log_format"
+local clf = require "lpeg.common_log_format"
 
 local msg = {
 Timestamp   = nil,

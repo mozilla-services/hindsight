@@ -10,18 +10,18 @@ https://github.com/trink/hindsight/tree/master/benchmarks.
 
 * Lenovo x230 Thinkpad
 * Memory 8GB
-* Processor Intel Core i7-3520M CPU @ 2.90GHz × 4
+* Processor Intel Core i7-3520M CPU @ 2.90GHz x 4
 * Disk SSD
 
 ### Test 1 - Processing a single log file
 
-#### Hindsight
+#### Hindsight (0.8)
 
-* RSS: 3064
-* VIRT: 93196
-* SHR: 1076
-* Processing time: 8.73 seconds
-* Log Lines/sec: 114,851
+* RSS: 3276
+* VIRT: 253148
+* SHR: 1140
+* Processing time: 9.88 seconds
+* Log Lines/sec: 101482
 
 #### Heka (0.9)
 
@@ -33,9 +33,9 @@ https://github.com/trink/hindsight/tree/master/benchmarks.
 
 #### Summary
 
-* Approximately 13x less resident memory
-* Approximately 7x less virtual memory
-* Over 7x the throughput
+* Approximately 12x less resident memory
+* Approximately 2.5 less virtual memory
+* Over 6x the throughput
 * Hindsight (kill -9) Caused some corruption in the stream but no messages were lost and 3 were duplicated.
     * Error unmarshalling message at offset: 275181251 error: proto: field/encoding mismatch: wrong type for field
     * Corruption detected at offset: 275181251 bytes: 317
@@ -45,13 +45,13 @@ https://github.com/trink/hindsight/tree/master/benchmarks.
 
 ### Test 2 - Processing all three log files concurrently
 
-#### Hindsight
+#### Hindsight (0.8)
 
-* RSS: 4868
-* VIRT: 241492
-* SHR: 1092
-* Processing time: 15.7 seconds
-* Log Lines/sec: 191,588
+* RSS: 5488
+* VIRT: 327872
+* SHR: 1128
+* Processing time: 17.84 seconds
+* Log Lines/sec: 168,606
 
 #### Heka (0.9)
 
@@ -63,6 +63,6 @@ https://github.com/trink/hindsight/tree/master/benchmarks.
 
 #### Summary
 
-* Approximately 8.6x less resident memory
-* Approximately 3.3x less virtual memory
-* Over 12.6x the throughput
+* Approximately 7.7x less resident memory
+* Approximately 2.4x less virtual memory
+* Over 11x the throughput

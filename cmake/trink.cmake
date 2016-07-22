@@ -22,7 +22,7 @@ else()
     set(CMAKE_C_FLAGS   "-std=c99 -pedantic -Werror -Wno-error=deprecated -Wall -Wextra -fPIC")
     set(CMAKE_C_FLAGS_DEBUG     "-g")
 
-    set(CMAKE_C_FLAGS_RELEASE   "-O2 -DNDEBUG")
+    set(CMAKE_C_FLAGS_RELEASE   "-O2")
 
     set(CMAKE_C_FLAGS_PROFILE   "${CMAKE_C_FLAGS_RELEASE} -g -pg")
 
@@ -33,7 +33,5 @@ else()
     set(CMAKE_INSTALL_RPATH_USE_LINK_PATH   FALSE)
 endif()
 
-set(CPACK_PACKAGE_VENDOR        "Trink")
-set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/LICENSE")
 include(CPack)
 include(CTest)

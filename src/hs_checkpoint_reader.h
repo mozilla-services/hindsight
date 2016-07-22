@@ -62,7 +62,7 @@ void hs_lookup_checkpoint(hs_checkpoint_reader *cpr,
 
 void hs_update_checkpoint(hs_checkpoint_reader *cpr,
                           const char *key,
-                          const hs_ip_checkpoint *cp);
+                          hs_ip_checkpoint *cp);
 
 void hs_lookup_input_checkpoint(hs_checkpoint_reader *cpr,
                                 const char *key,

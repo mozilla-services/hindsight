@@ -3,11 +3,10 @@
 -- file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 require "io"
-require "heka_stream_reader"
 require "string"
 
 local fn = read_config("input_file")
-local hsr = heka_stream_reader.new(fn)
+local hsr = create_stream_reader(fn)
 local cnt = 0
 
 function process_message(offset)
