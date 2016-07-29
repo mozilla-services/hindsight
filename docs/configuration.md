@@ -35,7 +35,7 @@
 
 ```lua
 output_path             = "output"
-output_size             = 64 * 1024
+output_size             = 64 * 1024 * 1024
 sandbox_load_path       = "load"
 sandbox_run_path        = "run"
 analysis_threads        = 1
