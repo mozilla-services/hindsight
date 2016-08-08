@@ -68,13 +68,15 @@ static int update_checkpoint_callback(void *parent, void *sequence_id)
   if (sequence_id && p->async_cp) {
     int i = (uintptr_t)sequence_id % p->async_len;
     pthread_mutex_lock(&p->cp_lock);
-    if (p->async_cp[i].input.id >= p->cp.input.id
-        && p->async_cp[i].input.offset > p->cp.input.offset) {
+    if ((p->async_cp[i].input.id == p->cp.input.id
+        && p->async_cp[i].input.offset > p->cp.input.offset)
+        || p->async_cp[i].input.id > p->cp.input.id) {
       p->cp.input.id = p->async_cp[i].input.id;
       p->cp.input.offset = p->async_cp[i].input.offset;
     }
-    if (p->async_cp[i].analysis.id >= p->cp.analysis.id
-        && p->async_cp[i].analysis.offset > p->cp.analysis.offset) {
+    if ((p->async_cp[i].analysis.id == p->cp.analysis.id
+        && p->async_cp[i].analysis.offset > p->cp.analysis.offset)
+        || p->async_cp[i].analysis.id > p->cp.analysis.id) {
       p->cp.analysis.id = p->async_cp[i].analysis.id;
       p->cp.analysis.offset = p->async_cp[i].analysis.offset;
     }
