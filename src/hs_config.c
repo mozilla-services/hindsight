@@ -41,6 +41,7 @@ static const char *cfg_io_lua_cpath = "io_lua_cpath";
 static const char *cfg_max_message_size = "max_message_size";
 static const char *cfg_hostname = "hostname";
 static const char *cfg_backpressure = "backpressure";
+static const char *cfg_backpressure_df = "backpressure_disk_free";
 static const char *cfg_rm_checkpoint = "remove_checkpoint_on_stop";
 
 static const char *cfg_sb_ipd = "input_defaults";
@@ -89,6 +90,7 @@ static void init_config(hs_config *cfg)
   cfg->analysis_threads = 1;
   cfg->max_message_size = 1024 * 64;
   cfg->backpressure = 0;
+  cfg->backpressure_df = 4;
   cfg->rm_checkpoint = false;
   cfg->pid = (int)getpid();
   init_sandbox_config(&cfg->ipd);
@@ -454,6 +456,10 @@ int hs_load_config(const char *fn, hs_config *cfg)
 
   ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_backpressure,
                          &cfg->backpressure);
+  if (ret) goto cleanup;
+
+  ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_backpressure_df,
+                         &cfg->backpressure_df);
   if (ret) goto cleanup;
 
   ret = get_string_item(L, LUA_GLOBALSINDEX, cfg_load_path, &cfg->load_path,

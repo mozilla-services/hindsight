@@ -57,4 +57,15 @@ int hs_get_fqfn(const char *path,
  */
 int hs_output_lua_string(FILE *fh, const char *s);
 
+
+/**
+ * Returns the amount of free disk space as the number of output
+ * buffers remaining.
+ *
+ * @param path Pathname to a file mounted on the filesystem
+ * @param ob_size Output buffer size in bytes
+ *
+ * @return unsigned Number of buffers
+ */
+unsigned hs_disk_free_ob(const char *path, unsigned ob_size);
 #endif

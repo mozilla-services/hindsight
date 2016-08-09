@@ -140,12 +140,29 @@ static int inject_message(void *parent,
             && p->plugins->output.cp.id - p->plugins->output.min_cp_id
             > p->plugins->cfg->backpressure) {
           backpressure = true;
-          hs_log(NULL, g_module, 4, "applying backpressure");
+          hs_log(NULL, g_module, 4, "applying backpressure (checkpoint)");
+        }
+        if (!backpressure && p->plugins->cfg->backpressure_df) {
+          unsigned df = hs_disk_free_ob(p->plugins->output.path,
+                                        p->plugins->cfg->output_size);
+          if (df <= p->plugins->cfg->backpressure_df) {
+            backpressure = true;
+            hs_log(NULL, g_module, 4, "applying backpressure (disk)");
+          }
         }
       }
     }
     if (backpressure) {
-      if (p->plugins->output.cp.id == p->plugins->output.min_cp_id) {
+      bool release_dfbp = true;
+      if (p->plugins->cfg->backpressure_df) {
+        unsigned df = hs_disk_free_ob(p->plugins->output.path,
+                                      p->plugins->cfg->output_size);
+        release_dfbp = (df > p->plugins->cfg->backpressure_df);
+      }
+      // even if we triggered on disk space continue to backpressure
+      // until the queue is caught up too
+      if (p->plugins->output.cp.id == p->plugins->output.min_cp_id
+          && release_dfbp) {
         backpressure = false;
         hs_log(NULL, g_module, 4, "releasing backpressure");
       }

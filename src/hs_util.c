@@ -10,6 +10,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <sys/vfs.h>
 
 bool hs_file_exists(const char *fn)
 {
@@ -65,4 +66,12 @@ bool hs_has_ext(const char *fn, const char *ext)
   size_t elen = strlen(ext);
   if (flen <= elen) return false; // a fn with only an extension is invalid
   return strcmp(fn + flen - elen, ext) == 0 ? true : false;
+}
+
+
+unsigned hs_disk_free_ob(const char *path, unsigned ob_size)
+{
+  struct statfs buf;
+  if (ob_size == 0 || statfs(path, &buf)) return 0;
+  return buf.f_bsize * buf.f_bavail / ob_size;
 }
