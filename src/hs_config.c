@@ -552,12 +552,12 @@ int hs_process_load_cfg(const char *lpath, const char *rpath, const char *name)
 {
   if (hs_has_ext(name, hs_cfg_ext)) {
     char cfg_lpath[HS_MAX_PATH];
-    if (!hs_get_fqfn(lpath, name, cfg_lpath, sizeof(cfg_lpath))) {
+    if (hs_get_fqfn(lpath, name, cfg_lpath, sizeof(cfg_lpath))) {
       hs_log(NULL, g_module, 0, "load cfg path too long");
       exit(EXIT_FAILURE);
     }
     char cfg_rpath[HS_MAX_PATH];
-    if (!hs_get_fqfn(rpath, name, cfg_rpath, sizeof(cfg_rpath))) {
+    if (hs_get_fqfn(rpath, name, cfg_rpath, sizeof(cfg_rpath))) {
       hs_log(NULL, g_module, 0, "run cfg path too long");
       exit(EXIT_FAILURE);
     }
@@ -583,7 +583,7 @@ int hs_process_load_cfg(const char *lpath, const char *rpath, const char *name)
     return 1;
   } else if (hs_has_ext(name, hs_off_ext)) {
     char off_lpath[HS_MAX_PATH];
-    if (!hs_get_fqfn(lpath, name, off_lpath, sizeof(off_lpath))) {
+    if (hs_get_fqfn(lpath, name, off_lpath, sizeof(off_lpath))) {
       hs_log(NULL, g_module, 0, "load off path too long");
       exit(EXIT_FAILURE);
     }
@@ -595,7 +595,7 @@ int hs_process_load_cfg(const char *lpath, const char *rpath, const char *name)
 
     // move the current cfg to .off and shutdown the plugin
     char off_rpath[HS_MAX_PATH];
-    if (!hs_get_fqfn(rpath, name, off_rpath, sizeof(off_rpath))) {
+    if (hs_get_fqfn(rpath, name, off_rpath, sizeof(off_rpath))) {
       hs_log(NULL, g_module, 0, "run off path too long");
       exit(EXIT_FAILURE);
     }

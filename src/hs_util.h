@@ -16,11 +16,21 @@
 /**
  * Test a file exists and can be opened for reading.
  *
- * @param fn
+ * @param fn filename
  *
- * @return bool
+ * @return bool True if the file exists
  */
 bool hs_file_exists(const char *fn);
+
+/**
+ * Test if a filename ends with the specified extension
+ *
+ * @param fn filename
+ * @param ext extension
+ *
+ * @return bool True if the extension matches
+ */
+bool hs_has_ext(const char *fn, const char *ext);
 
 /**
  * Constructs a fully qualified filename from the provided components
@@ -30,15 +40,21 @@ bool hs_file_exists(const char *fn);
  * @param fqfn Buffer to construct the string in
  * @param fqfn_len Length of the buffer
  *
- * @return bool true if string was successfully constructed
+ * @return int 0 if string was successfully constructed
  */
-bool hs_get_fqfn(const char *path,
-                 const char *name,
-                 char *fqfn,
-                 size_t fqfn_len);
+int hs_get_fqfn(const char *path,
+                const char *name,
+                char *fqfn,
+                size_t fqfn_len);
 
-void hs_output_lua_string(FILE *fh, const char *s);
-
-bool hs_has_ext(const char *fn, const char *ext);
+/**
+ * Escapes a string being written to a Lua file
+ *
+ * @param fh file handle write the string to
+ * @param s string to escape
+ *
+ * @return int 0 if successfully escaped/output
+ */
+int hs_output_lua_string(FILE *fh, const char *s);
 
 #endif

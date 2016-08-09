@@ -27,7 +27,7 @@ static void
 allocate_filename(const char *path, const char *name, char **filename)
 {
   char fqfn[HS_MAX_PATH];
-  if (!hs_get_fqfn(path, name, fqfn, sizeof(fqfn))) {
+  if (hs_get_fqfn(path, name, fqfn, sizeof(fqfn))) {
     hs_log(NULL, g_module, 0, "%s/%s exceeds the max length: %d", path, name,
            sizeof(fqfn));
     exit(EXIT_FAILURE);
@@ -79,7 +79,8 @@ void hs_write_checkpoints(hs_checkpoint_writer *cpw, hs_checkpoint_reader *cpr)
   static bool sample = false;
   unsigned long long min_input_id = ULLONG_MAX, min_analysis_id = ULLONG_MAX;
 
-  FILE *tsv = NULL;
+  FILE *tsv = NULL; // any stat write failures are non critical and will be
+                    // ignored
   if (sample) { // write the stats after the sample
     tsv = fopen(cpw->tsv_path_tmp, "we");
     if (tsv) {
@@ -126,7 +127,10 @@ void hs_write_checkpoints(hs_checkpoint_writer *cpw, hs_checkpoint_reader *cpr)
     pthread_mutex_unlock(&cpw->input_plugins->list_lock);
 
     pthread_mutex_lock(&cpw->input_plugins->output.lock);
-    fflush(cpw->input_plugins->output.fh);
+    if (fflush(cpw->input_plugins->output.fh)) {
+      hs_log(NULL, g_module, 0, "input queue fflush failed");
+      exit(EXIT_FAILURE);
+    }
     pthread_mutex_unlock(&cpw->input_plugins->output.lock);
   }
 
@@ -147,7 +151,10 @@ void hs_write_checkpoints(hs_checkpoint_writer *cpw, hs_checkpoint_reader *cpr)
       hs_update_input_checkpoint(cpr, hs_input_dir, at->input.name, &cp);
 
       pthread_mutex_lock(&cpw->analysis_plugins->output.lock);
-      fflush(cpw->analysis_plugins->output.fh);
+      if (fflush(cpw->analysis_plugins->output.fh)) {
+        hs_log(NULL, g_module, 0, "analysis queue fflush failed");
+        exit(EXIT_FAILURE);
+      }
       pthread_mutex_unlock(&cpw->analysis_plugins->output.lock);
 
       if (tsv) {
@@ -193,7 +200,7 @@ void hs_write_checkpoints(hs_checkpoint_writer *cpw, hs_checkpoint_reader *cpr)
       if (p->cur.analysis.id < min_analysis_id) {
         min_analysis_id = p->cur.analysis.id;
       }
-      if(!p->sample) p->sample = sample;
+      if (!p->sample) p->sample = sample;
       hs_update_input_checkpoint(cpr,
                                  hs_input_dir,
                                  p->name,
@@ -224,8 +231,7 @@ void hs_write_checkpoints(hs_checkpoint_writer *cpw, hs_checkpoint_reader *cpr)
     pthread_mutex_unlock(&cpw->output_plugins->list_lock);
   }
   if (tsv) {
-    fclose(tsv);
-    rename(cpw->tsv_path_tmp, cpw->tsv_path);
+    if (!fclose(tsv)) rename(cpw->tsv_path_tmp, cpw->tsv_path);
   }
   if (++cnt == 60) cnt = 0;
 
@@ -242,7 +248,11 @@ void hs_write_checkpoints(hs_checkpoint_writer *cpw, hs_checkpoint_reader *cpr)
     hs_log(NULL, g_module, 0, "%s: %s", cpw->cp_path_tmp, strerror(errno));
     exit(EXIT_FAILURE);
   }
-  hs_output_checkpoints(cpr, cp);
-  fclose(cp);
-  rename(cpw->cp_path_tmp, cpw->cp_path);
+  int rv = hs_output_checkpoints(cpr, cp);
+  if (fclose(cp) || rv) {
+    hs_log(NULL, g_module, 0, "checkpoint write failure");
+    exit(EXIT_FAILURE);
+  } else {
+    rename(cpw->cp_path_tmp, cpw->cp_path);
+  }
 }

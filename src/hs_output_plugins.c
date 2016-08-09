@@ -69,13 +69,13 @@ static int update_checkpoint_callback(void *parent, void *sequence_id)
     int i = (uintptr_t)sequence_id % p->async_len;
     pthread_mutex_lock(&p->cp_lock);
     if ((p->async_cp[i].input.id == p->cp.input.id
-        && p->async_cp[i].input.offset > p->cp.input.offset)
+         && p->async_cp[i].input.offset > p->cp.input.offset)
         || p->async_cp[i].input.id > p->cp.input.id) {
       p->cp.input.id = p->async_cp[i].input.id;
       p->cp.input.offset = p->async_cp[i].input.offset;
     }
     if ((p->async_cp[i].analysis.id == p->cp.analysis.id
-        && p->async_cp[i].analysis.offset > p->cp.analysis.offset)
+         && p->async_cp[i].analysis.offset > p->cp.analysis.offset)
         || p->async_cp[i].analysis.id > p->cp.analysis.id) {
       p->cp.analysis.id = p->async_cp[i].analysis.id;
       p->cp.analysis.offset = p->async_cp[i].analysis.offset;
@@ -94,7 +94,7 @@ create_output_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
 {
   char *state_file = NULL;
   char lua_file[HS_MAX_PATH];
-  if (!hs_get_fqfn(sbc->dir, sbc->filename, lua_file, sizeof(lua_file))) {
+  if (hs_get_fqfn(sbc->dir, sbc->filename, lua_file, sizeof(lua_file))) {
     hs_log(NULL, g_module, 3, "%s failed to construct the lua_file path",
            sbc->cfg_name);
     return NULL;
@@ -648,11 +648,11 @@ static void process_lua(hs_output_plugins *plugins, const char *lpath,
   while ((entry = readdir(dp))) {
     if (hs_has_ext(entry->d_name, hs_lua_ext)) {
       // move the Lua to the run directory
-      if (!hs_get_fqfn(lpath, entry->d_name, lua_lpath, sizeof(lua_lpath))) {
+      if (hs_get_fqfn(lpath, entry->d_name, lua_lpath, sizeof(lua_lpath))) {
         hs_log(NULL, g_module, 0, "load lua path too long");
         exit(EXIT_FAILURE);
       }
-      if (!hs_get_fqfn(rpath, entry->d_name, lua_rpath, sizeof(lua_rpath))) {
+      if (hs_get_fqfn(rpath, entry->d_name, lua_rpath, sizeof(lua_rpath))) {
         hs_log(NULL, g_module, 0, "run lua path too long");
         exit(EXIT_FAILURE);
       }
@@ -705,11 +705,11 @@ void hs_load_output_plugins(hs_output_plugins *plugins, const hs_config *cfg,
 {
   char lpath[HS_MAX_PATH];
   char rpath[HS_MAX_PATH];
-  if (!hs_get_fqfn(cfg->load_path, hs_output_dir, lpath, sizeof(lpath))) {
+  if (hs_get_fqfn(cfg->load_path, hs_output_dir, lpath, sizeof(lpath))) {
     hs_log(NULL, g_module, 0, "load path too long");
     exit(EXIT_FAILURE);
   }
-  if (!hs_get_fqfn(cfg->run_path, hs_output_dir, rpath, sizeof(rpath))) {
+  if (hs_get_fqfn(cfg->run_path, hs_output_dir, rpath, sizeof(rpath))) {
     hs_log(NULL, g_module, 0, "run path too long");
     exit(EXIT_FAILURE);
   }

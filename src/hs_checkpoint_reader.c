@@ -70,7 +70,7 @@ static void remove_checkpoint(hs_checkpoint_reader *cpr,
 void hs_init_checkpoint_reader(hs_checkpoint_reader *cpr, const char *path)
 {
   char fqfn[HS_MAX_PATH];
-  if (!hs_get_fqfn(path, "hindsight.cp", fqfn, sizeof(fqfn))) {
+  if (hs_get_fqfn(path, "hindsight.cp", fqfn, sizeof(fqfn))) {
     hs_log(NULL, g_module, 0, "checkpoint name exceeds the max length: %d",
            sizeof(fqfn));
     exit(EXIT_FAILURE);
@@ -108,7 +108,7 @@ void hs_free_checkpoint_reader(hs_checkpoint_reader *cpr)
 }
 
 
-bool hs_load_checkpoint(lua_State *L, int idx, hs_ip_checkpoint *cp)
+int hs_load_checkpoint(lua_State *L, int idx, hs_ip_checkpoint *cp)
 {
   size_t len;
   switch (lua_type(L, idx)) {
@@ -129,14 +129,14 @@ bool hs_load_checkpoint(lua_State *L, int idx, hs_ip_checkpoint *cp)
           cp->cap = 0;
           hs_log(NULL, g_module, 0, "malloc failed");
           pthread_mutex_unlock(&cp->lock);
-          return false;
+          return 1;
         }
         cp->cap = len;
       }
       memcpy(cp->value.s, tmp, len);
     } else {
       pthread_mutex_unlock(&cp->lock);
-      return false;
+      return 1;
     }
     pthread_mutex_unlock(&cp->lock);
     break;
@@ -156,9 +156,9 @@ bool hs_load_checkpoint(lua_State *L, int idx, hs_ip_checkpoint *cp)
   case LUA_TNIL:
     break;
   default:
-    return false;
+    return 1;
   }
-  return true;
+  return 0;
 }
 
 
@@ -222,7 +222,7 @@ void hs_lookup_input_checkpoint(hs_checkpoint_reader *cpr,
 
   if (!pos) {
     char fqfn[HS_MAX_PATH];
-    if (!hs_get_fqfn(path, subdir, fqfn, sizeof(fqfn))) {
+    if (hs_get_fqfn(path, subdir, fqfn, sizeof(fqfn))) {
       hs_log(NULL, g_module, 0, "checkpoint name exceeds the max length: %d",
              sizeof(fqfn));
       exit(EXIT_FAILURE);
@@ -246,28 +246,37 @@ void hs_update_input_checkpoint(hs_checkpoint_reader *cpr,
 }
 
 
-void hs_output_checkpoints(hs_checkpoint_reader *cpr, FILE *fh)
+int hs_output_checkpoints(hs_checkpoint_reader *cpr, FILE *fh)
 {
+  int rv = 0;
   const char *key;
   pthread_mutex_lock(&cpr->lock);
   lua_pushnil(cpr->values);
-  while (lua_next(cpr->values, LUA_GLOBALSINDEX) != 0) {
+  while (!rv && lua_next(cpr->values, LUA_GLOBALSINDEX) != 0) {
     if (lua_type(cpr->values, -2) == LUA_TSTRING) {
       key = lua_tostring(cpr->values, -2);
       switch (lua_type(cpr->values, -1)) {
       case LUA_TSTRING:
-        fprintf(fh, "_G['%s'] = '", key);
-        hs_output_lua_string(fh, lua_tostring(cpr->values, -1));
-        fwrite("'\n", 2, 1, fh);
+        if (fprintf(fh, "_G['%s'] = '", key) < 0) {
+          rv = 1;
+          break;
+        }
+        if (hs_output_lua_string(fh, lua_tostring(cpr->values, -1))) {
+          rv = 1;
+          break;
+        }
+        rv = (fwrite("'\n", 2, 1, fh) != 1);
         break;
       case LUA_TNUMBER:
-        fprintf(fh, "_G['%s'] = %.17g\n", key, lua_tonumber(cpr->values, -1));
+        rv = (fprintf(fh, "_G['%s'] = %.17g\n", key,
+                      lua_tonumber(cpr->values, -1)) < 0);
         break;
       }
     }
     lua_pop(cpr->values, 1);
   }
   pthread_mutex_unlock(&cpr->lock);
+  return rv;
 }
 
 
@@ -303,8 +312,7 @@ void hs_cleanup_checkpoints(hs_checkpoint_reader *cpr,
           // analysis thread does not exist anymore
           remove_checkpoint(cpr, key);
         }
-      }
-      else if (sscanf(subkey, "%[^.].%s", type, name) == 2) {
+      } else if (sscanf(subkey, "%[^.].%s", type, name) == 2) {
         int ret = snprintf(path, HS_MAX_PATH, "%s/%s/%s%s", run_path,
                            type, name, hs_cfg_ext);
         if (ret < 0 || ret > (int)sizeof(path) - 1) {

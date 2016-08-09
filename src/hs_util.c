@@ -22,41 +22,40 @@ bool hs_file_exists(const char *fn)
 }
 
 
-bool hs_get_fqfn(const char *path,
-                 const char *name,
-                 char *fqfn,
-                 size_t fqfn_len)
+int hs_get_fqfn(const char *path,
+                const char *name,
+                char *fqfn,
+                size_t fqfn_len)
 {
-  int ret = snprintf(fqfn, fqfn_len, "%s/%s", path, name);
-  if (ret < 0 || ret > (int)fqfn_len - 1) {
-    return false;
-  }
-  return true;
+  int rv = snprintf(fqfn, fqfn_len, "%s/%s", path, name);
+  return (rv < 0 || rv > (int)fqfn_len - 1);
 }
 
 
-void hs_output_lua_string(FILE *fh, const char *s)
+int hs_output_lua_string(FILE *fh, const char *s)
 {
+  int rv = 1;
   size_t len = strlen(s);
-  for (unsigned i = 0; i < len; ++i) {
+  for (unsigned i = 0; i < len && rv == 1; ++i) {
     switch (s[i]) {
     case '\n':
-      fwrite("\\n", 2, 1, fh);
+      rv = fwrite("\\n", 2, 1, fh);
       break;
     case '\r':
-      fwrite("\\r", 2, 1, fh);
+      rv = fwrite("\\r", 2, 1, fh);
       break;
     case '"':
-      fwrite("\\\"", 2, 1, fh);
+      rv = fwrite("\\\"", 2, 1, fh);
       break;
     case '\\':
       fwrite("\\\\", 2, 1, fh);
       break;
     default:
-      fwrite(s + i, 1, 1, fh);
+      rv = fwrite(s + i, 1, 1, fh);
       break;
     }
   }
+  return rv == 1 ? 0 : 1;
 }
 
 
