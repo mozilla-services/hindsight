@@ -10,6 +10,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <sys/vfs.h>
 
 bool hs_file_exists(const char *fn)
 {
@@ -22,41 +23,40 @@ bool hs_file_exists(const char *fn)
 }
 
 
-bool hs_get_fqfn(const char *path,
-                 const char *name,
-                 char *fqfn,
-                 size_t fqfn_len)
+int hs_get_fqfn(const char *path,
+                const char *name,
+                char *fqfn,
+                size_t fqfn_len)
 {
-  int ret = snprintf(fqfn, fqfn_len, "%s/%s", path, name);
-  if (ret < 0 || ret > (int)fqfn_len - 1) {
-    return false;
-  }
-  return true;
+  int rv = snprintf(fqfn, fqfn_len, "%s/%s", path, name);
+  return (rv < 0 || rv > (int)fqfn_len - 1);
 }
 
 
-void hs_output_lua_string(FILE *fh, const char *s)
+int hs_output_lua_string(FILE *fh, const char *s)
 {
+  int rv = 1;
   size_t len = strlen(s);
-  for (unsigned i = 0; i < len; ++i) {
+  for (unsigned i = 0; i < len && rv == 1; ++i) {
     switch (s[i]) {
     case '\n':
-      fwrite("\\n", 2, 1, fh);
+      rv = fwrite("\\n", 2, 1, fh);
       break;
     case '\r':
-      fwrite("\\r", 2, 1, fh);
+      rv = fwrite("\\r", 2, 1, fh);
       break;
     case '"':
-      fwrite("\\\"", 2, 1, fh);
+      rv = fwrite("\\\"", 2, 1, fh);
       break;
     case '\\':
       fwrite("\\\\", 2, 1, fh);
       break;
     default:
-      fwrite(s + i, 1, 1, fh);
+      rv = fwrite(s + i, 1, 1, fh);
       break;
     }
   }
+  return rv == 1 ? 0 : 1;
 }
 
 
@@ -66,4 +66,12 @@ bool hs_has_ext(const char *fn, const char *ext)
   size_t elen = strlen(ext);
   if (flen <= elen) return false; // a fn with only an extension is invalid
   return strcmp(fn + flen - elen, ext) == 0 ? true : false;
+}
+
+
+unsigned hs_disk_free_ob(const char *path, unsigned ob_size)
+{
+  struct statfs buf;
+  if (ob_size == 0 || statfs(path, &buf)) return 0;
+  return buf.f_bsize * buf.f_bavail / ob_size;
 }

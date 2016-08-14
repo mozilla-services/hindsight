@@ -33,8 +33,10 @@ static int inject_message(void *parent, const char *pb, size_t pb_len)
 {
   static bool backpressure = false;
   static char header[14];
-  hs_analysis_plugin *p = parent;
 
+  hs_analysis_plugin *p = parent;
+  int rv = 1;
+  bool bp;
   pthread_mutex_lock(&p->at->plugins->output.lock);
   int len = lsb_pb_output_varint(header + 3, pb_len);
   int tlen = 4 + len + pb_len;
@@ -42,31 +44,55 @@ static int inject_message(void *parent, const char *pb, size_t pb_len)
   header[1] = (char)(len + 1);
   header[2] = 0x08;
   header[3 + len] = 0x1f;
-  fwrite(header, 4 + len, 1, p->at->plugins->output.fh);
-  fwrite(pb, pb_len, 1, p->at->plugins->output.fh);
-  p->at->plugins->output.cp.offset += tlen;
-  if (p->at->plugins->output.cp.offset >= p->at->plugins->cfg->output_size) {
-    ++p->at->plugins->output.cp.id;
-    hs_open_output_file(&p->at->plugins->output);
-    if (p->at->plugins->cfg->backpressure
-        && p->at->plugins->output.cp.id - p->at->plugins->output.min_cp_id
-        > p->at->plugins->cfg->backpressure) {
-      backpressure = true;
-      hs_log(NULL, g_module, 4, "applying backpressure");
+  if (fwrite(header, 4 + len, 1, p->at->plugins->output.fh) == 1
+      && fwrite(pb, pb_len, 1, p->at->plugins->output.fh) == 1) {
+    p->at->plugins->output.cp.offset += tlen;
+    if (p->at->plugins->output.cp.offset >= p->at->plugins->cfg->output_size) {
+      ++p->at->plugins->output.cp.id;
+      hs_open_output_file(&p->at->plugins->output);
+      if (p->at->plugins->cfg->backpressure
+          && p->at->plugins->output.cp.id - p->at->plugins->output.min_cp_id
+          > p->at->plugins->cfg->backpressure) {
+        backpressure = true;
+        hs_log(NULL, g_module, 4, "applying backpressure (checkpoint)");
+      }
+      if (!backpressure && p->at->plugins->cfg->backpressure_df) {
+        unsigned df = hs_disk_free_ob(p->at->plugins->output.path,
+                                      p->at->plugins->cfg->output_size);
+        if (df <= p->at->plugins->cfg->backpressure_df) {
+          backpressure = true;
+          hs_log(NULL, g_module, 4, "applying backpressure (disk)");
+        }
+      }
     }
-  }
-  if (backpressure) {
-    if (p->at->plugins->output.cp.id == p->at->plugins->output.min_cp_id) {
-      backpressure = false;
-      hs_log(NULL, g_module, 4, "releasing backpressure");
+    if (backpressure) {
+      bool release_dfbp = true;
+      if (p->at->plugins->cfg->backpressure_df) {
+        unsigned df = hs_disk_free_ob(p->at->plugins->output.path,
+                                      p->at->plugins->cfg->output_size);
+        release_dfbp = (df > p->at->plugins->cfg->backpressure_df);
+      }
+      // even if we triggered on disk space continue to backpressure
+      // until the queue is caught up too
+      if (p->at->plugins->output.cp.id == p->at->plugins->output.min_cp_id
+          && release_dfbp) {
+        backpressure = false;
+        hs_log(NULL, g_module, 4, "releasing backpressure");
+      }
     }
+    rv = 0;
+  } else {
+    hs_log(NULL, g_module, 0, "inject_message fwrite failed: %s",
+           strerror(ferror(p->at->plugins->output.fh)));
+    exit(EXIT_FAILURE);
   }
+  bp = backpressure;
   pthread_mutex_unlock(&p->at->plugins->output.lock);
 
-  if (backpressure) {
+  if (bp) {
     usleep(100000); // throttle to 10 messages per second
   }
-  return 0;
+  return rv;
 }
 
 
@@ -90,7 +116,7 @@ create_analysis_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
   char *state_file = NULL;
 
   char lua_file[HS_MAX_PATH];
-  if (!hs_get_fqfn(sbc->dir, sbc->filename, lua_file, sizeof(lua_file))) {
+  if (hs_get_fqfn(sbc->dir, sbc->filename, lua_file, sizeof(lua_file))) {
     hs_log(NULL, g_module, 3, "%s failed to construct the lua_file path",
            sbc->cfg_name);
     return NULL;
@@ -531,11 +557,11 @@ static void process_lua(hs_analysis_plugins *plugins, const char *lpath,
   while ((entry = readdir(dp))) {
     if (hs_has_ext(entry->d_name, hs_lua_ext)) {
       // move the Lua to the run directory
-      if (!hs_get_fqfn(lpath, entry->d_name, lua_lpath, sizeof(lua_lpath))) {
+      if (hs_get_fqfn(lpath, entry->d_name, lua_lpath, sizeof(lua_lpath))) {
         hs_log(NULL, g_module, 0, "load lua path too long");
         exit(EXIT_FAILURE);
       }
-      if (!hs_get_fqfn(rpath, entry->d_name, lua_rpath, sizeof(lua_rpath))) {
+      if (hs_get_fqfn(rpath, entry->d_name, lua_rpath, sizeof(lua_rpath))) {
         hs_log(NULL, g_module, 0, "run lua path too long");
         exit(EXIT_FAILURE);
       }
@@ -605,7 +631,7 @@ static int get_thread_id(const char *lpath, const char *rpath, const char *name)
 
     if (otid != ntid) { // mis-matched cfgs so remove the load .cfg
       char path[HS_MAX_PATH];
-      if (!hs_get_fqfn(lpath, name, path, sizeof(path))) {
+      if (hs_get_fqfn(lpath, name, path, sizeof(path))) {
         hs_log(NULL, g_module, 0, "load off path too long");
         exit(EXIT_FAILURE);
       }
@@ -629,7 +655,7 @@ static int get_thread_id(const char *lpath, const char *rpath, const char *name)
 
     // no config was found so remove the .off flag
     char path[HS_MAX_PATH];
-    if (!hs_get_fqfn(lpath, name, path, sizeof(path))) {
+    if (hs_get_fqfn(lpath, name, path, sizeof(path))) {
       hs_log(NULL, g_module, 0, "load off path too long");
       exit(EXIT_FAILURE);
     }
@@ -647,11 +673,11 @@ void hs_load_analysis_plugins(hs_analysis_plugins *plugins,
 {
   char lpath[HS_MAX_PATH];
   char rpath[HS_MAX_PATH];
-  if (!hs_get_fqfn(cfg->load_path, hs_analysis_dir, lpath, sizeof(lpath))) {
+  if (hs_get_fqfn(cfg->load_path, hs_analysis_dir, lpath, sizeof(lpath))) {
     hs_log(NULL, g_module, 0, "load path too long");
     exit(EXIT_FAILURE);
   }
-  if (!hs_get_fqfn(cfg->run_path, hs_analysis_dir, rpath, sizeof(rpath))) {
+  if (hs_get_fqfn(cfg->run_path, hs_analysis_dir, rpath, sizeof(rpath))) {
     hs_log(NULL, g_module, 0, "run path too long");
     exit(EXIT_FAILURE);
   }

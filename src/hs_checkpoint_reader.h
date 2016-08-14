@@ -54,7 +54,7 @@ void hs_init_checkpoint_reader(hs_checkpoint_reader *cpr, const char *path);
 
 void hs_free_checkpoint_reader(hs_checkpoint_reader *cpr);
 
-bool hs_load_checkpoint(lua_State *L, int idx, hs_ip_checkpoint *cp);
+int hs_load_checkpoint(lua_State *L, int idx, hs_ip_checkpoint *cp);
 
 void hs_lookup_checkpoint(hs_checkpoint_reader *cpr,
                           const char *key,
@@ -75,7 +75,7 @@ void hs_update_input_checkpoint(hs_checkpoint_reader *cpr,
                                 const char *key,
                                 const hs_checkpoint *cp);
 
-void hs_output_checkpoints(hs_checkpoint_reader *cpr, FILE *fh);
+int hs_output_checkpoints(hs_checkpoint_reader *cpr, FILE *fh);
 
 void hs_remove_checkpoint(hs_checkpoint_reader *cpr,
                                 const char *key);

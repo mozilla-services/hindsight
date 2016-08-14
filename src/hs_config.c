@@ -41,6 +41,7 @@ static const char *cfg_io_lua_cpath = "io_lua_cpath";
 static const char *cfg_max_message_size = "max_message_size";
 static const char *cfg_hostname = "hostname";
 static const char *cfg_backpressure = "backpressure";
+static const char *cfg_backpressure_df = "backpressure_disk_free";
 static const char *cfg_rm_checkpoint = "remove_checkpoint_on_stop";
 
 static const char *cfg_sb_ipd = "input_defaults";
@@ -89,6 +90,7 @@ static void init_config(hs_config *cfg)
   cfg->analysis_threads = 1;
   cfg->max_message_size = 1024 * 64;
   cfg->backpressure = 0;
+  cfg->backpressure_df = 4;
   cfg->rm_checkpoint = false;
   cfg->pid = (int)getpid();
   init_sandbox_config(&cfg->ipd);
@@ -456,6 +458,10 @@ int hs_load_config(const char *fn, hs_config *cfg)
                          &cfg->backpressure);
   if (ret) goto cleanup;
 
+  ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_backpressure_df,
+                         &cfg->backpressure_df);
+  if (ret) goto cleanup;
+
   ret = get_string_item(L, LUA_GLOBALSINDEX, cfg_load_path, &cfg->load_path,
                         "");
   if (ret) goto cleanup;
@@ -552,12 +558,12 @@ int hs_process_load_cfg(const char *lpath, const char *rpath, const char *name)
 {
   if (hs_has_ext(name, hs_cfg_ext)) {
     char cfg_lpath[HS_MAX_PATH];
-    if (!hs_get_fqfn(lpath, name, cfg_lpath, sizeof(cfg_lpath))) {
+    if (hs_get_fqfn(lpath, name, cfg_lpath, sizeof(cfg_lpath))) {
       hs_log(NULL, g_module, 0, "load cfg path too long");
       exit(EXIT_FAILURE);
     }
     char cfg_rpath[HS_MAX_PATH];
-    if (!hs_get_fqfn(rpath, name, cfg_rpath, sizeof(cfg_rpath))) {
+    if (hs_get_fqfn(rpath, name, cfg_rpath, sizeof(cfg_rpath))) {
       hs_log(NULL, g_module, 0, "run cfg path too long");
       exit(EXIT_FAILURE);
     }
@@ -583,7 +589,7 @@ int hs_process_load_cfg(const char *lpath, const char *rpath, const char *name)
     return 1;
   } else if (hs_has_ext(name, hs_off_ext)) {
     char off_lpath[HS_MAX_PATH];
-    if (!hs_get_fqfn(lpath, name, off_lpath, sizeof(off_lpath))) {
+    if (hs_get_fqfn(lpath, name, off_lpath, sizeof(off_lpath))) {
       hs_log(NULL, g_module, 0, "load off path too long");
       exit(EXIT_FAILURE);
     }
@@ -595,7 +601,7 @@ int hs_process_load_cfg(const char *lpath, const char *rpath, const char *name)
 
     // move the current cfg to .off and shutdown the plugin
     char off_rpath[HS_MAX_PATH];
-    if (!hs_get_fqfn(rpath, name, off_rpath, sizeof(off_rpath))) {
+    if (hs_get_fqfn(rpath, name, off_rpath, sizeof(off_rpath))) {
       hs_log(NULL, g_module, 0, "run off path too long");
       exit(EXIT_FAILURE);
     }

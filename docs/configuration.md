@@ -27,8 +27,16 @@
 * **max_message_size** - maximum size of a valid message (bytes, default 64KiB)
 * **backpressure** - delta between the writer queue file and the slowest reader, when exceeded
   backpressure is applied  (message injection will be slowed) until the writer and reader
-  are both on the same file (count, default 0 (no backpressure))
-  e.g. backpressure = 10 [writer = 100.log, slowest reader = 89.log, delta = 11]
+  are both on the same file (count, default 0 (no backpressure)) e.g.
+```lua
+backpressure = 10 -- [writer = 100.log, slowest reader = 89.log, delta = 11]
+```
+* **backpressure_disk_free** - Number of output file units (`N * <output_size>`). Backpressure is applied
+  (message injection will be slowed) until the free space rises above this threshold
+  (count, default 4 (0 to disable)) e.g.
+```lua
+backpressure_disk_free = 4 -- [256MiB when using the defaults]
+```
 * **hostname** - hostname used in logging/messages (default gethostname())
 * **remove_checkpoint_on_stop** - removes the checkpoint entry when the plugin
   is stopped, terminated, or has been manually removed (default false)
