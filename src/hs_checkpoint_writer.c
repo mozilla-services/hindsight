@@ -111,7 +111,7 @@ void hs_write_checkpoints(hs_checkpoint_writer *cpw, hs_checkpoint_reader *cpr)
                   "%llu\t%llu\t%llu\t%llu\t"
                   "0\t0\t"
                   "%.0f\t%.0f\t"
-                  "%.0f\t%.0f\t\n",
+                  "%.0f\t%.0f\n",
                   p->name,
                   p->stats.im_cnt, p->stats.im_bytes,
                   p->stats.pm_cnt, p->stats.pm_failures,
@@ -170,7 +170,7 @@ void hs_write_checkpoints(hs_checkpoint_writer *cpw, hs_checkpoint_reader *cpr)
                   "%llu\t%llu\t%llu\t%llu\t"
                   "%.0f\t%.0f\t"
                   "%.0f\t%.0f\t"
-                  "%.0f\t%.0f\t\n",
+                  "%.0f\t%.0f\n",
                   p->name,
                   p->stats.im_cnt, p->stats.im_bytes,
                   p->stats.pm_cnt, p->stats.pm_failures,
@@ -216,7 +216,7 @@ void hs_write_checkpoints(hs_checkpoint_writer *cpw, hs_checkpoint_reader *cpr)
                 "%llu\t%llu\t%llu\t%llu\t"
                 "%.0f\t%.0f\t"
                 "%.0f\t%.0f\t"
-                "%.0f\t%.0f\t\n",
+                "%.0f\t%.0f\n",
                 p->name,
                 p->stats.im_cnt, p->stats.im_bytes,
                 p->stats.pm_cnt, p->stats.pm_failures,

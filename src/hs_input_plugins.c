@@ -116,6 +116,14 @@ static int inject_message(void *parent,
     p->sample = false;
   }
   pthread_mutex_unlock(&p->cp.lock);
+
+  if (!pb) { // a NULL message is used as a synchronization point
+    if (!sem_trywait(&p->shutdown)) {
+      sem_post(&p->shutdown);
+      lsb_heka_stop_sandbox_clean(p->hsb);
+    }
+    return rv;
+  }
   if (rv) return rv;
 
   bool bp;
@@ -290,6 +298,7 @@ create_input_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
   return p;
 }
 
+
 static void* input_thread(void *arg)
 {
   hs_input_plugin *p = (hs_input_plugin *)arg;
@@ -318,23 +327,25 @@ static void* input_thread(void *arg)
     }
     ret = lsb_heka_pm_input(p->hsb, ncp, scp, profile);
     if (ret <= 0) {
-      if (p->ticker_interval == 0) break; // run once
-
-      if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
-        hs_log(NULL, p->name, 3, "clock_gettime failed");
-        ts.tv_sec = time(NULL);
-        ts.tv_nsec = 0;
+      if (p->ticker_interval == 0) { // run once
+        if (!sem_trywait(&p->shutdown)) {
+          shutdown = true;
+        }
+        break; // exit
+      } else {  // poll
+        if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
+          hs_log(NULL, p->name, 3, "clock_gettime failed");
+          ts.tv_sec = time(NULL);
+          ts.tv_nsec = 0;
+        }
+        ts.tv_sec += p->ticker_interval;
+        if (!sem_timedwait(&p->shutdown, &ts)) {
+          shutdown = true;
+          break; // shutting down
+        }
       }
-      ts.tv_sec += p->ticker_interval;
-      if (!sem_timedwait(&p->shutdown, &ts)) {
-        sem_post(&p->shutdown);
-        shutdown = true;
-        break; // shutting down
-      }
-      // poll
     } else {
       if (!sem_trywait(&p->shutdown)) {
-        sem_post(&p->shutdown);
         shutdown = true;
       }
       break; // exiting due to error
@@ -352,6 +363,7 @@ static void* input_thread(void *arg)
 
   if (shutdown) {
     hs_log(NULL, p->name, 6, "shutting down");
+    sem_post(&p->shutdown);
   } else {
     hs_log(NULL, p->name, 6, "detaching received: %d msg: %s", ret,
            lsb_heka_get_error(p->hsb));
@@ -379,12 +391,28 @@ static bool join_thread(hs_input_plugins *plugins, hs_input_plugin *p)
     ts.tv_sec = time(NULL);
     ts.tv_nsec = 0;
   }
-  ts.tv_sec += 2;
 
+  ts.tv_sec += 2;
   if (pthread_timedjoin_np(p->thread, NULL, &ts)) {
-    p->orphaned = true;
-    hs_log(NULL, p->name, 4, "plugin is blocked on a system call");
-    return false;
+    lsb_heka_stop_sandbox(p->hsb);
+    hs_log(NULL, p->name, 4, "sandbox did not respond to a clean stop");
+    ts.tv_sec += 2;
+    if (pthread_timedjoin_np(p->thread, NULL, &ts)) {
+      if (!sem_trywait(&p->shutdown)) {
+        p->orphaned = true;
+        hs_log(NULL, p->name, 3, "sandbox did not respond to a forced stop "
+                                 "(orphaning)");
+        sem_post(&p->shutdown);
+        return false;
+      } else {
+        ts.tv_sec += 1;
+        if (pthread_timedjoin_np(p->thread, NULL, &ts)) {
+          hs_log(NULL, p->name, 2, "sandbox acknowledged the stop but failed "
+                                   "to stop (undefined behavior)");
+          return false;
+        }
+      }
+    }
   }
   destroy_input_plugin(p);
   --plugins->list_cnt;
@@ -396,7 +424,7 @@ static bool remove_plugin(hs_input_plugins *plugins, int idx)
 {
   hs_input_plugin *p = plugins->list[idx];
   sem_post(&p->shutdown);
-  lsb_heka_stop_sandbox(p->hsb);
+  lsb_heka_stop_sandbox_clean(p->hsb);
   if (join_thread(plugins, p)) {
     plugins->list[idx] = NULL;
     return true;
@@ -668,9 +696,7 @@ void hs_stop_input_plugins(hs_input_plugins *plugins)
   pthread_mutex_lock(&plugins->list_lock);
   for (int i = 0; i < plugins->list_cap; ++i) {
     if (!plugins->list[i]) continue;
-
     sem_post(&plugins->list[i]->shutdown);
-    lsb_heka_stop_sandbox(plugins->list[i]->hsb);
   }
   pthread_mutex_unlock(&plugins->list_lock);
 }

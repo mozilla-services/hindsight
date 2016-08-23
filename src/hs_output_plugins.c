@@ -218,9 +218,9 @@ static int output_message(hs_output_plugin *p, lsb_heka_message *msg,
   int ret = 0, te_ret = 0;
   time_t current_t = time(NULL);
   unsigned long long start;
+  unsigned long long mmdelta = 0;
 
   if (msg->raw.s) { // non idle/empty message
-    unsigned long long mmdelta = 0;
     if (sample) start = lsb_get_time();
     bool matched = lsb_eval_message_matcher(p->mm, msg);
     if (sample) {
@@ -263,14 +263,16 @@ static int output_message(hs_output_plugin *p, lsb_heka_message *msg,
     if (ret <= 0 && !p->batching) {
       update_checkpoint(p);
     }
+  }
 
-    if (sample) {
-      pthread_mutex_lock(&p->cp_lock);
+  if (sample) {
+    pthread_mutex_lock(&p->cp_lock);
+    if (mmdelta) {
       lsb_update_running_stats(&p->mms, mmdelta);
-      p->stats = lsb_heka_get_stats(p->hsb);
-      p->sample = false;
-      pthread_mutex_unlock(&p->cp_lock);
     }
+    p->stats = lsb_heka_get_stats(p->hsb);
+    p->sample = false;
+    pthread_mutex_unlock(&p->cp_lock);
   }
 
   if (ret <= 0 && p->ticker_interval
