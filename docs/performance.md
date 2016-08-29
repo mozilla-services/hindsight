@@ -4,7 +4,7 @@ It is very preliminary but I setup a test using some Nginx logs. The logs were s
 1,002,646 log lines. The test consists of parsing the Nginx logs, converting them to a Heka protobuf stream, and writing 
 them back to disk.  The configurations were setup to be as equivalent as posssible (single output, similar flush 
 intervals, and individual readers for each file in the concurrent test). The configs can be found here: 
-https://github.com/trink/hindsight/tree/master/benchmarks.  
+https://github.com/mozilla-services/hindsight/tree/master/benchmarks.
 
 ### Test Hardware
 

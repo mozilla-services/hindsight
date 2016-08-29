@@ -370,7 +370,6 @@ static void analyze_message(hs_analysis_thread *at, bool sample)
       bool matched = lsb_eval_message_matcher(p->mm, at->msg);
       if (sample) {
         lsb_update_running_stats(&p->mms, lsb_get_time() - start);
-        p->stats = lsb_heka_get_stats(p->hsb);
       }
       if (matched) {
         ret = lsb_heka_pm_analysis(p->hsb, at->msg, false);
@@ -381,6 +380,9 @@ static void analyze_message(hs_analysis_thread *at, bool sample)
           }
         }
       }
+    }
+    if (sample) {
+      p->stats = lsb_heka_get_stats(p->hsb);
     }
 
     if (ret <= 0 && p->ticker_interval && at->current_t >= p->ticker_expires) {

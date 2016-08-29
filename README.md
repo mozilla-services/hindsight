@@ -17,11 +17,11 @@ Hindsight is that light weight skeleton around the same lua sandbox offering
 
 * Clang 3.1 or GCC 4.7+
 * CMake (3.0+) - http://cmake.org/cmake/resources/software.html
-* lua_sandbox (1.0.3+) - https://github.com/mozilla-services/lua_sandbox
+* lua_sandbox (1.1+) - https://github.com/mozilla-services/lua_sandbox
 
 ### CMake Build Instructions
 
-    git clone git@github.com:trink/hindsight.git
+    git clone git@github.com:mozilla-services/hindsight.git
     cd hindsight 
     mkdir release
     cd release

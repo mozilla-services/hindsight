@@ -13,7 +13,7 @@ if(MSVC)
     set(CMAKE_C_FLAGS_DEBUG     "/MDd /Zi /RTC1")
 
     # multi threaded dll runtime, optimize for speed, auto inlining
-    set(CMAKE_C_FLAGS_RELEASE   "/MD /O2 /Ob2 /DNDEBUG")
+    set(CMAKE_C_FLAGS_RELEASE   "/MD /O2 /Ob2")
 
     set(CPACK_GENERATOR         "NSIS")
 else()
