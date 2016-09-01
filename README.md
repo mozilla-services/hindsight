@@ -12,7 +12,7 @@ Hindsight is that light weight skeleton around the same lua sandbox offering
 * [Full Documentation](docs/index.md)
 * Support
     * IRC: [#hindsight on irc.mozilla.org](irc://irc.mozilla.org/hindsight)
-    * Mailing list: https://groups.google.com/a/mozilla.com/forum/?hl=en#!forum/hindsight
+    * Mailing list: https://mail.mozilla.org/listinfo/hindsight
 
 ## Build
 
