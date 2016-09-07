@@ -11,6 +11,7 @@
 
 #include <luasandbox/util/input_buffer.h>
 
+#include "hs_checkpoint_reader.h"
 #include "hs_config.h"
 
 #include <pthread.h>

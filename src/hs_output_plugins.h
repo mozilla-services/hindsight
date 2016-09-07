@@ -32,7 +32,7 @@ struct hs_output_plugin {
   lsb_heka_sandbox    *hsb;
   lsb_message_matcher *mm;
   hs_output_plugins   *plugins;
-  uintptr_t  sequence_id;
+  uintptr_t           sequence_id;
   lsb_running_stats   mms;
   lsb_heka_stats      stats;
   int                 ticker_interval;
@@ -54,8 +54,9 @@ struct hs_output_plugin {
 };
 
 struct hs_output_plugins {
-  hs_output_plugin **list;
-  hs_config *cfg;
+  hs_output_plugin      **list;
+  hs_config             *cfg;
+  hs_checkpoint_reader  *cpr;
 
   int list_cnt;
   int list_cap;
@@ -63,13 +64,13 @@ struct hs_output_plugins {
   pthread_mutex_t list_lock;
 };
 
-void hs_init_output_plugins(hs_output_plugins *plugins, hs_config *cfg);
+void hs_init_output_plugins(hs_output_plugins *plugins,
+                            hs_config *cfg,
+                            hs_checkpoint_reader *cpr);
 
 void hs_free_output_plugins(hs_output_plugins *plugins);
 
-void hs_load_output_plugins(hs_output_plugins *plugins,
-                            const hs_config *cfg,
-                            bool dynamic);
+void hs_load_output_plugins(hs_output_plugins *plugins, bool dynamic);
 
 void hs_stop_output_plugins(hs_output_plugins *plugins);
 

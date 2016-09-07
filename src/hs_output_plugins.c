@@ -437,12 +437,12 @@ static void* input_thread(void *arg)
 
   // hold the current checkpoints in memory incase we restart it
   hs_output_plugins *plugins = p->plugins;
-  hs_update_input_checkpoint(&plugins->cfg->cp_reader,
+  hs_update_input_checkpoint(plugins->cpr,
                              hs_input_dir,
                              p->name,
                              &p->cp.input);
 
-  hs_update_input_checkpoint(&plugins->cfg->cp_reader,
+  hs_update_input_checkpoint(plugins->cpr,
                              hs_analysis_dir,
                              p->name,
                              &p->cp.analysis);
@@ -455,9 +455,9 @@ static void* input_thread(void *arg)
     if (plugins->cfg->rm_checkpoint) {
       char key[HS_MAX_PATH];
       snprintf(key, HS_MAX_PATH, "%s->%s", hs_input_dir, p->name);
-      hs_remove_checkpoint(&plugins->cfg->cp_reader, key);
+      hs_remove_checkpoint(plugins->cpr, key);
       snprintf(key, HS_MAX_PATH, "%s->%s", hs_analysis_dir, p->name);
-      hs_remove_checkpoint(&plugins->cfg->cp_reader, key);
+      hs_remove_checkpoint(plugins->cpr, key);
     }
     pthread_mutex_lock(&plugins->list_lock);
     plugins->list[p->list_index] = NULL;
@@ -504,10 +504,10 @@ static void remove_from_output_plugins(hs_output_plugins *plugins,
         char key[HS_MAX_PATH];
         snprintf(key, HS_MAX_PATH, "%s->%s.%.*s", hs_input_dir,
                  hs_output_dir, (int)strlen(name) - HS_EXT_LEN, name);
-        hs_remove_checkpoint(&plugins->cfg->cp_reader, key);
+        hs_remove_checkpoint(plugins->cpr, key);
         snprintf(key, HS_MAX_PATH, "%s->%s.%.*s", hs_analysis_dir,
                  hs_output_dir, (int)strlen(name) - HS_EXT_LEN, name);
-        hs_remove_checkpoint(&plugins->cfg->cp_reader, key);
+        hs_remove_checkpoint(plugins->cpr, key);
       }
       break;
     }
@@ -561,21 +561,20 @@ static void add_to_output_plugins(hs_output_plugins *plugins,
   pthread_mutex_unlock(&plugins->list_lock);
   assert(p->list_index >= 0);
 
-  hs_config *cfg = p->plugins->cfg;
   // sync the output and read checkpoints
   // the read and output checkpoints can differ to allow for batching
-  hs_lookup_input_checkpoint(&cfg->cp_reader,
+  hs_lookup_input_checkpoint(p->plugins->cpr,
                              hs_input_dir,
                              p->name,
-                             cfg->output_path,
+                             p->plugins->cfg->output_path,
                              &p->input.cp);
   p->cur.input.id = p->cp.input.id = p->input.cp.id;
   p->cur.input.offset = p->cp.input.offset = p->input.cp.offset;
 
-  hs_lookup_input_checkpoint(&cfg->cp_reader,
+  hs_lookup_input_checkpoint(p->plugins->cpr,
                              hs_analysis_dir,
                              p->name,
-                             cfg->output_path,
+                             p->plugins->cfg->output_path,
                              &p->analysis.cp);
   p->cur.analysis.id = p->cp.analysis.id = p->analysis.cp.id;
   p->cur.analysis.offset = p->cp.analysis.offset = p->analysis.cp.offset;
@@ -588,9 +587,12 @@ static void add_to_output_plugins(hs_output_plugins *plugins,
 }
 
 
-void hs_init_output_plugins(hs_output_plugins *plugins, hs_config *cfg)
+void hs_init_output_plugins(hs_output_plugins *plugins,
+                            hs_config *cfg,
+                            hs_checkpoint_reader *cpr)
 {
   plugins->cfg = cfg;
+  plugins->cpr = cpr;
   plugins->list = NULL;
   plugins->list_cnt = 0;
   plugins->list_cap = 0;
@@ -702,9 +704,9 @@ static void process_lua(hs_output_plugins *plugins, const char *lpath,
 }
 
 
-void hs_load_output_plugins(hs_output_plugins *plugins, const hs_config *cfg,
-                            bool dynamic)
+void hs_load_output_plugins(hs_output_plugins *plugins, bool dynamic)
 {
+  hs_config *cfg = plugins->cfg;
   char lpath[HS_MAX_PATH];
   char rpath[HS_MAX_PATH];
   if (hs_get_fqfn(cfg->load_path, hs_output_dir, lpath, sizeof(lpath))) {

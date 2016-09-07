@@ -13,9 +13,8 @@
 #include <luasandbox/util/output_buffer.h>
 #include <stdbool.h>
 
-#include "hs_checkpoint_reader.h"
-
 #define HS_EXT_LEN 4
+#define HS_MAX_PATH 260
 
 extern const char *hs_input_dir;
 extern const char *hs_analysis_dir;
@@ -31,7 +30,7 @@ typedef struct hs_sandbox_config
   char *cfg_name;
   char *cfg_lua;
 
-  char *message_matcher; // analysis/output sandbox only
+  char     *message_matcher; // analysis/output sandbox only
   unsigned thread; // analysis sandbox only
   unsigned async_buffer_size; // output sandbox only
 
@@ -39,8 +38,8 @@ typedef struct hs_sandbox_config
   unsigned memory_limit;
   unsigned instruction_limit;
   unsigned ticker_interval;
-  bool preserve_data;
-  bool restricted_headers;
+  bool     preserve_data;
+  bool     restricted_headers;
 } hs_sandbox_config;
 
 typedef struct hs_config
@@ -53,14 +52,15 @@ typedef struct hs_config
   char *analysis_lua_path;
   char *analysis_lua_cpath;
   char *hostname;
+
   unsigned max_message_size;
   unsigned output_size;
   unsigned analysis_threads;
   unsigned backpressure;
   unsigned backpressure_df;
-  bool rm_checkpoint;
-  int pid;
-  hs_checkpoint_reader cp_reader;
+  int      pid;
+  bool     rm_checkpoint;
+
   hs_sandbox_config ipd; // input plugin defaults
   hs_sandbox_config apd; // analysis plugin defaults
   hs_sandbox_config opd; // output plugin defaults

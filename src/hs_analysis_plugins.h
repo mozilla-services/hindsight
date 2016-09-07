@@ -38,11 +38,12 @@ struct hs_analysis_plugin {
 };
 
 struct hs_analysis_plugins {
-  hs_analysis_thread  *list;
-  pthread_t           *threads;
-  hs_config           *cfg;
-  int                 thread_cnt;
-  hs_output           output;
+  hs_analysis_thread    *list;
+  pthread_t             *threads;
+  hs_config             *cfg;
+  hs_checkpoint_reader  *cpr;
+  int                   thread_cnt;
+  hs_output             output;
 };
 
 struct hs_analysis_thread {
@@ -63,15 +64,15 @@ struct hs_analysis_thread {
   bool     sample;
 };
 
-void hs_init_analysis_plugins(hs_analysis_plugins *plugins, hs_config *cfg);
+void hs_init_analysis_plugins(hs_analysis_plugins *plugins,
+                              hs_config *cfg,
+                              hs_checkpoint_reader *cpr);
 
 void hs_free_analysis_plugins(hs_analysis_plugins *plugins);
 
 void hs_start_analysis_threads(hs_analysis_plugins *plugins);
 
-void hs_load_analysis_plugins(hs_analysis_plugins *plugins,
-                              const hs_config *cfg,
-                              bool dynamic);
+void hs_load_analysis_plugins(hs_analysis_plugins *plugins, bool dynamic);
 
 void hs_start_analysis_input(hs_analysis_plugins *plugins, pthread_t *t);
 

@@ -9,6 +9,7 @@
 #ifndef hs_output_h_
 #define hs_output_h_
 
+#include "hs_checkpoint_reader.h"
 #include "hs_config.h"
 
 #include <luasandbox/lua.h>
