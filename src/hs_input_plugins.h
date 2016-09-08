@@ -36,8 +36,9 @@ struct hs_input_plugin {
 };
 
 struct hs_input_plugins {
-  hs_input_plugin **list;
-  hs_config       *cfg;
+  hs_input_plugin       **list;
+  hs_config             *cfg;
+  hs_checkpoint_reader  *cpr;
 
   pthread_mutex_t list_lock;
   int list_cnt;
@@ -46,12 +47,13 @@ struct hs_input_plugins {
   hs_output output;
 };
 
-void hs_init_input_plugins(hs_input_plugins *plugins, hs_config *cfg);
+void hs_init_input_plugins(hs_input_plugins *plugins,
+                           hs_config *cfg,
+                           hs_checkpoint_reader *cpr);
 
 void hs_free_input_plugins(hs_input_plugins *plugins);
 
-void hs_load_input_plugins(hs_input_plugins *plugins, const hs_config *cfg,
-                           bool dynamic);
+void hs_load_input_plugins(hs_input_plugins *plugins, bool dynamic);
 
 void hs_stop_input_plugins(hs_input_plugins *plugins);
 

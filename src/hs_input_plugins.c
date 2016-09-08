@@ -359,7 +359,7 @@ static void* input_thread(void *arg)
   hs_input_plugins *plugins = p->plugins;
   // hold the current checkpoint in memory until we shutdown to facilitate
   // resuming where it left off
-  hs_update_checkpoint(&plugins->cfg->cp_reader, p->name, &p->cp);
+  hs_update_checkpoint(plugins->cpr, p->name, &p->cp);
 
   if (shutdown) {
     hs_log(NULL, p->name, 6, "shutting down");
@@ -368,7 +368,7 @@ static void* input_thread(void *arg)
     hs_log(NULL, p->name, 6, "detaching received: %d msg: %s", ret,
            lsb_heka_get_error(p->hsb));
     if (plugins->cfg->rm_checkpoint) {
-      hs_remove_checkpoint(&plugins->cfg->cp_reader, p->name);
+      hs_remove_checkpoint(plugins->cpr, p->name);
     }
     pthread_mutex_lock(&plugins->list_lock);
     plugins->list[p->list_index] = NULL;
@@ -401,14 +401,14 @@ static bool join_thread(hs_input_plugins *plugins, hs_input_plugin *p)
       if (!sem_trywait(&p->shutdown)) {
         p->orphaned = true;
         hs_log(NULL, p->name, 3, "sandbox did not respond to a forced stop "
-                                 "(orphaning)");
+               "(orphaning)");
         sem_post(&p->shutdown);
         return false;
       } else {
         ts.tv_sec += 1;
         if (pthread_timedjoin_np(p->thread, NULL, &ts)) {
           hs_log(NULL, p->name, 2, "sandbox acknowledged the stop but failed "
-                                   "to stop (undefined behavior)");
+                 "to stop (undefined behavior)");
           return false;
         }
       }
@@ -449,7 +449,7 @@ static bool remove_from_input_plugins(hs_input_plugins *plugins,
           char key[HS_MAX_PATH];
           snprintf(key, HS_MAX_PATH, "%s.%.*s", hs_input_dir,
                    (int)strlen(name) - HS_EXT_LEN, name);
-          hs_remove_checkpoint(&plugins->cfg->cp_reader, key);
+          hs_remove_checkpoint(plugins->cpr, key);
         }
       }
       break;
@@ -509,7 +509,7 @@ static bool add_to_input_plugins(hs_input_plugins *plugins, hs_input_plugin *p)
   pthread_mutex_unlock(&plugins->list_lock);
   assert(p->list_index >= 0);
 
-  hs_lookup_checkpoint(&p->plugins->cfg->cp_reader, p->name, &p->cp);
+  hs_lookup_checkpoint(p->plugins->cpr, p->name, &p->cp);
 
   int ret = pthread_create(&p->thread,
                            NULL,
@@ -523,10 +523,13 @@ static bool add_to_input_plugins(hs_input_plugins *plugins, hs_input_plugin *p)
 }
 
 
-void hs_init_input_plugins(hs_input_plugins *plugins, hs_config *cfg)
+void hs_init_input_plugins(hs_input_plugins *plugins,
+                           hs_config *cfg,
+                           hs_checkpoint_reader *cpr)
 {
   hs_init_output(&plugins->output, cfg->output_path, hs_input_dir);
   plugins->cfg = cfg;
+  plugins->cpr = cpr;
   plugins->list_cnt = 0;
   plugins->list = NULL;
   plugins->list_cap = 0;
@@ -629,9 +632,9 @@ static void process_lua(hs_input_plugins *plugins, const char *lpath,
 }
 
 
-void hs_load_input_plugins(hs_input_plugins *plugins, const hs_config *cfg,
-                           bool dynamic)
+void hs_load_input_plugins(hs_input_plugins *plugins, bool dynamic)
 {
+  hs_config *cfg = plugins->cfg;
   char lpath[HS_MAX_PATH];
   char rpath[HS_MAX_PATH];
   if (hs_get_fqfn(cfg->load_path, hs_input_dir, lpath, sizeof(lpath))) {

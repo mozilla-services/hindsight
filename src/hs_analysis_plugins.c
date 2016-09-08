@@ -492,12 +492,16 @@ static void* input_thread(void *arg)
 }
 
 
-void hs_init_analysis_plugins(hs_analysis_plugins *plugins, hs_config *cfg)
+void hs_init_analysis_plugins(hs_analysis_plugins *plugins,
+                              hs_config *cfg,
+                              hs_checkpoint_reader *cpr)
+
 {
   hs_init_output(&plugins->output, cfg->output_path, hs_analysis_dir);
 
   plugins->thread_cnt = cfg->analysis_threads;
   plugins->cfg = cfg;
+  plugins->cpr = cpr;
 
   plugins->list = malloc(sizeof(hs_analysis_thread) * cfg->analysis_threads);
   for (unsigned i = 0; i < cfg->analysis_threads; ++i) {
@@ -669,10 +673,9 @@ static int get_thread_id(const char *lpath, const char *rpath, const char *name)
 }
 
 
-void hs_load_analysis_plugins(hs_analysis_plugins *plugins,
-                              const hs_config *cfg,
-                              bool dynamic)
+void hs_load_analysis_plugins(hs_analysis_plugins *plugins, bool dynamic)
 {
+  hs_config *cfg = plugins->cfg;
   char lpath[HS_MAX_PATH];
   char rpath[HS_MAX_PATH];
   if (hs_get_fqfn(cfg->load_path, hs_analysis_dir, lpath, sizeof(lpath))) {
@@ -738,11 +741,10 @@ void hs_start_analysis_threads(hs_analysis_plugins *plugins)
 {
   for (int i = 0; i < plugins->thread_cnt; ++i) {
     hs_analysis_thread *at = &plugins->list[i];
-    hs_config *cfg = at->plugins->cfg;
-    hs_lookup_input_checkpoint(&cfg->cp_reader,
+    hs_lookup_input_checkpoint(at->plugins->cpr,
                                hs_input_dir,
                                at->input.name,
-                               cfg->output_path,
+                               at->plugins->cfg->output_path,
                                &at->input.cp);
     at->cp.id = at->input.cp.id;
     at->cp.offset = at->input.cp.offset;

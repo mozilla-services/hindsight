@@ -163,8 +163,8 @@ static int get_numeric_item(lua_State *L, int idx, const char *name,
   switch (t) {
   case LUA_TNUMBER:
     d = lua_tonumber(L, -1);
-    if (d < 0) {
-      lua_pushfstring(L, "%s must be set to a positive number", name);
+    if (d < 0 || d > UINT_MAX) {
+      lua_pushfstring(L, "%s must be an unsigned int", name);
       return 1;
     }
     *val = (unsigned)d;
@@ -281,8 +281,6 @@ void hs_free_config(hs_config *cfg)
   hs_free_sandbox_config(&cfg->ipd);
   hs_free_sandbox_config(&cfg->apd);
   hs_free_sandbox_config(&cfg->opd);
-
-  hs_free_checkpoint_reader(&cfg->cp_reader);
 }
 
 
@@ -527,8 +525,6 @@ int hs_load_config(const char *fn, hs_config *cfg)
   ret = check_for_unknown_options(L, LUA_GLOBALSINDEX, NULL);
   if (ret) goto cleanup;
 
-  hs_init_checkpoint_reader(&cfg->cp_reader, cfg->output_path);
-
 cleanup:
   if (ret) {
     hs_log(NULL, g_module, 3, "loading %s failed: %s", fn, lua_tostring(L, -1));
@@ -663,6 +659,17 @@ bool hs_get_full_config(lsb_output_buffer *ob, char type, const hs_config *cfg,
 
   // just test the last write to make sure the buffer wasn't exhausted
   lsb_err_value ret = lsb_outputf(ob, "-- end Hindsight configuration\n");
+
+  char fcfg[] = ".fcfg";
+  char fn[strlen(sbc->dir) + 1 + strlen(sbc->cfg_name) + sizeof(fcfg)];
+  char *p = strchr(sbc->cfg_name, '.');
+  if (!p) return false;
+  snprintf(fn, sizeof(fn), "%s/%s%s", sbc->dir, p + 1, fcfg);
+  FILE* fh = fopen(fn, "we");
+  if (!fh) return false;
+  fwrite(ob->buf, ob->pos, 1, fh);
+  fclose(fh);
+
   return ret ? false : true;
 }
 
