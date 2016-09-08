@@ -116,6 +116,7 @@ create_output_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
   p->list_index = -1;
   p->sequence_id = 1;
   p->ticker_interval = sbc->ticker_interval;
+  p->rm_cp_terminate = sbc->rm_cp_terminate;
   int stagger = p->ticker_interval > 60 ? 60 : p->ticker_interval;
   // distribute when the timer_events will fire
   if (stagger) {
@@ -452,7 +453,7 @@ static void* input_thread(void *arg)
   } else {
     hs_log(NULL, p->name, 6, "detaching received: %d msg: %s", ret,
            lsb_heka_get_error(p->hsb));
-    if (plugins->cfg->rm_checkpoint) {
+    if (p->rm_cp_terminate) {
       char key[HS_MAX_PATH];
       snprintf(key, HS_MAX_PATH, "%s->%s", hs_input_dir, p->name);
       hs_remove_checkpoint(plugins->cpr, key);
@@ -500,15 +501,13 @@ static void remove_from_output_plugins(hs_output_plugins *plugins,
     char *pos = p->name + tlen;
     if (strstr(name, pos) && strlen(pos) == strlen(name) - HS_EXT_LEN) {
       remove_plugin(plugins, i);
-      if (plugins->cfg->rm_checkpoint) {
-        char key[HS_MAX_PATH];
-        snprintf(key, HS_MAX_PATH, "%s->%s.%.*s", hs_input_dir,
-                 hs_output_dir, (int)strlen(name) - HS_EXT_LEN, name);
-        hs_remove_checkpoint(plugins->cpr, key);
-        snprintf(key, HS_MAX_PATH, "%s->%s.%.*s", hs_analysis_dir,
-                 hs_output_dir, (int)strlen(name) - HS_EXT_LEN, name);
-        hs_remove_checkpoint(plugins->cpr, key);
-      }
+      char key[HS_MAX_PATH];
+      snprintf(key, HS_MAX_PATH, "%s->%s.%.*s", hs_input_dir,
+               hs_output_dir, (int)strlen(name) - HS_EXT_LEN, name);
+      hs_remove_checkpoint(plugins->cpr, key);
+      snprintf(key, HS_MAX_PATH, "%s->%s.%.*s", hs_analysis_dir,
+               hs_output_dir, (int)strlen(name) - HS_EXT_LEN, name);
+      hs_remove_checkpoint(plugins->cpr, key);
       break;
     }
   }

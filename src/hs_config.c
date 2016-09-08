@@ -42,7 +42,6 @@ static const char *cfg_max_message_size = "max_message_size";
 static const char *cfg_hostname = "hostname";
 static const char *cfg_backpressure = "backpressure";
 static const char *cfg_backpressure_df = "backpressure_disk_free";
-static const char *cfg_rm_checkpoint = "remove_checkpoint_on_stop";
 
 static const char *cfg_sb_ipd = "input_defaults";
 static const char *cfg_sb_apd = "analysis_defaults";
@@ -57,6 +56,7 @@ static const char *cfg_sb_ticker_interval = "ticker_interval";
 static const char *cfg_sb_thread = "thread";
 static const char *cfg_sb_async_buffer = "async_buffer_size";
 static const char *cfg_sb_matcher = "message_matcher";
+static const char *cfg_sb_rm_cp_terminate = "remove_checkpoints_on_terminate";
 
 static void init_sandbox_config(hs_sandbox_config *cfg)
 {
@@ -65,6 +65,7 @@ static void init_sandbox_config(hs_sandbox_config *cfg)
   cfg->instruction_limit = 1000000;
   cfg->preserve_data = false;
   cfg->restricted_headers = true;
+  cfg->rm_cp_terminate = false;
   cfg->dir = NULL;
   cfg->filename = NULL;
   cfg->cfg_name = NULL;
@@ -91,7 +92,6 @@ static void init_config(hs_config *cfg)
   cfg->max_message_size = 1024 * 64;
   cfg->backpressure = 0;
   cfg->backpressure_df = 4;
-  cfg->rm_checkpoint = false;
   cfg->pid = (int)getpid();
   init_sandbox_config(&cfg->ipd);
   init_sandbox_config(&cfg->apd);
@@ -226,6 +226,13 @@ static int load_sandbox_defaults(lua_State *L,
     return 1;
   }
 
+  if (strcmp(key, cfg_sb_opd) == 0) {
+    if (get_bool_item(L, 1, cfg_sb_rm_cp_terminate,
+                      &cfg->rm_cp_terminate)) {
+      return 1;
+    }
+  }
+
   if (check_for_unknown_options(L, 1, key)) return 1;
 
   remove_item(L, LUA_GLOBALSINDEX, key);
@@ -326,6 +333,7 @@ bool hs_load_sandbox_config(const char *dir,
     cfg->ticker_interval = dflt->ticker_interval;
     cfg->preserve_data = dflt->preserve_data;
     cfg->restricted_headers = dflt->restricted_headers;
+    cfg->rm_cp_terminate = dflt->rm_cp_terminate;
   }
 
   int ret = luaL_dostring(L, cfg->cfg_lua);
@@ -406,6 +414,10 @@ bool hs_load_sandbox_config(const char *dir,
   if (type == 'o') {
     ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_sb_async_buffer,
                            &cfg->async_buffer_size);
+    if (ret) goto cleanup;
+
+    ret = get_bool_item(L, LUA_GLOBALSINDEX, cfg_sb_rm_cp_terminate,
+                        &cfg->rm_cp_terminate);
     if (ret) goto cleanup;
   }
 
@@ -507,10 +519,6 @@ int hs_load_config(const char *fn, hs_config *cfg)
     lua_pushfstring(L, "%s must be 1-64", cfg_threads);
     ret = 1;
   }
-  if (ret) goto cleanup;
-
-  ret = get_bool_item(L, LUA_GLOBALSINDEX, cfg_rm_checkpoint,
-                      &cfg->rm_checkpoint);
   if (ret) goto cleanup;
 
   ret = load_sandbox_defaults(L, cfg_sb_ipd, &cfg->ipd);

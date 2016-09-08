@@ -31,15 +31,13 @@
 ```lua
 backpressure = 10 -- [writer = 100.log, slowest reader = 89.log, delta = 11]
 ```
-* **backpressure_disk_free** - Number of output file units (`N * <output_size>`). Backpressure is applied
-  (message injection will be slowed) until the free space rises above this threshold
-  (count, default 4 (0 to disable)) e.g.
+* **backpressure_disk_free** - Number of output file units (`N * <output_size>`).
+  Backpressure is applied (message injection will be slowed) until the free
+  space rises above this threshold (count, default 4 (0 to disable)) e.g.
 ```lua
 backpressure_disk_free = 4 -- [256MiB when using the defaults]
 ```
 * **hostname** - hostname used in logging/messages (default gethostname())
-* **remove_checkpoint_on_stop** - removes the checkpoint entry when the plugin
-  is stopped, terminated, or has been manually removed (default false)
 
 ```lua
 output_path             = "output"
@@ -77,17 +75,27 @@ output_defaults = {
 
 #### Default Sandbox Configuration Variables
 
-* **output_limit** - the largest message an input or analysis plugin can inject into Hindsight (bytes, default 64KiB)
-* **memory_limit** - the maximum amount of memory a plugin can use before being terminated (bytes, default 8MiB)
-* **instruction_limit** - the maximum number of Lua instructions a plugin can execute in a single `process_message` or
+* **output_limit** - the largest message an input or analysis plugin can inject
+  into Hindsight (bytes, default 64KiB)
+* **memory_limit** - the maximum amount of memory a plugin can use before being
+  terminated (bytes, default 8MiB)
+* **instruction_limit** - the maximum number of Lua instructions a plugin can
+  execute in a single `process_message` or
 `timer_event` function call (count, default 1MM)
-* **preserve_data** - flag indicating if all global data should be saved on shutdown (bool, default false)
-* **restricted_headers** - flag indicating that the following header fields are not user modifiable
-  `Hostname` and `Logger` (bool, default true (analysis), false (input/output))
+* **preserve_data** - flag indicating if all global data should be saved on
+  shutdown (bool, default false)
+* **restricted_headers** - flag indicating that the following header fields are
+  not user modifiable `Hostname` and `Logger` (bool, default true (analysis),
+  false (input/output))
 * **ticker_interval** (default 0)
-  * For input plugins it is the poll interval when `process_message` is called see: [polling input
-plugins](https://github.com/mozilla-services/lua_sandbox/blob/master/docs/heka/input.md#polling)
-  * For analysis and output plugins it is the amount of time between `timer_event` function calls
+  * For input plugins it is the poll interval when `process_message` is called
+    see: [polling input plugins](https://github.com/mozilla-services/lua_sandbox/blob/master/docs/heka/input.md#polling)
+  * For analysis and output plugins it is the amount of time between
+    `timer_event` function calls
+* **remove_checkpoints_on_terminate** - (`output_defaults` only) removes the
+  checkpoint entries when the plugin is terminated (default false).  This
+  prevents the data from being pruned until the plugin can be fixed but it can
+  also cause the system to back pressure as it will start filling the disk.
 
 #### Common Plugin Configuration Variables
 

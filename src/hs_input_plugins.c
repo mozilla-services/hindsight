@@ -367,9 +367,6 @@ static void* input_thread(void *arg)
   } else {
     hs_log(NULL, p->name, 6, "detaching received: %d msg: %s", ret,
            lsb_heka_get_error(p->hsb));
-    if (plugins->cfg->rm_checkpoint) {
-      hs_remove_checkpoint(plugins->cpr, p->name);
-    }
     pthread_mutex_lock(&plugins->list_lock);
     plugins->list[p->list_index] = NULL;
     if (pthread_detach(p->thread)) {
@@ -444,14 +441,7 @@ static bool remove_from_input_plugins(hs_input_plugins *plugins,
 
     char *pos = plugins->list[i]->name + tlen;
     if (strstr(name, pos) && strlen(pos) == strlen(name) - HS_EXT_LEN) {
-      if ((removed = remove_plugin(plugins, i))) {
-        if (plugins->cfg->rm_checkpoint) {
-          char key[HS_MAX_PATH];
-          snprintf(key, HS_MAX_PATH, "%s.%.*s", hs_input_dir,
-                   (int)strlen(name) - HS_EXT_LEN, name);
-          hs_remove_checkpoint(plugins->cpr, key);
-        }
-      }
+      removed = remove_plugin(plugins, i);
       break;
     }
   }

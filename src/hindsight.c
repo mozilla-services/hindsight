@@ -88,9 +88,7 @@ int main(int argc, char *argv[])
 
   hs_checkpoint_reader cpr;
   hs_init_checkpoint_reader(&cpr, cfg.output_path);
-  if (cfg.rm_checkpoint) {
-    hs_cleanup_checkpoints(&cpr, cfg.run_path, cfg.analysis_threads);
-  }
+  hs_cleanup_checkpoints(&cpr, cfg.run_path, cfg.analysis_threads);
 
   hs_log(NULL, g_module, 6, "starting");
   sigset_t signal_set;
