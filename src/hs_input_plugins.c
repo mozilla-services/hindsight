@@ -104,7 +104,6 @@ static int inject_message(void *parent,
                           const char *cp_string)
 {
   static bool backpressure = false;
-  static size_t bytes_written = 0;
   static char header[14];
 
   hs_input_plugin *p = parent;
@@ -137,26 +136,22 @@ static int inject_message(void *parent,
   header[3 + len] = 0x1f;
   if (fwrite(header, 4 + len, 1, p->plugins->output.fh) == 1
       && fwrite(pb, pb_len, 1, p->plugins->output.fh) == 1) {
-    bytes_written += tlen;
-    if (bytes_written > BUFSIZ) {
-      p->plugins->output.cp.offset += bytes_written;
-      bytes_written = 0;
-      if (p->plugins->output.cp.offset >= p->plugins->cfg->output_size) {
-        ++p->plugins->output.cp.id;
-        hs_open_output_file(&p->plugins->output);
-        if (p->plugins->cfg->backpressure
-            && p->plugins->output.cp.id - p->plugins->output.min_cp_id
-            > p->plugins->cfg->backpressure) {
+    p->plugins->output.cp.offset += tlen;
+    if (p->plugins->output.cp.offset >= p->plugins->cfg->output_size) {
+      ++p->plugins->output.cp.id;
+      hs_open_output_file(&p->plugins->output);
+      if (p->plugins->cfg->backpressure
+          && p->plugins->output.cp.id - p->plugins->output.min_cp_id
+          > p->plugins->cfg->backpressure) {
+        backpressure = true;
+        hs_log(NULL, g_module, 4, "applying backpressure (checkpoint)");
+      }
+      if (!backpressure && p->plugins->cfg->backpressure_df) {
+        unsigned df = hs_disk_free_ob(p->plugins->output.path,
+                                      p->plugins->cfg->output_size);
+        if (df <= p->plugins->cfg->backpressure_df) {
           backpressure = true;
-          hs_log(NULL, g_module, 4, "applying backpressure (checkpoint)");
-        }
-        if (!backpressure && p->plugins->cfg->backpressure_df) {
-          unsigned df = hs_disk_free_ob(p->plugins->output.path,
-                                        p->plugins->cfg->output_size);
-          if (df <= p->plugins->cfg->backpressure_df) {
-            backpressure = true;
-            hs_log(NULL, g_module, 4, "applying backpressure (disk)");
-          }
+          hs_log(NULL, g_module, 4, "applying backpressure (disk)");
         }
       }
     }
@@ -333,6 +328,10 @@ static void* input_thread(void *arg)
         }
         break; // exit
       } else {  // poll
+        pthread_mutex_lock(&p->cp.lock);
+        p->stats = lsb_heka_get_stats(p->hsb);
+        pthread_mutex_unlock(&p->cp.lock);
+
         if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
           hs_log(NULL, p->name, 3, "clock_gettime failed");
           ts.tv_sec = time(NULL);
