@@ -328,6 +328,10 @@ static void* input_thread(void *arg)
         }
         break; // exit
       } else {  // poll
+        pthread_mutex_lock(&p->cp.lock);
+        p->stats = lsb_heka_get_stats(p->hsb);
+        pthread_mutex_unlock(&p->cp.lock);
+
         if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
           hs_log(NULL, p->name, 3, "clock_gettime failed");
           ts.tv_sec = time(NULL);
