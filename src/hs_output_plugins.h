@@ -43,6 +43,7 @@ struct hs_output_plugin {
   bool      batching;
   bool      stop;
   bool      sample;
+  bool      rm_cp_terminate;
   hs_input input;
   hs_input analysis;
 

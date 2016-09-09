@@ -40,6 +40,7 @@ typedef struct hs_sandbox_config
   unsigned ticker_interval;
   bool     preserve_data;
   bool     restricted_headers;
+  bool     rm_cp_terminate;   // output sandbox only
 } hs_sandbox_config;
 
 typedef struct hs_config
@@ -59,7 +60,6 @@ typedef struct hs_config
   unsigned backpressure;
   unsigned backpressure_df;
   int      pid;
-  bool     rm_checkpoint;
 
   hs_sandbox_config ipd; // input plugin defaults
   hs_sandbox_config apd; // analysis plugin defaults
