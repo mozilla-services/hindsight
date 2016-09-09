@@ -77,6 +77,7 @@ void hs_write_checkpoints(hs_checkpoint_writer *cpw, hs_checkpoint_reader *cpr)
 {
   static int cnt = 0;
   static bool sample = false;
+  static hs_checkpoint hscp = {0};
   unsigned long long min_input_id = ULLONG_MAX, min_analysis_id = ULLONG_MAX;
 
   FILE *tsv = NULL; // any stat write failures are non critical and will be
@@ -131,31 +132,33 @@ void hs_write_checkpoints(hs_checkpoint_writer *cpw, hs_checkpoint_reader *cpr)
       hs_log(NULL, g_module, 0, "input queue fflush failed");
       exit(EXIT_FAILURE);
     }
+    hscp = cpw->input_plugins->output.cp;
     pthread_mutex_unlock(&cpw->input_plugins->output.lock);
+    hs_update_input_checkpoint(cpr, hs_input_dir, NULL, &hscp);
   }
 
   if (cpw->analysis_plugins) {
-    hs_checkpoint cp;
-
     for (int i = 0; i < cpw->analysis_plugins->thread_cnt; ++i) {
       hs_analysis_thread *at = &cpw->analysis_plugins->list[i];
       pthread_mutex_lock(&at->cp_lock);
-      cp = at->cp;
+      hscp = at->cp;
       if (!at->sample) {
         at->sample = sample;
       }
       pthread_mutex_unlock(&at->cp_lock);
-      if (cp.id < min_input_id) {
-        min_input_id = cp.id;
+      if (hscp.id < min_input_id) {
+        min_input_id = hscp.id;
       }
-      hs_update_input_checkpoint(cpr, hs_input_dir, at->input.name, &cp);
+      hs_update_input_checkpoint(cpr, hs_input_dir, at->input.name, &hscp);
 
       pthread_mutex_lock(&cpw->analysis_plugins->output.lock);
       if (fflush(cpw->analysis_plugins->output.fh)) {
         hs_log(NULL, g_module, 0, "analysis queue fflush failed");
         exit(EXIT_FAILURE);
       }
+      hscp = cpw->analysis_plugins->output.cp;
       pthread_mutex_unlock(&cpw->analysis_plugins->output.lock);
+      hs_update_input_checkpoint(cpr, hs_analysis_dir, NULL, &hscp);
 
       if (tsv) {
         hs_analysis_plugin *p;

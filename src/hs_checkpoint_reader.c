@@ -205,7 +205,11 @@ void hs_lookup_input_checkpoint(hs_checkpoint_reader *cpr,
 {
   const char *pos = NULL;
   pthread_mutex_lock(&cpr->lock);
-  lua_pushfstring(cpr->values, "%s->%s", subdir, key);
+  if (key) {
+    lua_pushfstring(cpr->values, "%s->%s", subdir, key);
+  } else {
+    lua_pushstring(cpr->values, subdir);
+  }
   lua_gettable(cpr->values, LUA_GLOBALSINDEX);
   if (lua_type(cpr->values, -1) == LUA_TSTRING) {
     const char *tmp = lua_tostring(cpr->values, -1);
@@ -221,13 +225,19 @@ void hs_lookup_input_checkpoint(hs_checkpoint_reader *cpr,
   pthread_mutex_unlock(&cpr->lock);
 
   if (!pos) {
-    char fqfn[HS_MAX_PATH];
-    if (hs_get_fqfn(path, subdir, fqfn, sizeof(fqfn))) {
-      hs_log(NULL, g_module, 0, "checkpoint name exceeds the max length: %d",
-             sizeof(fqfn));
-      exit(EXIT_FAILURE);
+    if (path) {
+      char fqfn[HS_MAX_PATH];
+      if (hs_get_fqfn(path, subdir, fqfn, sizeof(fqfn))) {
+        hs_log(NULL, g_module, 0, "checkpoint name exceeds the max length: %d",
+               sizeof(fqfn));
+        exit(EXIT_FAILURE);
+      }
+      cp->id = find_first_id(fqfn);
+    } else {
+      if (key) {
+        hs_lookup_input_checkpoint(cpr, subdir, NULL, path, cp);
+      }
     }
-    cp->id = find_first_id(fqfn);
   }
 }
 
@@ -238,7 +248,11 @@ void hs_update_input_checkpoint(hs_checkpoint_reader *cpr,
                                 const hs_checkpoint *cp)
 {
   pthread_mutex_lock(&cpr->lock);
-  lua_pushfstring(cpr->values, "%s->%s", subdir, key);
+  if (key) {
+    lua_pushfstring(cpr->values, "%s->%s", subdir, key);
+  } else {
+    lua_pushstring(cpr->values, subdir);
+  }
   lua_pushfstring(cpr->values, "%f:%f", (lua_Number)cp->id,
                   (lua_Number)cp->offset);
   lua_settable(cpr->values, LUA_GLOBALSINDEX);
