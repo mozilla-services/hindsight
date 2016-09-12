@@ -77,7 +77,7 @@ void hs_write_checkpoints(hs_checkpoint_writer *cpw, hs_checkpoint_reader *cpr)
 {
   static int cnt = 0;
   static bool sample = false;
-  static hs_checkpoint hscp = {0};
+  static hs_checkpoint hscp = { .id = 0, .offset = 0 };
   unsigned long long min_input_id = ULLONG_MAX, min_analysis_id = ULLONG_MAX;
 
   FILE *tsv = NULL; // any stat write failures are non critical and will be
