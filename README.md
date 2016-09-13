@@ -24,7 +24,7 @@ Hindsight is that light weight skeleton around the same lua sandbox offering
 
 ### CMake Build Instructions
 
-    git clone git@github.com:mozilla-services/hindsight.git
+    git clone https://github.com/mozilla-services/hindsight.git
     cd hindsight 
     mkdir release
     cd release
