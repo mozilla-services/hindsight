@@ -13,6 +13,8 @@
 #include <stdio.h>
 #include <time.h>
 
+#include "hs_config.h"
+
 /**
  * Test a file exists and can be opened for reading.
  *
@@ -31,6 +33,25 @@ bool hs_file_exists(const char *fn);
  * @return bool True if the extension matches
  */
 bool hs_has_ext(const char *fn, const char *ext);
+
+/**
+ * Attempts to locate the Lua file in the run_path and then the install_path.
+ * Returns true if the file was found and the fully qualified filename was added
+ * to the fqfn buffer.
+ *
+ * @param cfg Hindsight configuration
+ * @param sbc Sandbox configuration
+ * @param ptype Plugin type (dir name)
+ * @param fqfn Buffer for the fully qualified file name to be returned in
+ * @param fqfn_len Size of the buffer
+ *
+ * @return bool
+ */
+bool hs_find_lua(const hs_config *cfg,
+                const hs_sandbox_config *sbc,
+                const char *ptype,
+                char *fqfn,
+                size_t fqfn_len);
 
 /**
  * Constructs a fully qualified filename from the provided components

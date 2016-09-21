@@ -33,6 +33,7 @@ static const char *cfg_output_path = "output_path";
 static const char *cfg_output_size = "output_size";
 static const char *cfg_load_path = "sandbox_load_path";
 static const char *cfg_run_path = "sandbox_run_path";
+static const char *cfg_install_path = "sandbox_install_path";
 static const char *cfg_threads = "analysis_threads";
 static const char *cfg_analysis_lua_path = "analysis_lua_path";
 static const char *cfg_analysis_lua_cpath = "analysis_lua_cpath";
@@ -56,6 +57,7 @@ static const char *cfg_sb_ticker_interval = "ticker_interval";
 static const char *cfg_sb_thread = "thread";
 static const char *cfg_sb_async_buffer = "async_buffer_size";
 static const char *cfg_sb_matcher = "message_matcher";
+static const char *cfg_sb_shutdown_terminate = "shutdown_on_terminate";
 static const char *cfg_sb_rm_cp_terminate = "remove_checkpoints_on_terminate";
 
 static void init_sandbox_config(hs_sandbox_config *cfg)
@@ -66,6 +68,7 @@ static void init_sandbox_config(hs_sandbox_config *cfg)
   cfg->preserve_data = false;
   cfg->restricted_headers = true;
   cfg->rm_cp_terminate = false;
+  cfg->shutdown_terminate = false;
   cfg->dir = NULL;
   cfg->filename = NULL;
   cfg->cfg_name = NULL;
@@ -82,6 +85,7 @@ static void init_config(hs_config *cfg)
   cfg->run_path = NULL;
   cfg->load_path = NULL;
   cfg->output_path = NULL;
+  cfg->install_path = NULL;
   cfg->io_lua_path = NULL;
   cfg->io_lua_cpath = NULL;
   cfg->analysis_lua_path = NULL;
@@ -226,6 +230,11 @@ static int load_sandbox_defaults(lua_State *L,
     return 1;
   }
 
+  if (get_bool_item(L, 1, cfg_sb_shutdown_terminate,
+                    &cfg->shutdown_terminate)) {
+    return 1;
+  }
+
   if (strcmp(key, cfg_sb_opd) == 0) {
     if (get_bool_item(L, 1, cfg_sb_rm_cp_terminate,
                       &cfg->rm_cp_terminate)) {
@@ -269,6 +278,9 @@ void hs_free_config(hs_config *cfg)
 
   free(cfg->output_path);
   cfg->output_path = NULL;
+
+  free(cfg->install_path);
+  cfg->install_path = NULL;
 
   free(cfg->io_lua_path);
   cfg->io_lua_path = NULL;
@@ -333,6 +345,7 @@ bool hs_load_sandbox_config(const char *dir,
     cfg->ticker_interval = dflt->ticker_interval;
     cfg->preserve_data = dflt->preserve_data;
     cfg->restricted_headers = dflt->restricted_headers;
+    cfg->shutdown_terminate = dflt->shutdown_terminate;
     cfg->rm_cp_terminate = dflt->rm_cp_terminate;
   }
 
@@ -397,6 +410,10 @@ bool hs_load_sandbox_config(const char *dir,
 
   ret = get_bool_item(L, LUA_GLOBALSINDEX, cfg_sb_restricted_headers,
                       &cfg->restricted_headers);
+  if (ret) goto cleanup;
+
+  ret = get_bool_item(L, LUA_GLOBALSINDEX, cfg_sb_shutdown_terminate,
+                      &cfg->shutdown_terminate);
   if (ret) goto cleanup;
 
   if (type == 'a' || type == 'o') {
@@ -478,6 +495,11 @@ int hs_load_config(const char *fn, hs_config *cfg)
 
   ret = get_string_item(L, LUA_GLOBALSINDEX, cfg_run_path, &cfg->run_path,
                         NULL);
+  if (ret) goto cleanup;
+
+  ret = get_string_item(L, LUA_GLOBALSINDEX, cfg_install_path,
+                        &cfg->install_path,
+                        "/usr/share/luasandbox/sandboxes/heka");
   if (ret) goto cleanup;
 
   ret = get_string_item(L, LUA_GLOBALSINDEX, cfg_io_lua_path, &cfg->io_lua_path,
@@ -644,6 +666,7 @@ bool hs_get_full_config(lsb_output_buffer *ob, char type, const hs_config *cfg,
     lsb_outputf(ob, "max_message_size = %u\n", cfg->max_message_size);
     lsb_outputf(ob, "sandbox_load_path = [[%s]]\n", cfg->load_path);
     lsb_outputf(ob, "sandbox_run_path = [[%s]]\n", cfg->run_path);
+    lsb_outputf(ob, "sandbox_install_path = [[%s]]\n", cfg->install_path);
   }
 
   lsb_outputf(ob, "\n-- Sandbox defaults and overrides\n");
@@ -673,7 +696,7 @@ bool hs_get_full_config(lsb_output_buffer *ob, char type, const hs_config *cfg,
   char *p = strchr(sbc->cfg_name, '.');
   if (!p) return false;
   snprintf(fn, sizeof(fn), "%s/%s%s", sbc->dir, p + 1, fcfg);
-  FILE* fh = fopen(fn, "we");
+  FILE *fh = fopen(fn, "we");
   if (!fh) return false;
   fwrite(ob->buf, ob->pos, 1, fh);
   fclose(fh);

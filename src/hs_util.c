@@ -12,6 +12,7 @@
 #include <string.h>
 #include <sys/vfs.h>
 
+
 bool hs_file_exists(const char *fn)
 {
   FILE *fh = fopen(fn, "re");
@@ -30,6 +31,22 @@ int hs_get_fqfn(const char *path,
 {
   int rv = snprintf(fqfn, fqfn_len, "%s/%s", path, name);
   return (rv < 0 || rv > (int)fqfn_len - 1);
+}
+
+
+bool hs_find_lua(const hs_config *cfg,
+                const hs_sandbox_config *sbc,
+                const char *ptype,
+                char *fqfn,
+                size_t fqfn_len)
+{
+  int rv = snprintf(fqfn, fqfn_len, "%s/%s", sbc->dir, sbc->filename);
+  if (rv < 0 || rv > (int)fqfn_len - 1) return false;
+  if (hs_file_exists(fqfn)) return true;
+
+  rv = snprintf(fqfn, fqfn_len, "%s/%s/%s", cfg->install_path, ptype, sbc->filename);
+  if (rv < 0 || rv > (int)fqfn_len - 1) return false;
+  return hs_file_exists(fqfn);
 }
 
 
