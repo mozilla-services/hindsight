@@ -34,6 +34,7 @@ struct hs_analysis_plugin {
   lsb_running_stats   mms;
   lsb_heka_stats      stats;
   int                 ticker_interval;
+  bool                shutdown_terminate;
   time_t              ticker_expires;
 };
 

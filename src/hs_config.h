@@ -40,6 +40,7 @@ typedef struct hs_sandbox_config
   unsigned ticker_interval;
   bool     preserve_data;
   bool     restricted_headers;
+  bool     shutdown_terminate;
   bool     rm_cp_terminate;   // output sandbox only
 } hs_sandbox_config;
 
@@ -48,6 +49,7 @@ typedef struct hs_config
   char *run_path;
   char *load_path;
   char *output_path;
+  char *install_path;
   char *io_lua_path;
   char *io_lua_cpath;
   char *analysis_lua_path;

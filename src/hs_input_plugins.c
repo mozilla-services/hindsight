@@ -16,13 +16,15 @@
 #include <luasandbox.h>
 #include <luasandbox/lauxlib.h>
 #include <luasandbox/lua.h>
-#include <luasandbox_output.h>
 #include <luasandbox/util/protobuf.h>
+#include <luasandbox_output.h>
 #include <math.h>
 #include <pthread.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -204,11 +206,10 @@ static void destroy_input_plugin(hs_input_plugin *p)
 static hs_input_plugin*
 create_input_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
 {
-  char *state_file = NULL;
   char lua_file[HS_MAX_PATH];
-  if (hs_get_fqfn(sbc->dir, sbc->filename, lua_file, sizeof(lua_file))) {
-    hs_log(NULL, g_module, 3, "%s failed to construct the lua_file path",
-           sbc->cfg_name);
+  if (!hs_find_lua(cfg, sbc, hs_input_dir, lua_file, sizeof(lua_file))) {
+    hs_log(NULL, g_module, 3, "%s failed to find the specified lua filename: %s"
+           , sbc->cfg_name, sbc->filename);
     return NULL;
   }
 
@@ -219,6 +220,7 @@ create_input_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
     return NULL;
   }
 
+  p->shutdown_terminate = sbc->shutdown_terminate;
   p->ticker_interval = sbc->ticker_interval;
   p->list_index = -1;
 
@@ -242,6 +244,7 @@ create_input_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
   }
   memcpy(p->name, sbc->cfg_name, len);
 
+  char *state_file = NULL;
   if (sbc->preserve_data) {
     size_t len = strlen(cfg->output_path) + strlen(sbc->cfg_name) + 7;
     state_file = malloc(len);
@@ -370,6 +373,10 @@ static void* input_thread(void *arg)
     plugins->list[p->list_index] = NULL;
     if (pthread_detach(p->thread)) {
       hs_log(NULL, p->name, 3, "thread could not be detached");
+    }
+    if (p->shutdown_terminate) {
+      hs_log(NULL, p->name, 6, "shutting down on terminate");
+      kill(getpid(), SIGTERM);
     }
     destroy_input_plugin(p);
     --plugins->list_cnt;
