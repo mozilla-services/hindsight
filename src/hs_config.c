@@ -521,7 +521,7 @@ int hs_load_config(const char *fn, hs_config *cfg)
   char hostname[65] = { 0 };
   if (gethostname(hostname, sizeof(hostname))) {
     hostname[sizeof(hostname) - 1] = 0;
-    hs_log(NULL, g_module, 4, "the system hostname was trucated to: %s",
+    hs_log(NULL, g_module, 4, "the system hostname was truncated to: %s",
            hostname);
   }
 
@@ -531,7 +531,7 @@ int hs_load_config(const char *fn, hs_config *cfg)
 
   if (strlen(cfg->hostname) > sizeof(hostname) - 1) {
     cfg->hostname[sizeof(hostname) - 1] = 0;
-    hs_log(NULL, g_module, 4, "the configured hostname was trucated to: %s",
+    hs_log(NULL, g_module, 4, "the configured hostname was truncated to: %s",
            cfg->hostname);
   }
 
