@@ -487,7 +487,12 @@ static void* input_thread(void *arg)
       lsb_clear_heka_message(&msg); // create an idle/empty message
       at->msg = &msg;
       at->current_t = time(NULL);
-      analyze_message(at, false);
+      analyze_message(at, sample);
+      if (sample) {
+        pthread_mutex_lock(&at->cp_lock);
+        at->sample = false;
+        pthread_mutex_unlock(&at->cp_lock);
+      }
       at->msg = NULL;
       sleep(1);
     }

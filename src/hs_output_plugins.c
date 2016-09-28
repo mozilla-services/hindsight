@@ -429,7 +429,12 @@ static void* input_thread(void *arg)
       // trigger any pending timer events
       lsb_clear_heka_message(&im); // create an idle/empty message
       msg = &im;
-      output_message(p, msg, false);
+      output_message(p, msg, sample);
+      if (sample) {
+        pthread_mutex_lock(&p->cp_lock);
+        p->sample = false;
+        pthread_mutex_unlock(&p->cp_lock);
+      }
       msg = NULL;
       sleep(1);
     }
