@@ -379,7 +379,7 @@ static void analyze_message(hs_analysis_thread *at, bool sample)
         lsb_update_running_stats(&p->mms, lsb_get_time() - start);
       }
       if (matched) {
-        ret = lsb_heka_pm_analysis(p->hsb, at->msg, false);
+        ret = lsb_heka_pm_analysis(p->hsb, at->msg, sample);
         if (ret < 0) {
           const char *err = lsb_heka_get_error(p->hsb);
           if (strlen(err) > 0) {
