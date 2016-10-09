@@ -47,7 +47,13 @@ typedef struct hs_sandbox_config
 typedef struct hs_config
 {
   char *run_path;
+  char *run_path_input;
+  char *run_path_analysis;
+  char *run_path_output;
   char *load_path;
+  char *load_path_input;
+  char *load_path_analysis;
+  char *load_path_output;
   char *output_path;
   char *install_path;
   char *io_lua_path;

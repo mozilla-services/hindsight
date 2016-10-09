@@ -72,7 +72,9 @@ void hs_init_output_plugins(hs_output_plugins *plugins,
 
 void hs_free_output_plugins(hs_output_plugins *plugins);
 
-void hs_load_output_plugins(hs_output_plugins *plugins, bool dynamic);
+void hs_load_output_startup(hs_output_plugins *plugins);
+
+void hs_load_output_dynamic(hs_output_plugins *plugins, const char *name);
 
 void hs_stop_output_plugins(hs_output_plugins *plugins);
 

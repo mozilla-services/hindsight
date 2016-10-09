@@ -73,7 +73,9 @@ void hs_free_analysis_plugins(hs_analysis_plugins *plugins);
 
 void hs_start_analysis_threads(hs_analysis_plugins *plugins);
 
-void hs_load_analysis_plugins(hs_analysis_plugins *plugins, bool dynamic);
+void hs_load_analysis_startup(hs_analysis_plugins *plugins);
+
+void hs_load_analysis_dynamic(hs_analysis_plugins *plugins, const char *name);
 
 void hs_start_analysis_input(hs_analysis_plugins *plugins, pthread_t *t);
 

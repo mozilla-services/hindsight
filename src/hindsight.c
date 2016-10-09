@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/inotify.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -86,6 +87,23 @@ int main(int argc, char *argv[])
     return EXIT_FAILURE;
   }
 
+  int watch[3] = {0};
+  int load = 0;
+  if (cfg.load_path[0] != 0) {
+    load = inotify_init1(IN_NONBLOCK | IN_CLOEXEC);
+    if (load < 0) {
+      hs_free_config(&cfg);
+      perror("inotify_init failed");
+      return EXIT_FAILURE;
+    }
+    watch[0] = inotify_add_watch(load, cfg.load_path_input,
+                                 IN_CLOSE_WRITE | IN_MOVED_TO);
+    watch[1] = inotify_add_watch(load, cfg.load_path_analysis,
+                                 IN_CLOSE_WRITE | IN_MOVED_TO);
+    watch[2] = inotify_add_watch(load, cfg.load_path_output,
+                                 IN_CLOSE_WRITE | IN_MOVED_TO);
+  }
+
   hs_checkpoint_reader cpr;
   hs_init_checkpoint_reader(&cpr, cfg.output_path);
   hs_cleanup_checkpoints(&cpr, cfg.run_path, cfg.analysis_threads);
@@ -105,22 +123,25 @@ int main(int argc, char *argv[])
 
   hs_input_plugins ips;
   hs_init_input_plugins(&ips, &cfg, &cpr);
-  hs_load_input_plugins(&ips, false);
+  hs_load_input_startup(&ips);
 
   hs_analysis_plugins aps;
   hs_init_analysis_plugins(&aps, &cfg, &cpr);
-  hs_load_analysis_plugins(&aps, false);
+  hs_load_analysis_startup(&aps);
   hs_start_analysis_threads(&aps);
 
   hs_output_plugins ops;
   hs_init_output_plugins(&ops, &cfg, &cpr);
-  hs_load_output_plugins(&ops, false);
+  hs_load_output_startup(&ops);
 
   hs_checkpoint_writer cpw;
   hs_init_checkpoint_writer(&cpw, &ips, &aps, &ops, cfg.output_path);
 
   struct timespec ts;
-  int cnt = 0;
+  const struct inotify_event *event;
+  char inotify_buf[sizeof(struct inotify_event) + FILENAME_MAX + 1]
+      __attribute__((aligned(__alignof__(struct inotify_event))));
+
   while (true) {
     if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
       hs_log(NULL, g_module, 3, "clock_gettime failed");
@@ -133,14 +154,32 @@ int main(int argc, char *argv[])
       break; // shutting down
     }
     hs_write_checkpoints(&cpw, &cpr);
-    if (cfg.load_path[0] != 0 && ++cnt == 59) {
-      // scan just before emitting the stats
-      hs_log(NULL, g_module, 7, "scan load directories");
-      hs_load_input_plugins(&ips, true);
-      hs_load_analysis_plugins(&aps, true);
-      hs_load_output_plugins(&ops, true);
-      cnt = 0;
+
+    if (load) {
+      for (;;){
+        ssize_t len = read(load, inotify_buf, sizeof(inotify_buf));
+        if (len == -1 && errno != EAGAIN) {
+          hs_log(NULL, g_module, 1, "inotify read failure");
+          sem_post(&g_shutdown);
+        }
+        if (len <= 0) break;
+
+        for (char *ptr = inotify_buf; ptr < inotify_buf + len;
+             ptr += sizeof(struct inotify_event) + event->len) {
+          event = (const struct inotify_event *)ptr;
+          if (event->len) {
+            if (watch[1] == event->wd) {
+              hs_load_analysis_dynamic(&aps, event->name);
+            } else if (watch[0] == event->wd) {
+              hs_load_input_dynamic(&ips, event->name);
+            } else if (watch[2] == event->wd) {
+              hs_load_output_dynamic(&ops, event->name);
+            }
+          }
+        }
+      }
     }
+
 #ifdef HINDSIGHT_CLI
     if (ips.list_cnt == 0) {
       hs_log(NULL, g_module, 6, "input plugins have exited; "
@@ -148,6 +187,13 @@ int main(int argc, char *argv[])
       pthread_kill(sig_thread, SIGINT); // when all the inputs are done, exit
     }
 #endif
+  }
+
+  if (load) {
+    for (int i = 0; i < 3; ++i) {
+      inotify_rm_watch(load, watch[i]);
+    }
+    close(load);
   }
 
 #ifdef HINDSIGHT_CLI

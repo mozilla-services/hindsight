@@ -562,71 +562,67 @@ void hs_free_analysis_plugins(hs_analysis_plugins *plugins)
 }
 
 
-static void process_lua(hs_analysis_plugins *plugins, const char *lpath,
-                        const char *rpath, DIR *dp)
+static void process_lua(hs_analysis_plugins *plugins, const char *name)
 {
+  hs_config *cfg = plugins->cfg;
+  const char *lpath = cfg->load_path_analysis;
+  const char *rpath = cfg->run_path_analysis;
   char lua_lpath[HS_MAX_PATH];
   char lua_rpath[HS_MAX_PATH];
   char cfg_lpath[HS_MAX_PATH];
   char cfg_rpath[HS_MAX_PATH];
   size_t tlen = strlen(hs_analysis_dir) + 1;
 
-  struct dirent *entry;
-  while ((entry = readdir(dp))) {
-    if (hs_has_ext(entry->d_name, hs_lua_ext)) {
-      // move the Lua to the run directory
-      if (hs_get_fqfn(lpath, entry->d_name, lua_lpath, sizeof(lua_lpath))) {
-        hs_log(NULL, g_module, 0, "load lua path too long");
-        exit(EXIT_FAILURE);
-      }
-      if (hs_get_fqfn(rpath, entry->d_name, lua_rpath, sizeof(lua_rpath))) {
-        hs_log(NULL, g_module, 0, "run lua path too long");
-        exit(EXIT_FAILURE);
-      }
-      if (rename(lua_lpath, lua_rpath)) {
-        hs_log(NULL, g_module, 3, "failed to move: %s to %s errno: %d",
-               lua_lpath, lua_rpath, errno);
-        continue;
-      }
+  // move the Lua to the run directory
+  if (hs_get_fqfn(lpath, name, lua_lpath, sizeof(lua_lpath))) {
+    hs_log(NULL, g_module, 0, "load lua path too long");
+    exit(EXIT_FAILURE);
+  }
+  if (hs_get_fqfn(rpath, name, lua_rpath, sizeof(lua_rpath))) {
+    hs_log(NULL, g_module, 0, "run lua path too long");
+    exit(EXIT_FAILURE);
+  }
+  if (rename(lua_lpath, lua_rpath)) {
+    hs_log(NULL, g_module, 3, "failed to move: %s to %s errno: %d",
+           lua_lpath, lua_rpath, errno);
+    return;
+  }
 
-      for (int t = 0; t < plugins->thread_cnt; ++t) {
-        // restart any plugins using this Lua code
-        hs_analysis_thread *at = &plugins->list[t];
-        pthread_mutex_lock(&at->list_lock);
-        for (int i = 0; i < at->list_cap; ++i) {
-          if (!at->list[i]) continue;
+  for (int t = 0; t < plugins->thread_cnt; ++t) {
+    // restart any plugins using this Lua code
+    hs_analysis_thread *at = &plugins->list[t];
+    pthread_mutex_lock(&at->list_lock);
+    for (int i = 0; i < at->list_cap; ++i) {
+      if (!at->list[i]) continue;
 
-          hs_analysis_plugin *p = at->list[i];
-          if (strcmp(lua_rpath, lsb_heka_get_lua_file(p->hsb)) == 0) {
-            int ret = snprintf(cfg_lpath, HS_MAX_PATH, "%s/%s%s", lpath,
-                               p->name + tlen, hs_cfg_ext);
-            if (ret < 0 || ret > HS_MAX_PATH - 1) {
-              hs_log(NULL, g_module, 0, "load cfg path too long");
-              exit(EXIT_FAILURE);
-            }
-
-            ret = snprintf(cfg_rpath, HS_MAX_PATH, "%s/%s%s", rpath,
+      hs_analysis_plugin *p = at->list[i];
+      if (strcmp(lua_rpath, lsb_heka_get_lua_file(p->hsb)) == 0) {
+        int ret = snprintf(cfg_lpath, HS_MAX_PATH, "%s/%s%s", lpath,
                            p->name + tlen, hs_cfg_ext);
-            if (ret < 0 || ret > HS_MAX_PATH - 1) {
-              hs_log(NULL, g_module, 0, "run cfg path too long");
-              exit(EXIT_FAILURE);
-            }
+        if (ret < 0 || ret > HS_MAX_PATH - 1) {
+          hs_log(NULL, g_module, 0, "load cfg path too long");
+          exit(EXIT_FAILURE);
+        }
 
-            // if no new cfg was provided, move the existing cfg to the load
-            // directory
-            if (!hs_file_exists(cfg_lpath)) {
-              if (rename(cfg_rpath, cfg_lpath)) {
-                hs_log(NULL, g_module, 3, "failed to move: %s to %s errno: %d",
-                       cfg_rpath, cfg_lpath, errno);
-              }
-            }
+        ret = snprintf(cfg_rpath, HS_MAX_PATH, "%s/%s%s", rpath,
+                       p->name + tlen, hs_cfg_ext);
+        if (ret < 0 || ret > HS_MAX_PATH - 1) {
+          hs_log(NULL, g_module, 0, "run cfg path too long");
+          exit(EXIT_FAILURE);
+        }
+
+        // if no new cfg was provided, move the existing cfg to the load
+        // directory
+        if (!hs_file_exists(cfg_lpath)) {
+          if (rename(cfg_rpath, cfg_lpath)) {
+            hs_log(NULL, g_module, 3, "failed to move: %s to %s errno: %d",
+                   cfg_rpath, cfg_lpath, errno);
           }
         }
-        pthread_mutex_unlock(&at->list_lock);
       }
     }
+    pthread_mutex_unlock(&at->list_lock);
   }
-  rewinddir(dp);
 }
 
 
@@ -685,56 +681,20 @@ static int get_thread_id(const char *lpath, const char *rpath, const char *name)
 }
 
 
-void hs_load_analysis_plugins(hs_analysis_plugins *plugins, bool dynamic)
+void hs_load_analysis_startup(hs_analysis_plugins *plugins)
 {
   hs_config *cfg = plugins->cfg;
-  char lpath[HS_MAX_PATH];
-  char rpath[HS_MAX_PATH];
-  if (hs_get_fqfn(cfg->load_path, hs_analysis_dir, lpath, sizeof(lpath))) {
-    hs_log(NULL, g_module, 0, "load path too long");
-    exit(EXIT_FAILURE);
-  }
-  if (hs_get_fqfn(cfg->run_path, hs_analysis_dir, rpath, sizeof(rpath))) {
-    hs_log(NULL, g_module, 0, "run path too long");
-    exit(EXIT_FAILURE);
-  }
-
-  const char *dir = dynamic ? lpath : rpath;
+  const char *dir = cfg->run_path_analysis;
   DIR *dp = opendir(dir);
   if (dp == NULL) {
     hs_log(NULL, g_module, 0, "%s: %s", dir, strerror(errno));
     exit(EXIT_FAILURE);
   }
 
-  if (dynamic) process_lua(plugins, lpath, rpath, dp);
-
   struct dirent *entry;
   while ((entry = readdir(dp))) {
-    if (dynamic) {
-      int tid = get_thread_id(lpath, rpath, entry->d_name);
-      if (tid < 0) {
-        if (tid == -1) {
-          hs_log(NULL, g_module, 3, "plugin cannot be restarted on a different "
-                 "thread: %s", entry->d_name);
-        }
-        continue;
-      }
-
-      tid %= plugins->thread_cnt;
-      int ret = hs_process_load_cfg(lpath, rpath, entry->d_name);
-      switch (ret) {
-      case 0:
-        remove_from_analysis_plugins(&plugins->list[tid], entry->d_name);
-        break;
-      case 1: // proceed to load
-        break;
-      default: // ignore
-        continue;
-      }
-    }
-
     hs_sandbox_config sbc;
-    if (hs_load_sandbox_config(rpath, entry->d_name, &sbc, &cfg->apd, 'a')) {
+    if (hs_load_sandbox_config(dir, entry->d_name, &sbc, &cfg->apd, 'a')) {
       hs_analysis_plugin *p = create_analysis_plugin(cfg, &sbc);
       if (p) {
         add_to_analysis_plugins(&sbc, plugins, p);
@@ -746,6 +706,55 @@ void hs_load_analysis_plugins(hs_analysis_plugins *plugins, bool dynamic)
     }
   }
   closedir(dp);
+}
+
+
+
+void hs_load_analysis_dynamic(hs_analysis_plugins *plugins, const char *name)
+{
+  hs_config *cfg = plugins->cfg;
+  const char *lpath = cfg->load_path_analysis;
+  const char *rpath = cfg->run_path_analysis;
+
+  if (hs_has_ext(name, hs_lua_ext)) {
+    process_lua(plugins, name);
+    return;
+  }
+
+  int tid = get_thread_id(lpath, rpath, name);
+  if (tid < 0) {
+    if (tid == -1) {
+      hs_log(NULL, g_module, 3, "plugin cannot be restarted on a different "
+             "thread: %s", name);
+    }
+    hs_log(NULL, g_module, 7, "%s ignored %s", __func__, name);
+    return;
+  }
+
+  tid %= plugins->thread_cnt;
+  switch (hs_process_load_cfg(lpath, rpath, name)) {
+  case 0:
+    remove_from_analysis_plugins(&plugins->list[tid], name);
+    break;
+  case 1: // load
+    {
+      hs_sandbox_config sbc;
+      if (hs_load_sandbox_config(rpath, name, &sbc, &cfg->apd, 'a')) {
+        hs_analysis_plugin *p = create_analysis_plugin(cfg, &sbc);
+        if (p) {
+          add_to_analysis_plugins(&sbc, plugins, p);
+        } else {
+          hs_log(NULL, g_module, 3, "%s create_analysis_plugin failed",
+                 sbc.cfg_name);
+        }
+        hs_free_sandbox_config(&sbc);
+      }
+    }
+    break;
+  default:
+    hs_log(NULL, g_module, 7, "%s ignored %s", __func__, name);
+    break;
+  }
 }
 
 
