@@ -83,7 +83,13 @@ static void init_sandbox_config(hs_sandbox_config *cfg)
 static void init_config(hs_config *cfg)
 {
   cfg->run_path = NULL;
+  cfg->run_path_input = NULL;
+  cfg->run_path_analysis = NULL;
+  cfg->run_path_output = NULL;
   cfg->load_path = NULL;
+  cfg->load_path_input = NULL;
+  cfg->load_path_analysis = NULL;
+  cfg->load_path_output = NULL;
   cfg->output_path = NULL;
   cfg->install_path = NULL;
   cfg->io_lua_path = NULL;
@@ -273,8 +279,26 @@ void hs_free_config(hs_config *cfg)
   free(cfg->run_path);
   cfg->run_path = NULL;
 
+  free(cfg->run_path_input);
+  cfg->run_path_input = NULL;
+
+  free(cfg->run_path_analysis);
+  cfg->run_path_analysis = NULL;
+
+  free(cfg->run_path_output);
+  cfg->run_path_output = NULL;
+
   free(cfg->load_path);
   cfg->load_path = NULL;
+
+  free(cfg->load_path_input);
+  cfg->load_path_input = NULL;
+
+  free(cfg->load_path_analysis);
+  cfg->load_path_analysis = NULL;
+
+  free(cfg->load_path_output);
+  cfg->load_path_output = NULL;
 
   free(cfg->output_path);
   cfg->output_path = NULL;
@@ -470,8 +494,8 @@ int hs_load_config(const char *fn, hs_config *cfg)
   if (cfg->max_message_size < 1024) {
     lua_pushfstring(L, "%s must be > 1023", cfg_max_message_size);
     ret = 1;
+    goto cleanup;
   }
-  if (ret) goto cleanup;
 
   ret = get_string_item(L, LUA_GLOBALSINDEX, cfg_output_path,
                         &cfg->output_path, NULL);
@@ -493,9 +517,63 @@ int hs_load_config(const char *fn, hs_config *cfg)
                         "");
   if (ret) goto cleanup;
 
+  size_t len = strlen(cfg->load_path) + strlen(hs_input_dir) + 2;
+  cfg->load_path_input = malloc(len);
+  if (!cfg->load_path_input) {
+    lua_pushfstring(L, "load_path_input malloc failed");
+    ret = 1;
+    goto cleanup;
+  }
+  hs_get_fqfn(cfg->load_path, hs_input_dir, cfg->load_path_input, len);
+
+  len = strlen(cfg->load_path) + strlen(hs_analysis_dir) + 2;
+  cfg->load_path_analysis = malloc(len);
+  if (!cfg->load_path_analysis) {
+    lua_pushfstring(L, "load_path_analysis malloc failed");
+    ret = 1;
+    goto cleanup;
+  }
+  hs_get_fqfn(cfg->load_path, hs_analysis_dir, cfg->load_path_analysis, len);
+
+  len = strlen(cfg->load_path) + strlen(hs_output_dir) + 2;
+  cfg->load_path_output = malloc(len);
+  if (!cfg->load_path_output) {
+    lua_pushfstring(L, "load_path_output malloc failed");
+    ret = 1;
+    goto cleanup;
+  }
+  hs_get_fqfn(cfg->load_path, hs_output_dir, cfg->load_path_output, len);
+
   ret = get_string_item(L, LUA_GLOBALSINDEX, cfg_run_path, &cfg->run_path,
                         NULL);
   if (ret) goto cleanup;
+
+  len = strlen(cfg->run_path) + strlen(hs_input_dir) + 2;
+  cfg->run_path_input = malloc(len);
+  if (!cfg->run_path_input) {
+    lua_pushfstring(L, "run_path_input malloc failed");
+    ret = 1;
+    goto cleanup;
+  }
+  hs_get_fqfn(cfg->run_path, hs_input_dir, cfg->run_path_input, len);
+
+  len = strlen(cfg->run_path) + strlen(hs_analysis_dir) + 2;
+  cfg->run_path_analysis = malloc(len);
+  if (!cfg->run_path_analysis) {
+    lua_pushfstring(L, "run_path_analysis malloc failed");
+    ret = 1;
+    goto cleanup;
+  }
+  hs_get_fqfn(cfg->run_path, hs_analysis_dir, cfg->run_path_analysis, len);
+
+  len = strlen(cfg->run_path) + strlen(hs_output_dir) + 2;
+  cfg->run_path_output = malloc(len);
+  if (!cfg->run_path_output) {
+    lua_pushfstring(L, "run_path_output malloc failed");
+    ret = 1;
+    goto cleanup;
+  }
+  hs_get_fqfn(cfg->run_path, hs_output_dir, cfg->run_path_output, len);
 
   ret = get_string_item(L, LUA_GLOBALSINDEX, cfg_install_path,
                         &cfg->install_path,
@@ -540,8 +618,8 @@ int hs_load_config(const char *fn, hs_config *cfg)
   if (cfg->analysis_threads < 1 || cfg->analysis_threads > 64) {
     lua_pushfstring(L, "%s must be 1-64", cfg_threads);
     ret = 1;
+    goto cleanup;
   }
-  if (ret) goto cleanup;
 
   ret = load_sandbox_defaults(L, cfg_sb_ipd, &cfg->ipd);
   if (ret) goto cleanup;

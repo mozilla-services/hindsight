@@ -54,7 +54,9 @@ void hs_init_input_plugins(hs_input_plugins *plugins,
 
 void hs_free_input_plugins(hs_input_plugins *plugins);
 
-void hs_load_input_plugins(hs_input_plugins *plugins, bool dynamic);
+void hs_load_input_startup(hs_input_plugins *plugins);
+
+void hs_load_input_dynamic(hs_input_plugins *plugins, const char *name);
 
 void hs_stop_input_plugins(hs_input_plugins *plugins);
 
