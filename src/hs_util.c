@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/vfs.h>
+#include <time.h>
 
 
 bool hs_file_exists(const char *fn)
@@ -35,10 +36,10 @@ int hs_get_fqfn(const char *path,
 
 
 bool hs_find_lua(const hs_config *cfg,
-                const hs_sandbox_config *sbc,
-                const char *ptype,
-                char *fqfn,
-                size_t fqfn_len)
+                 const hs_sandbox_config *sbc,
+                 const char *ptype,
+                 char *fqfn,
+                 size_t fqfn_len)
 {
   int rv = snprintf(fqfn, fqfn_len, "%s/%s", sbc->dir, sbc->filename);
   if (rv < 0 || rv > (int)fqfn_len - 1) return false;
@@ -91,4 +92,31 @@ unsigned hs_disk_free_ob(const char *path, unsigned ob_size)
   struct statfs buf;
   if (ob_size == 0 || statfs(path, &buf)) return 0;
   return buf.f_bsize * buf.f_bavail / ob_size;
+}
+
+
+void hs_save_termination_err(const hs_config *cfg,
+                             const char *name,
+                             const char *err)
+{
+  const char *pos = strchr(name, '.');
+  if (!pos) return;
+
+  char fn[HS_MAX_PATH];
+  int ret = snprintf(fn, sizeof(fn), "%s/%.*s/%s.err", cfg->run_path,
+                     (int)(pos - name), name,
+                     pos + 1);
+  if (ret < 0 || ret > (int)sizeof(fn) - 1) return;
+
+  FILE *fh = fopen(fn, "we");
+  if (fh) {
+    time_t t = time(NULL);
+    struct tm tms;
+    if (gmtime_r(&t, &tms)) {
+      fprintf(fh, "%04d-%02d-%02dT%02d:%02d:%02d\t%s\n",
+              tms.tm_year + 1900, tms.tm_mon + 1, tms.tm_mday, tms.tm_hour,
+              tms.tm_min, tms.tm_sec, err);
+    }
+    fclose(fh);
+  }
 }

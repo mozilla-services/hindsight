@@ -26,6 +26,7 @@ const char *hs_output_dir = "output";
 const char *hs_lua_ext = ".lua";
 const char *hs_cfg_ext = ".cfg";
 const char *hs_off_ext = ".off";
+const char *hs_err_ext = ".err";
 
 static const char g_module[] = "config_parser";
 
@@ -349,10 +350,22 @@ bool hs_load_sandbox_config(const char *dir,
                             char type)
 {
   if (!cfg) return false;
-  init_sandbox_config(cfg);
 
   char fqfn[HS_MAX_PATH];
-  if (!hs_get_config_fqfn(dir, fn, fqfn, sizeof(fqfn))) return false;
+  if (hs_has_ext(fn, hs_cfg_ext)) {
+    if (hs_get_fqfn(dir, fn, fqfn, sizeof(fqfn))) {
+      return false;
+    }
+  } else if (hs_has_ext(fn, hs_err_ext)) {
+    if (!hs_get_fqfn(dir, fn, fqfn, sizeof(fqfn))) {
+      unlink(fqfn);
+    }
+    return false;
+  } else {
+    return false;
+  }
+
+  init_sandbox_config(cfg);
   cfg->cfg_lua = lsb_read_file(fqfn);
   if (!cfg->cfg_lua) return false;
 
@@ -643,21 +656,6 @@ cleanup:
 }
 
 
-bool hs_get_config_fqfn(const char *path,
-                        const char *name,
-                        char *fqfn,
-                        size_t fqfn_len)
-{
-  if (!hs_has_ext(name, hs_cfg_ext)) return false;
-
-  int ret = snprintf(fqfn, fqfn_len, "%s/%s", path, name);
-  if (ret < 0 || ret > (int)fqfn_len - 1) {
-    return false;
-  }
-  return true;
-}
-
-
 int hs_process_load_cfg(const char *lpath, const char *rpath, const char *name)
 {
   if (hs_has_ext(name, hs_cfg_ext)) {
@@ -675,7 +673,18 @@ int hs_process_load_cfg(const char *lpath, const char *rpath, const char *name)
     // if the plugin was off clear the flag and prepare for restart
     char off_rpath[HS_MAX_PATH];
     strcpy(off_rpath, cfg_rpath);
-    strcpy(off_rpath + strlen(off_rpath) - HS_EXT_LEN, hs_off_ext);
+    size_t pos = strlen(off_rpath) - HS_EXT_LEN;
+    strcpy(off_rpath + pos, hs_off_ext);
+    if (hs_file_exists(off_rpath)) {
+      if (unlink(off_rpath)) {
+        hs_log(NULL, g_module, 3, "failed to delete: %s errno: %d", off_rpath,
+               errno);
+        return -1;
+      }
+    }
+
+    // if the plugin was terminated clear the error and prepare for restart
+    strcpy(off_rpath + pos, hs_err_ext);
     if (hs_file_exists(off_rpath)) {
       if (unlink(off_rpath)) {
         hs_log(NULL, g_module, 3, "failed to delete: %s errno: %d", off_rpath,
