@@ -459,8 +459,9 @@ static void* input_thread(void *arg)
   if (stop) {
     hs_log(NULL, p->name, 6, "shutting down");
   } else {
-    hs_log(NULL, p->name, 6, "detaching received: %d msg: %s", ret,
-           lsb_heka_get_error(p->hsb));
+    const char *err = lsb_heka_get_error(p->hsb);
+    hs_log(NULL, p->name, 6, "detaching received: %d msg: %s", ret, err);
+    hs_save_termination_err(plugins->cfg, p->name, err);
     if (p->rm_cp_terminate) {
       char key[HS_MAX_PATH];
       snprintf(key, HS_MAX_PATH, "%s->%s", hs_input_dir, p->name);

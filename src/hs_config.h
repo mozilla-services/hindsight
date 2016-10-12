@@ -22,6 +22,7 @@ extern const char *hs_output_dir;
 extern const char *hs_lua_ext;
 extern const char *hs_cfg_ext;
 extern const char *hs_off_ext;
+extern const char *hs_err_ext;
 
 typedef struct hs_sandbox_config
 {
@@ -115,11 +116,6 @@ bool hs_load_sandbox_config(const char *dir,
  * @return int 0 on success
  */
 int hs_load_config(const char *fn, hs_config *cfg);
-
-bool hs_get_config_fqfn(const char *path,
-                        const char *name,
-                        char *fqfn,
-                        size_t fqfn_len);
 
 int hs_process_load_cfg(const char *lpath, const char *rpath, const char *name);
 

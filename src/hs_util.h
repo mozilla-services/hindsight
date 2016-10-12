@@ -89,4 +89,16 @@ int hs_output_lua_string(FILE *fh, const char *s);
  * @return unsigned Number of buffers
  */
 unsigned hs_disk_free_ob(const char *path, unsigned ob_size);
+
+/**
+ * Writes the termination error to disk
+ *
+ * @param cfg Hindsight configuration
+ * @param name Sandbox name
+ * @param err Sandbox error message
+ */
+void hs_save_termination_err(const hs_config *cfg,
+                             const char *name,
+                             const char *err);
+
 #endif

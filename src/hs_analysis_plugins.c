@@ -348,9 +348,9 @@ static void free_analysis_thread(hs_analysis_thread *at)
 
 static void terminate_sandbox(hs_analysis_thread *at, int i)
 {
-  hs_log(NULL, at->list[i]->name, 3, "terminated: %s",
-         lsb_heka_get_error(at->list[i]->hsb));
-
+  const char *err = lsb_heka_get_error(at->list[i]->hsb);
+  hs_log(NULL, at->list[i]->name, 3, "terminated: %s", err);
+  hs_save_termination_err(at->plugins->cfg, at->list[i]->name, err);
   if (at->list[i]->shutdown_terminate) {
     hs_log(NULL, at->list[i]->name, 6, "shutting down on terminate");
     kill(getpid(), SIGTERM);
