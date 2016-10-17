@@ -247,7 +247,6 @@ static void add_to_analysis_plugins(const hs_sandbox_config *cfg,
                                     hs_analysis_plugins *plugins,
                                     hs_analysis_plugin *p)
 {
-  bool added = false;
   int idx = -1;
   int thread = cfg->thread % plugins->cfg->analysis_threads;
   hs_analysis_thread *at = &plugins->list[thread];
@@ -258,17 +257,12 @@ static void add_to_analysis_plugins(const hs_sandbox_config *cfg,
   for (int i = 0; i < at->list_cap; ++i) {
     if (!at->list[i]) {
       idx = i;
-    } else if (strcmp(at->list[i]->name, p->name) == 0) {
-      idx = i;
-      remove_plugin(at, idx);
-      add_plugin(at, p, idx);
-      added = true;
       break;
     }
   }
-  if (!added && idx != -1) add_plugin(at, p, idx);
-
-  if (idx == -1) {
+  if (idx != -1) {
+    add_plugin(at, p, idx);
+  } else {
     ++at->list_cap;
     // todo probably don't want to grow it by 1
     hs_analysis_plugin **tmp = realloc(at->list,
@@ -737,6 +731,7 @@ void hs_load_analysis_dynamic(hs_analysis_plugins *plugins, const char *name)
     remove_from_analysis_plugins(&plugins->list[tid], name);
     break;
   case 1: // load
+    remove_from_analysis_plugins(&plugins->list[tid], name);
     {
       hs_sandbox_config sbc;
       if (hs_load_sandbox_config(rpath, name, &sbc, &cfg->apd, 'a')) {

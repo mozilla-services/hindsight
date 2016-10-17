@@ -465,29 +465,19 @@ static void add_plugin(hs_input_plugins *plugins, hs_input_plugin *p, int idx)
 }
 
 
-static bool add_to_input_plugins(hs_input_plugins *plugins, hs_input_plugin *p)
+static void add_to_input_plugins(hs_input_plugins *plugins, hs_input_plugin *p)
 {
-  bool added = false;
   int idx = -1;
-
   pthread_mutex_lock(&plugins->list_lock);
   for (int i = 0; i < plugins->list_cap; ++i) {
     if (!plugins->list[i]) {
       idx = i;
-    } else if (strcmp(plugins->list[i]->name, p->name) == 0) {
-      idx = i;
-      if (!remove_plugin(plugins, idx)) {
-        pthread_mutex_unlock(&plugins->list_lock);
-        return false;
-      }
-      add_plugin(plugins, p, idx);
-      added = true;
       break;
     }
   }
-  if (!added && idx != -1) add_plugin(plugins, p, idx);
-
-  if (idx == -1) {
+  if (idx != -1) {
+    add_plugin(plugins, p, idx);
+  } else {
     // todo probably don't want to grow it by 1
     ++plugins->list_cap;
     hs_input_plugin **tmp = realloc(plugins->list,
@@ -516,7 +506,6 @@ static bool add_to_input_plugins(hs_input_plugins *plugins, hs_input_plugin *p)
     perror("pthread_create failed");
     exit(EXIT_FAILURE);
   }
-  return true;
 }
 
 
@@ -643,11 +632,7 @@ void hs_load_input_startup(hs_input_plugins *plugins)
       hs_free_sandbox_config(&sbc);
       if (p) {
         p->plugins = plugins;
-        if (!add_to_input_plugins(plugins, p)) {
-          destroy_input_plugin(p);
-          hs_log(NULL, g_module, 3, "%s dynamic load request denied",
-                 entry->d_name);
-        }
+        add_to_input_plugins(plugins, p);
       } else {
         hs_log(NULL, g_module, 3, "%s create_inputs_plugin failed",
                entry->d_name);
@@ -677,16 +662,17 @@ void hs_load_input_dynamic(hs_input_plugins *plugins, const char *name)
     break;
   case 1: // load
     {
+      if (!remove_from_input_plugins(plugins, name)) {
+        hs_log(NULL, g_module, 4, "%s stop request pending", name);
+        break;
+      }
       hs_sandbox_config sbc;
       if (hs_load_sandbox_config(rpath, name, &sbc, &cfg->ipd, 'i')) {
         hs_input_plugin *p = create_input_plugin(cfg, &sbc);
         hs_free_sandbox_config(&sbc);
         if (p) {
           p->plugins = plugins;
-          if (!add_to_input_plugins(plugins, p)) {
-            destroy_input_plugin(p);
-            hs_log(NULL, g_module, 3, "%s dynamic load request denied", name);
-          }
+          add_to_input_plugins(plugins, p);
         } else {
           hs_log(NULL, g_module, 3, "%s create_input_plugin failed", name);
         }

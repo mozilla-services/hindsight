@@ -539,23 +539,17 @@ static void add_to_output_plugins(hs_output_plugins *plugins,
                                   hs_output_plugin *p,
                                   bool dynamic)
 {
-  bool added = false;
   int idx = -1;
   pthread_mutex_lock(&plugins->list_lock);
   for (int i = 0; i < plugins->list_cap; ++i) {
     if (!plugins->list[i]) {
       idx = i;
-    } else if (strcmp(plugins->list[i]->name, p->name) == 0) {
-      idx = i;
-      remove_plugin(plugins, idx);
-      add_plugin(plugins, p, idx);
-      added = true;
       break;
     }
   }
-  if (!added && idx != -1) add_plugin(plugins, p, idx);
-
-  if (idx == -1) {
+  if (idx != -1) {
+    add_plugin(plugins, p, idx);
+  } else {
     // todo probably don't want to grow it by 1
     ++plugins->list_cap;
     hs_output_plugin **tmp = realloc(plugins->list,
@@ -763,6 +757,7 @@ void hs_load_output_dynamic(hs_output_plugins *plugins, const char *name)
     remove_from_output_plugins(plugins, name);
     break;
   case 1: // load
+    remove_from_output_plugins(plugins, name);
     {
       hs_sandbox_config sbc;
       if (hs_load_sandbox_config(rpath, name, &sbc, &cfg->opd, 'o')) {
