@@ -413,12 +413,19 @@ static void* input_thread(void *arg)
       pthread_mutex_unlock(&p->cp_lock);
       ret = output_message(p, msg, sample);
       if (ret == LSB_HEKA_PM_RETRY) {
-        while (!stop && ret == LSB_HEKA_PM_RETRY) {
+        while (!stop) {
           const char *err = lsb_heka_get_error(p->hsb);
           hs_log(NULL, p->name, 7, "retry message %llu err: %s", p->sequence_id,
                  err);
           sleep(1);
           ret = output_message(p, msg, false);
+          if (ret == LSB_HEKA_PM_RETRY) {
+            pthread_mutex_lock(&p->cp_lock);
+            stop = p->stop;
+            pthread_mutex_unlock(&p->cp_lock);
+            continue;
+          }
+          break;
         }
       }
       if (ret > 0) {
