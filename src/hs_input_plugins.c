@@ -369,13 +369,15 @@ static void* input_thread(void *arg)
   } else {
     const char *err = lsb_heka_get_error(p->hsb);
     hs_log(NULL, p->name, 6, "detaching received: %d msg: %s", ret, err);
-    hs_save_termination_err(plugins->cfg, p->name, err);
+    if (ret > 0) {
+      hs_save_termination_err(plugins->cfg, p->name, err);
+    }
     pthread_mutex_lock(&plugins->list_lock);
     plugins->list[p->list_index] = NULL;
     if (pthread_detach(p->thread)) {
       hs_log(NULL, p->name, 3, "thread could not be detached");
     }
-    if (p->shutdown_terminate) {
+    if (ret > 0 && p->shutdown_terminate) {
       hs_log(NULL, p->name, 6, "shutting down on terminate");
       kill(getpid(), SIGTERM);
     }
