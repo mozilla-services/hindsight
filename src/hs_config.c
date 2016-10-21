@@ -60,24 +60,31 @@ static const char *cfg_sb_async_buffer = "async_buffer_size";
 static const char *cfg_sb_matcher = "message_matcher";
 static const char *cfg_sb_shutdown_terminate = "shutdown_on_terminate";
 static const char *cfg_sb_rm_cp_terminate = "remove_checkpoints_on_terminate";
+static const char *cfg_sb_pm_im_limit = "process_message_inject_limit";
+static const char *cfg_sb_te_im_limit = "timer_event_inject_limit";
 
 static void init_sandbox_config(hs_sandbox_config *cfg)
 {
-  cfg->output_limit = 1024 * 64;
-  cfg->memory_limit = 1024 * 1024 * 8;
-  cfg->instruction_limit = 1000000;
-  cfg->preserve_data = false;
-  cfg->restricted_headers = true;
-  cfg->rm_cp_terminate = false;
-  cfg->shutdown_terminate = false;
   cfg->dir = NULL;
   cfg->filename = NULL;
   cfg->cfg_name = NULL;
   cfg->cfg_lua = NULL;
   cfg->message_matcher = NULL;
-  cfg->ticker_interval = 0;
+
   cfg->thread = 0;
   cfg->async_buffer_size = 0;
+  cfg->output_limit = 1024 * 64;
+  cfg->memory_limit = 1024 * 1024 * 8;
+  cfg->instruction_limit = 1000000;
+  cfg->ticker_interval = 0;
+
+  cfg->preserve_data = false;
+  cfg->restricted_headers = true;
+  cfg->shutdown_terminate = false;
+  cfg->rm_cp_terminate = false;
+
+  cfg->pm_im_limit = 0;
+  cfg->te_im_limit = 10;
 }
 
 
@@ -165,7 +172,7 @@ static int get_string_item(lua_State *L, int idx, const char *name, char **val,
 }
 
 
-static int get_numeric_item(lua_State *L, int idx, const char *name,
+static int get_unsigned_int(lua_State *L, int idx, const char *name,
                             unsigned *val)
 {
   lua_getfield(L, idx, name);
@@ -179,6 +186,34 @@ static int get_numeric_item(lua_State *L, int idx, const char *name,
       return 1;
     }
     *val = (unsigned)d;
+    break;
+  case LUA_TNIL:
+    break; // use the default
+  default:
+    lua_pushfstring(L, "%s must be set to a number", name);
+    return 1;
+    break;
+  }
+  remove_item(L, idx, name);
+
+  return 0;
+}
+
+
+static int get_unsigned_char(lua_State *L, int idx, const char *name,
+                             unsigned char *val)
+{
+  lua_getfield(L, idx, name);
+  int t = lua_type(L, -1);
+  double d;
+  switch (t) {
+  case LUA_TNUMBER:
+    d = lua_tonumber(L, -1);
+    if (d < 0 || d > UCHAR_MAX) {
+      lua_pushfstring(L, "%s must be an unsigned char", name);
+      return 1;
+    }
+    *val = (unsigned char)d;
     break;
   case LUA_TNIL:
     break; // use the default
@@ -222,12 +257,12 @@ static int load_sandbox_defaults(lua_State *L,
     lua_pushfstring(L, "%s must be a table", key);
     return 1;
   }
-  if (get_numeric_item(L, 1, cfg_sb_output, &cfg->output_limit)) return 1;
-  if (get_numeric_item(L, 1, cfg_sb_memory, &cfg->memory_limit)) return 1;
-  if (get_numeric_item(L, 1, cfg_sb_instruction, &cfg->instruction_limit)) {
+  if (get_unsigned_int(L, 1, cfg_sb_output, &cfg->output_limit)) return 1;
+  if (get_unsigned_int(L, 1, cfg_sb_memory, &cfg->memory_limit)) return 1;
+  if (get_unsigned_int(L, 1, cfg_sb_instruction, &cfg->instruction_limit)) {
     return 1;
   }
-  if (get_numeric_item(L, 1, cfg_sb_ticker_interval, &cfg->ticker_interval)) {
+  if (get_unsigned_int(L, 1, cfg_sb_ticker_interval, &cfg->ticker_interval)) {
     return 1;
   }
   if (get_bool_item(L, 1, cfg_sb_preserve, &cfg->preserve_data)) return 1;
@@ -242,9 +277,17 @@ static int load_sandbox_defaults(lua_State *L,
     return 1;
   }
 
+  if (strcmp(key, cfg_sb_apd) == 0) {
+    if (get_unsigned_char(L, 1, cfg_sb_pm_im_limit, &cfg->pm_im_limit)) {
+      return 1;
+    }
+    if (get_unsigned_char(L, 1, cfg_sb_te_im_limit, &cfg->te_im_limit)) {
+      return 1;
+    }
+  }
+
   if (strcmp(key, cfg_sb_opd) == 0) {
-    if (get_bool_item(L, 1, cfg_sb_rm_cp_terminate,
-                      &cfg->rm_cp_terminate)) {
+    if (get_bool_item(L, 1, cfg_sb_rm_cp_terminate, &cfg->rm_cp_terminate)) {
       return 1;
     }
   }
@@ -261,11 +304,11 @@ void hs_free_sandbox_config(hs_sandbox_config *cfg)
   free(cfg->dir);
   cfg->dir = NULL;
 
-  free(cfg->cfg_name);
-  cfg->cfg_name = NULL;
-
   free(cfg->filename);
   cfg->filename = NULL;
+
+  free(cfg->cfg_name);
+  cfg->cfg_name = NULL;
 
   free(cfg->cfg_lua);
   cfg->cfg_lua = NULL;
@@ -384,6 +427,8 @@ bool hs_load_sandbox_config(const char *dir,
     cfg->restricted_headers = dflt->restricted_headers;
     cfg->shutdown_terminate = dflt->shutdown_terminate;
     cfg->rm_cp_terminate = dflt->rm_cp_terminate;
+    cfg->pm_im_limit = dflt->pm_im_limit;
+    cfg->te_im_limit = dflt->te_im_limit;
   }
 
   int ret = luaL_dostring(L, cfg->cfg_lua);
@@ -410,19 +455,19 @@ bool hs_load_sandbox_config(const char *dir,
     goto cleanup;
   }
 
-  ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_sb_output,
+  ret = get_unsigned_int(L, LUA_GLOBALSINDEX, cfg_sb_output,
                          &cfg->output_limit);
   if (ret) goto cleanup;
 
-  ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_sb_memory,
+  ret = get_unsigned_int(L, LUA_GLOBALSINDEX, cfg_sb_memory,
                          &cfg->memory_limit);
   if (ret) goto cleanup;
 
-  ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_sb_instruction,
+  ret = get_unsigned_int(L, LUA_GLOBALSINDEX, cfg_sb_instruction,
                          &cfg->instruction_limit);
   if (ret) goto cleanup;
 
-  ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_sb_ticker_interval,
+  ret = get_unsigned_int(L, LUA_GLOBALSINDEX, cfg_sb_ticker_interval,
                          &cfg->ticker_interval);
   if (ret) goto cleanup;
 
@@ -460,13 +505,17 @@ bool hs_load_sandbox_config(const char *dir,
   }
 
   if (type == 'a') {
-    ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_sb_thread,
+    ret = get_unsigned_int(L, LUA_GLOBALSINDEX, cfg_sb_thread,
                            &cfg->thread);
+    ret = get_unsigned_char(L, LUA_GLOBALSINDEX, cfg_sb_pm_im_limit,
+                            &cfg->pm_im_limit);
+    ret = get_unsigned_char(L, LUA_GLOBALSINDEX, cfg_sb_te_im_limit,
+                            &cfg->te_im_limit);
     if (ret) goto cleanup;
   }
 
   if (type == 'o') {
-    ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_sb_async_buffer,
+    ret = get_unsigned_int(L, LUA_GLOBALSINDEX, cfg_sb_async_buffer,
                            &cfg->async_buffer_size);
     if (ret) goto cleanup;
 
@@ -502,7 +551,7 @@ int hs_load_config(const char *fn, hs_config *cfg)
   int ret = luaL_dofile(L, fn);
   if (ret) goto cleanup;
 
-  ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_max_message_size,
+  ret = get_unsigned_int(L, LUA_GLOBALSINDEX, cfg_max_message_size,
                          &cfg->max_message_size);
   if (cfg->max_message_size < 1024) {
     lua_pushfstring(L, "%s must be > 1023", cfg_max_message_size);
@@ -514,15 +563,15 @@ int hs_load_config(const char *fn, hs_config *cfg)
                         &cfg->output_path, NULL);
   if (ret) goto cleanup;
 
-  ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_output_size,
+  ret = get_unsigned_int(L, LUA_GLOBALSINDEX, cfg_output_size,
                          &cfg->output_size);
   if (ret) goto cleanup;
 
-  ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_backpressure,
+  ret = get_unsigned_int(L, LUA_GLOBALSINDEX, cfg_backpressure,
                          &cfg->backpressure);
   if (ret) goto cleanup;
 
-  ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_backpressure_df,
+  ret = get_unsigned_int(L, LUA_GLOBALSINDEX, cfg_backpressure_df,
                          &cfg->backpressure_df);
   if (ret) goto cleanup;
 
@@ -626,7 +675,7 @@ int hs_load_config(const char *fn, hs_config *cfg)
            cfg->hostname);
   }
 
-  ret = get_numeric_item(L, LUA_GLOBALSINDEX, cfg_threads,
+  ret = get_unsigned_int(L, LUA_GLOBALSINDEX, cfg_threads,
                          &cfg->analysis_threads);
   if (cfg->analysis_threads < 1 || cfg->analysis_threads > 64) {
     lua_pushfstring(L, "%s must be 1-64", cfg_threads);
@@ -769,6 +818,8 @@ bool hs_get_full_config(lsb_output_buffer *ob, char type, const hs_config *cfg,
 
   if (type == 'a') {
     lsb_outputf(ob, "thread = %u\n", sbc->thread);
+    lsb_outputf(ob, "process_message_inject_limit = %hhu\n", sbc->pm_im_limit);
+    lsb_outputf(ob, "timer_event_inject_limit = %hhu\n", sbc->te_im_limit);
   }
 
   if (type == 'o') {

@@ -30,19 +30,22 @@ typedef struct hs_sandbox_config
   char *filename;
   char *cfg_name;
   char *cfg_lua;
+  char *message_matcher; // analysis/output sandbox only
 
-  char     *message_matcher; // analysis/output sandbox only
   unsigned thread; // analysis sandbox only
   unsigned async_buffer_size; // output sandbox only
-
   unsigned output_limit;
   unsigned memory_limit;
   unsigned instruction_limit;
   unsigned ticker_interval;
-  bool     preserve_data;
-  bool     restricted_headers;
-  bool     shutdown_terminate;
-  bool     rm_cp_terminate;   // output sandbox only
+
+  bool preserve_data;
+  bool restricted_headers;
+  bool shutdown_terminate;
+  bool rm_cp_terminate;   // output sandbox only
+
+  unsigned char pm_im_limit; // analysis sandbox only
+  unsigned char te_im_limit; // analysis sandbox only
 } hs_sandbox_config;
 
 typedef struct hs_config
