@@ -35,6 +35,9 @@ struct hs_analysis_plugin {
   lsb_heka_stats      stats;
   int                 ticker_interval;
   bool                shutdown_terminate;
+  unsigned char       im_limit;
+  unsigned char       pm_im_limit;
+  unsigned char       te_im_limit;
   time_t              ticker_expires;
 };
 

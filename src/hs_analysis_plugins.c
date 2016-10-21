@@ -38,6 +38,8 @@ static int inject_message(void *parent, const char *pb, size_t pb_len)
 
   hs_analysis_plugin *p = parent;
   int rv = 1;
+  if (p->im_limit == 0) return rv;
+  --p->im_limit;
   bool bp;
   pthread_mutex_lock(&p->at->plugins->output.lock);
   int len = lsb_pb_output_varint(header + 3, pb_len);
@@ -129,6 +131,8 @@ create_analysis_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
     return NULL;
   }
 
+  p->pm_im_limit = sbc->pm_im_limit;
+  p->te_im_limit = sbc->te_im_limit;
   p->shutdown_terminate = sbc->shutdown_terminate;
   p->ticker_interval = sbc->ticker_interval;
   int stagger = p->ticker_interval > 60 ? 60 : p->ticker_interval;
@@ -373,6 +377,7 @@ static void analyze_message(hs_analysis_thread *at, bool sample)
         lsb_update_running_stats(&p->mms, lsb_get_time() - start);
       }
       if (matched) {
+        p->im_limit = p->pm_im_limit;
         ret = lsb_heka_pm_analysis(p->hsb, at->msg, sample);
         if (ret < 0) {
           const char *err = lsb_heka_get_error(p->hsb);
@@ -387,6 +392,7 @@ static void analyze_message(hs_analysis_thread *at, bool sample)
     }
 
     if (ret <= 0 && p->ticker_interval && at->current_t >= p->ticker_expires) {
+      p->im_limit = p->te_im_limit;
       ret = lsb_heka_timer_event(p->hsb, at->current_t, false);
       p->ticker_expires = at->current_t + p->ticker_interval;
     }
@@ -403,6 +409,7 @@ static void shutdown_timer_event(hs_analysis_thread *at)
   for (int i = 0; i < at->list_cap; ++i) {
     if (!at->list[i]) continue;
 
+    at->list[i]->im_limit = at->list[i]->te_im_limit;
     if (lsb_heka_timer_event(at->list[i]->hsb, at->current_t, true)) {
       terminate_sandbox(at, i);
     }

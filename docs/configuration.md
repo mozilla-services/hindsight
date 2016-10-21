@@ -113,6 +113,16 @@ output_defaults = {
 * **shutdown_on_terminate** - cleanly shuts down Hindsight if this plugin is
   terminated (default false)
 
+#### Default Analysis Sandbox Configuration Variables
+
+* **process_message_inject_limit** - the maximum number of messages the
+  `process_message` function can inject in a single invocation (count (0-255),
+  default 0).
+
+* **timer_event_inject_limit** - the maximum number of messages the
+  `timer_event` function can inject in a single invocation (count (0-255),
+  default 10).
+
 #### Default Output Sandbox Configuration Variables
 
 * **remove_checkpoints_on_terminate** - removes the checkpoint entries when the
