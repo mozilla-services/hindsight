@@ -815,6 +815,8 @@ bool hs_get_full_config(lsb_output_buffer *ob, char type, const hs_config *cfg,
               sbc->preserve_data ? "true" : "false");
   lsb_outputf(ob, "restricted_headers = %s\n",
               sbc->restricted_headers ? "true" : "false");
+  lsb_outputf(ob, "shutdown_on_terminate = %s\n",
+              sbc->shutdown_terminate ? "true" : "false");
 
   if (type == 'a') {
     lsb_outputf(ob, "thread = %u\n", sbc->thread);
