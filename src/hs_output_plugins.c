@@ -311,6 +311,8 @@ static void* input_thread(void *arg)
   int ret = 0;
   bool stop = false;
   bool sample = false;
+  bool next_input_available = false;
+  bool next_analysis_available = false;
   lsb_logger logger = { .context = NULL, .cb = hs_log };
 #ifdef HINDSIGHT_CLI
   bool input_stop = false;
@@ -332,23 +334,25 @@ static void* input_thread(void *arg)
         bytes_read[0] = hs_read_file(&p->input);
       }
 
+      // when the read gets to the end it will always check once for the next
+      // available file just incase the output_size was increased on the last
+      // restart
       if (!bytes_read[0]
-          && p->input.cp.offset >= p->plugins->cfg->output_size) {
+          && (p->input.cp.offset >= p->plugins->cfg->output_size
+              || next_input_available)) {
+        next_input_available = hs_open_file(&p->input, hs_input_dir,
+                                            p->input.cp.id + 1);
 #ifdef HINDSIGHT_CLI
-        size_t cid = p->input.cp.id;
-#endif
-        // see if the next file is there yet
-        hs_open_file(&p->input, hs_input_dir, p->input.cp.id + 1);
-#ifdef HINDSIGHT_CLI
-        if (cid == p->input.cp.id && stop) {
+        if (!next_input_available && stop) {
           input_stop = true;
         }
 #endif
       }
     } else if (!p->input.fh) { // still waiting on the first file
-      hs_open_file(&p->input, hs_input_dir, p->input.cp.id);
+      next_input_available = hs_open_file(&p->input, hs_input_dir,
+                                          p->input.cp.id);
 #ifdef HINDSIGHT_CLI
-      if (!p->input.fh && stop) {
+      if (!next_input_available && stop) {
         input_stop = true;
       }
 #endif
@@ -363,22 +367,21 @@ static void* input_thread(void *arg)
       }
 
       if (!bytes_read[1]
-          && p->analysis.cp.offset >= p->plugins->cfg->output_size) {
+          && (p->analysis.cp.offset >= p->plugins->cfg->output_size
+              || next_analysis_available)) {
+        next_analysis_available = hs_open_file(&p->analysis, hs_analysis_dir,
+                                               p->analysis.cp.id + 1);
 #ifdef HINDSIGHT_CLI
-        size_t cid = p->analysis.cp.id;
-#endif
-        // see if the next file is there yet
-        hs_open_file(&p->analysis, hs_analysis_dir, p->analysis.cp.id + 1);
-#ifdef HINDSIGHT_CLI
-        if (cid == p->analysis.cp.id && stop) {
+        if (!next_analysis_available && stop) {
           analysis_stop = true;
         }
 #endif
       }
     } else if (!p->analysis.fh) { // still waiting on the first file
-      hs_open_file(&p->analysis, hs_analysis_dir, p->analysis.cp.id);
+      next_analysis_available = hs_open_file(&p->analysis, hs_analysis_dir,
+                                             p->analysis.cp.id);
 #ifdef HINDSIGHT_CLI
-      if (!p->analysis.fh && stop) {
+      if (!next_analysis_available && stop) {
         analysis_stop = true;
       }
 #endif

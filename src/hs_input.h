@@ -35,7 +35,7 @@ void hs_init_input(hs_input *hsi, size_t max_message_size,
                    const char *name);
 void hs_free_input(hs_input *hsi);
 
-int hs_open_file(hs_input *hsi, const char *subdir, unsigned long long id);
+bool hs_open_file(hs_input *hsi, const char *subdir, unsigned long long id);
 
 size_t hs_read_file(hs_input *hsi);
 

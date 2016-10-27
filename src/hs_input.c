@@ -20,7 +20,7 @@
 
 static const char g_module[] = "input_reader";
 
-int hs_open_file(hs_input *hsi, const char *subdir, unsigned long long id)
+bool hs_open_file(hs_input *hsi, const char *subdir, unsigned long long id)
 {
   char fqfn[HS_MAX_PATH];
   int ret = snprintf(fqfn, sizeof(fqfn), "%s/%s/%llu.log", hsi->path, subdir,
@@ -30,7 +30,7 @@ int hs_open_file(hs_input *hsi, const char *subdir, unsigned long long id)
            " greater than %zu", hsi->name, hsi->cp.id, sizeof(fqfn));
     exit(EXIT_FAILURE);
   }
-  if (hsi->fn && strcmp(hsi->fn, fqfn) == 0) return 0;
+  if (hsi->fn && strcmp(hsi->fn, fqfn) == 0) return true;
 
   FILE *fh = fopen(fqfn, "re");
   if (fh) {
@@ -72,8 +72,9 @@ int hs_open_file(hs_input *hsi, const char *subdir, unsigned long long id)
     }
     strcpy(hsi->fn, fqfn);
     hsi->fh = fh;
+    return true;
   }
-  return 0;
+  return false;
 }
 
 
