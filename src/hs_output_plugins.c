@@ -332,7 +332,8 @@ static void* input_thread(void *arg)
         bytes_read[0] = hs_read_file(&p->input);
       }
 
-      if (!bytes_read[0]) {
+      if (!bytes_read[0]
+          && p->input.cp.offset >= p->plugins->cfg->output_size) {
 #ifdef HINDSIGHT_CLI
         size_t cid = p->input.cp.id;
 #endif
@@ -361,7 +362,8 @@ static void* input_thread(void *arg)
         bytes_read[1] = hs_read_file(&p->analysis);
       }
 
-      if (!bytes_read[1]) {
+      if (!bytes_read[1]
+          && p->analysis.cp.offset >= p->plugins->cfg->output_size) {
 #ifdef HINDSIGHT_CLI
         size_t cid = p->analysis.cp.id;
 #endif

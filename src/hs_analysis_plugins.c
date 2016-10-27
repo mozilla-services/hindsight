@@ -460,7 +460,8 @@ static void* input_thread(void *arg)
         bytes_read = hs_read_file(&at->input);
       }
 
-      if (!bytes_read) {
+      if (!bytes_read
+          && at->input.cp.offset >= at->plugins->cfg->output_size) {
 #ifdef HINDSIGHT_CLI
         size_t cid = at->input.cp.id;
 #endif
