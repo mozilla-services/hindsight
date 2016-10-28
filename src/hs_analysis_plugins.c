@@ -431,6 +431,7 @@ static void* input_thread(void *arg)
   lsb_logger logger = { .context = NULL, .cb = hs_log };
   bool stop = false;
   bool sample = false;
+  bool next_available = false;
 #ifdef HINDSIGHT_CLI
   bool input_stop = false;
   while (!(stop && input_stop)) {
@@ -460,22 +461,21 @@ static void* input_thread(void *arg)
         bytes_read = hs_read_file(&at->input);
       }
 
-      if (!bytes_read) {
+      if (!bytes_read
+          && (at->input.cp.offset >= at->plugins->cfg->output_size
+              || next_available)) {
+        next_available = hs_open_file(&at->input, hs_input_dir,
+                                      at->input.cp.id + 1);
 #ifdef HINDSIGHT_CLI
-        size_t cid = at->input.cp.id;
-#endif
-        // see if the next file is there yet
-        hs_open_file(&at->input, hs_input_dir, at->input.cp.id + 1);
-#ifdef HINDSIGHT_CLI
-        if (cid == at->input.cp.id && stop) {
+        if (!next_available && stop) {
           input_stop = true;
         }
 #endif
       }
     } else { // still waiting on the first file
-      hs_open_file(&at->input, hs_input_dir, at->input.cp.id);
+      next_available = hs_open_file(&at->input, hs_input_dir, at->input.cp.id);
 #ifdef HINDSIGHT_CLI
-      if (!at->input.fh && stop) {
+      if (!next_available && stop) {
         input_stop = true;
       }
 #endif
