@@ -1,0 +1,20 @@
+language: generic
+sudo: required
+services:
+  - docker
+
+env:
+    matrix:
+        - DOCKER_IMAGE=centos:6 CMAKE_URL=auto
+        - DOCKER_IMAGE=centos:7 CMAKE_URL=auto
+        - DOCKER_IMAGE=debian:7 CMAKE_URL=auto
+        - DOCKER_IMAGE=debian:8
+        - DOCKER_IMAGE=debian:8 CC=clang
+        - DOCKER_IMAGE=debian:stretch
+        - DOCKER_IMAGE=fedora:latest
+        - DOCKER_IMAGE=ubuntu:12.04 CMAKE_URL=auto
+        - DOCKER_IMAGE=ubuntu:latest # LTS
+        - DOCKER_IMAGE=ubuntu:devel
+
+script:
+    - ./build/run.sh build
