@@ -18,10 +18,10 @@ USER app
 WORKDIR /app
 
 RUN sudo yum -y install wget && \
-    wget https://dl.fedoraproject.org/pub/epel/7/x86_64/e/epel-release-7-8.noarch.rpm && \
-    sudo rpm -ivh epel-release-7-8.noarch.rpm && \
-    rm epel-release-7-8.noarch.rpm && \
-    sudo yum -y install cmake3 make clang gcc git rpm-build sudo && \
+    wget https://dl.fedoraproject.org/pub/epel/7/x86_64/e/epel-release-7-9.noarch.rpm && \
+    sudo rpm -ivh epel-release-7-9.noarch.rpm && \
+    rm epel-release-7-9.noarch.rpm && \
+    sudo yum -y install lua-devel luarocks cmake3 make clang gcc git rpm-build sudo && \
     sudo ln -s /usr/bin/cmake3 /usr/local/bin/cmake && \
 
     # Build the lua sandbox & extensions
@@ -52,9 +52,12 @@ RUN sudo yum -y install wget && \
              /app/run/output && \
     cp /app/src/hindsight/hindsight.cfg /app/cfg/hindsight.cfg && \
 
+    # some extra lua libraries
+    sudo luarocks install lrexlib-pcre && \
+
     # cleanup
     rm -rf /app/src && \
-    sudo yum -y remove cmake3 make clang gcc git rpm-build && \
+    sudo yum -y remove cmake3 make clang git rpm-build && \
     sudo yum -y autoremove && \
     sudo yum -y clean all
 
