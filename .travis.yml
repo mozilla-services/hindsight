@@ -15,6 +15,19 @@ env:
         - DOCKER_IMAGE=ubuntu:12.04 CMAKE_URL=auto
         - DOCKER_IMAGE=ubuntu:latest # LTS
         - DOCKER_IMAGE=ubuntu:devel
+        # used to build a container for mozilla/hindsight
+        - BUILD_CONTAINER=1
 
 script:
-    - ./build/run.sh build
+    - if [ ! -z "$DOCKER_IMAGE" ]; then ./build/run.sh build; fi
+    - |
+        if [ "$BUILD_CONTAINER" -eq 1 ]; then
+            docker build -t "app:build" .
+            # If a TRAVIS_TAG is set, push a new release on dockerhub
+            if [ ! -z "$TRAVIS_TAG" ]; then
+                docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
+                docker tag app:build mozilla/hindsight:${TRAVIS_TAG}
+                docker push mozilla/hindsight:${TRAVIS_TAG}
+                docker logout
+            fi
+        fi
