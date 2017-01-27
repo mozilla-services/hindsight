@@ -27,7 +27,8 @@ script:
             if [ ! -z "$TRAVIS_TAG" ]; then
                 docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
                 docker tag app:build mozilla/hindsight:${TRAVIS_TAG}
-                docker push mozilla/hindsight:${TRAVIS_TAG}
+                docker tag app:build mozilla/hindsight:latest
+                docker push mozilla/hindsight:latest
                 docker logout
             fi
         fi
