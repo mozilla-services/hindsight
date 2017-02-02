@@ -13,13 +13,13 @@ set(CPACK_PACKAGE_CONTACT       "Mike Trinkala <trink@mozilla.com>")
 set(CPACK_STRIP_FILES           TRUE)
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/LICENSE")
 set(CPACK_RPM_PACKAGE_LICENSE   "MPLv2.0")
-set(CPACK_DEBIAN_PACKAGE_DEPENDS "luasandbox (>= 1.1)")
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "luasandbox (>= 1.2.3)")
 
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 include(mozsvc)
 
-find_package(luasandbox 1.2.0 REQUIRED CONFIG)
+find_package(luasandbox 1.2.3 REQUIRED CONFIG)
 include(GNUInstallDirs)
 
 if(CMAKE_HOST_UNIX)

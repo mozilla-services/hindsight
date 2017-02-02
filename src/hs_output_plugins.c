@@ -174,7 +174,7 @@ create_output_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
     }
   }
   lsb_output_buffer ob;
-  if (lsb_init_output_buffer(&ob, 8 * 1024)) {
+  if (lsb_init_output_buffer(&ob, strlen(sbc->cfg_lua) + (8 * 1024))) {
     hs_log(NULL, g_module, 3, "%s configuration memory allocation failed",
            sbc->cfg_name);
     free(state_file);

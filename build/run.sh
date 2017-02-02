@@ -13,7 +13,7 @@ lsb_dir="$(dirname "$hindsight_dir")/lua_sandbox"
 
 if [ ! -d "$lsb_dir" ]; then
     (   set -x;
-        git clone -b travis_m1 https://github.com/sathieu/lua_sandbox "$lsb_dir"
+        git clone https://github.com/mozilla-services/lua_sandbox "$lsb_dir"
         git rev-parse HEAD
     )
 fi
