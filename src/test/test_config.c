@@ -99,6 +99,16 @@ static char* test_load_invalid_config()
 }
 
 
+static char* test_load_output_too_large_config()
+{
+  hs_config cfg;
+  int ret = hs_load_config("cfg/output_too_large.cfg", &cfg);
+  mu_assert(ret == 1, "hindsight_load_config: %d", ret);
+  hs_free_config(&cfg);
+  return NULL;
+}
+
+
 static char* test_sandbox_input_config()
 {
   hs_sandbox_config cfg;
@@ -177,6 +187,7 @@ static char* all_tests()
   mu_run_test(test_load_default_config);
   mu_run_test(test_load_config);
   mu_run_test(test_load_invalid_config);
+  mu_run_test(test_load_output_too_large_config);
   mu_run_test(test_sandbox_input_config);
   mu_run_test(test_sandbox_analysis_config);
   mu_run_test(test_sandbox_output_config);
