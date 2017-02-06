@@ -37,8 +37,7 @@ static int inject_message(void *parent, const char *pb, size_t pb_len)
   static char header[14];
 
   hs_analysis_plugin *p = parent;
-  int rv = 1;
-  if (p->im_limit == 0) return rv;
+  if (p->im_limit == 0) return LSB_HEKA_IM_LIMIT;
   --p->im_limit;
   bool bp;
   pthread_mutex_lock(&p->at->plugins->output.lock);
@@ -84,7 +83,6 @@ static int inject_message(void *parent, const char *pb, size_t pb_len)
         hs_log(NULL, g_module, 4, "releasing backpressure");
       }
     }
-    rv = 0;
   } else {
     hs_log(NULL, g_module, 0, "inject_message fwrite failed: %s",
            strerror(ferror(p->at->plugins->output.fh)));
@@ -96,7 +94,7 @@ static int inject_message(void *parent, const char *pb, size_t pb_len)
   if (bp) {
     usleep(100000); // throttle to 10 messages per second
   }
-  return rv;
+  return LSB_HEKA_IM_SUCCESS;
 }
 
 
@@ -178,7 +176,7 @@ create_analysis_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
     }
   }
   lsb_output_buffer ob;
-  if (lsb_init_output_buffer(&ob, 8 * 1024)) {
+  if (lsb_init_output_buffer(&ob, strlen(sbc->cfg_lua) + (8 * 1024))) {
     hs_log(NULL, g_module, 3, "%s configuration memory allocation failed",
            sbc->cfg_name);
     free(state_file);

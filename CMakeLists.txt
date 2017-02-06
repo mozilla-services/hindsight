@@ -3,7 +3,7 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 cmake_minimum_required(VERSION 3.0 FATAL_ERROR)
-project(hindsight VERSION 0.12.7 LANGUAGES C)
+project(hindsight VERSION 0.12.8 LANGUAGES C)
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Hindsight")
 set(CPACK_PACKAGE_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
 set(CPACK_PACKAGE_VERSION_MINOR ${PROJECT_VERSION_MINOR})
@@ -13,13 +13,13 @@ set(CPACK_PACKAGE_CONTACT       "Mike Trinkala <trink@mozilla.com>")
 set(CPACK_STRIP_FILES           TRUE)
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/LICENSE")
 set(CPACK_RPM_PACKAGE_LICENSE   "MPLv2.0")
-set(CPACK_DEBIAN_PACKAGE_DEPENDS "luasandbox (>= 1.1)")
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "luasandbox (>= 1.2.3)")
 
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 include(mozsvc)
 
-find_package(luasandbox 1.2.0 REQUIRED CONFIG)
+find_package(luasandbox 1.2.3 REQUIRED CONFIG)
 include(GNUInstallDirs)
 
 if(CMAKE_HOST_UNIX)

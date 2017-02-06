@@ -475,7 +475,7 @@ bool hs_load_sandbox_config(const char *dir,
                         NULL);
   if (!ret) {
     if (strpbrk(cfg->filename, "/\\")) {
-      lua_pushfstring(L, "%s must be not contain a path component",
+      lua_pushfstring(L, "%s must not contain a path component",
                       cfg_sb_filename);
       ret = 1;
     } else if (!hs_has_ext(cfg->filename, hs_lua_ext)) {
@@ -691,6 +691,15 @@ int hs_load_config(const char *fn, hs_config *cfg)
 
   ret = load_sandbox_defaults(L, cfg_sb_opd, &cfg->opd);
   if (ret) goto cleanup;
+
+  if (cfg->max_message_size < cfg->ipd.output_limit
+      || cfg->max_message_size < cfg->apd.output_limit
+      || cfg->max_message_size < cfg->opd.output_limit) {
+    lua_pushfstring(L, "%s must be greater than or equal to the sandbox %s",
+                    cfg_max_message_size, cfg_sb_output);
+    ret = 1;
+    goto cleanup;
+  }
 
   ret = check_for_unknown_options(L, LUA_GLOBALSINDEX, NULL);
   if (ret) goto cleanup;

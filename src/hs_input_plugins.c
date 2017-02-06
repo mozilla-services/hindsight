@@ -60,7 +60,7 @@ static void free_ip_checkpoint(hs_ip_checkpoint *cp)
 }
 
 
-static bool update_checkpoint(double d, const char *s, hs_ip_checkpoint *cp)
+static int update_checkpoint(double d, const char *s, hs_ip_checkpoint *cp)
 {
   if (!isnan(d)) {
     if (cp->type == HS_CP_STRING) {
@@ -84,7 +84,7 @@ static bool update_checkpoint(double d, const char *s, hs_ip_checkpoint *cp)
           cp->len = 0;
           cp->cap = 0;
           hs_log(NULL, g_module, 0, "malloc failed");
-          return false;
+          return LSB_HEKA_IM_CHECKPOINT;
         }
         cp->cap = cp->len;
       }
@@ -92,10 +92,10 @@ static bool update_checkpoint(double d, const char *s, hs_ip_checkpoint *cp)
     } else {
       hs_log(NULL, g_module, 3, "checkpoint string exceeds %d",
              HS_MAX_IP_CHECKPOINT);
-      return false;
+      return LSB_HEKA_IM_CHECKPOINT;
     }
   }
-  return true;
+  return LSB_HEKA_IM_SUCCESS;
 }
 
 
@@ -111,7 +111,7 @@ static int inject_message(void *parent,
   hs_input_plugin *p = parent;
   int rv;
   pthread_mutex_lock(&p->cp.lock);
-  rv = !update_checkpoint(cp_numeric, cp_string, &p->cp);
+  rv = update_checkpoint(cp_numeric, cp_string, &p->cp);
   if (p->sample) {
     p->stats = lsb_heka_get_stats(p->hsb);
     p->sample = false;
@@ -125,7 +125,7 @@ static int inject_message(void *parent,
     }
     return rv;
   }
-  if (rv) return rv;
+  if (rv != LSB_HEKA_IM_SUCCESS) return rv;
 
   bool bp;
   pthread_mutex_lock(&p->plugins->output.lock);
@@ -172,7 +172,6 @@ static int inject_message(void *parent,
         hs_log(NULL, g_module, 4, "releasing backpressure");
       }
     }
-    rv = 0;
   } else {
     hs_log(NULL, g_module, 0, "inject_message fwrite failed: %s",
            strerror(ferror(p->plugins->output.fh)));
@@ -265,7 +264,7 @@ create_input_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
     }
   }
   lsb_output_buffer ob;
-  if (lsb_init_output_buffer(&ob, 8 * 1024)) {
+  if (lsb_init_output_buffer(&ob, strlen(sbc->cfg_lua) + (8 * 1024))) {
     hs_log(NULL, g_module, 3, "%s configuration memory allocation failed",
            sbc->cfg_name);
     free(state_file);
