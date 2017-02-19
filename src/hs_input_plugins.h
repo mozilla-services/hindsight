@@ -31,6 +31,7 @@ struct hs_input_plugin {
   hs_ip_checkpoint  cp;
   lsb_heka_stats    stats;
   sem_t             shutdown;
+  int               im_delta_cnt;
   bool              sample;
   bool              orphaned;
   bool              shutdown_terminate;

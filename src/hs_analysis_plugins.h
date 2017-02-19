@@ -34,6 +34,7 @@ struct hs_analysis_plugin {
   lsb_running_stats   mms;
   lsb_heka_stats      stats;
   int                 ticker_interval;
+  int                 pm_delta_cnt;
   bool                shutdown_terminate;
   unsigned char       im_limit;
   unsigned char       pm_im_limit;
@@ -60,12 +61,14 @@ struct hs_analysis_thread {
   hs_checkpoint   cp;
   time_t          current_t;
 
-  int      list_cap;
-  int      list_cnt;
-  int      tid;
-  hs_input input;
-  bool     stop;
-  bool     sample;
+  hs_input  input;
+  int       list_cap;
+  int       list_cnt;
+  int       tid;
+  int       mm_delta_cnt;
+  int       max_mps;
+  bool      stop;
+  bool      sample;
 };
 
 void hs_init_analysis_plugins(hs_analysis_plugins *plugins,

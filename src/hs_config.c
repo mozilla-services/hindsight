@@ -835,6 +835,8 @@ bool hs_get_full_config(lsb_output_buffer *ob, char type, const hs_config *cfg,
 
   if (type == 'o') {
     lsb_outputf(ob, "async_buffer_size = %u\n", sbc->async_buffer_size);
+    lsb_outputf(ob, "remove_checkpoints_on_terminate = %s\n",
+                sbc->rm_cp_terminate ? "true" : "false");
   }
 
   // just test the last write to make sure the buffer wasn't exhausted

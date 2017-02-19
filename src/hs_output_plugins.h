@@ -36,6 +36,9 @@ struct hs_output_plugin {
   lsb_running_stats   mms;
   lsb_heka_stats      stats;
   int                 ticker_interval;
+  int                 mm_delta_cnt;
+  int                 pm_delta_cnt;
+  int                 max_mps;
   time_t              ticker_expires;
 
   pthread_t thread;
