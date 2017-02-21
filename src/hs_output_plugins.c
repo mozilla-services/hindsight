@@ -259,7 +259,12 @@ static int output_message(hs_output_plugin *p, lsb_heka_message *msg,
                    err);
           }
         }
-        if (ret != LSB_HEKA_PM_RETRY) ++p->sequence_id;
+        if (ret != LSB_HEKA_PM_RETRY) {
+          pthread_mutex_lock(&p->cp_lock);
+          ++p->pm_delta_cnt;
+          pthread_mutex_unlock(&p->cp_lock);
+          ++p->sequence_id;
+        }
       }
     }
 
@@ -415,6 +420,7 @@ static void* input_thread(void *arg)
         p->cur.analysis.offset = p->analysis.cp.offset -
             (p->analysis.ib.readpos - p->analysis.ib.scanpos);
       }
+      ++p->mm_delta_cnt;
       pthread_mutex_unlock(&p->cp_lock);
       ret = output_message(p, msg, sample);
       if (ret == LSB_HEKA_PM_RETRY) {
