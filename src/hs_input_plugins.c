@@ -116,6 +116,9 @@ static int inject_message(void *parent,
     p->stats = lsb_heka_get_stats(p->hsb);
     p->sample = false;
   }
+  if (pb) {
+    ++p->im_delta_cnt;
+  }
   pthread_mutex_unlock(&p->cp.lock);
 
   if (!pb) { // a NULL message is used as a synchronization point

@@ -230,6 +230,7 @@ static void remove_from_analysis_plugins(hs_analysis_thread *at,
     char *pos = at->list[i]->name + tlen;
     if (strstr(name, pos) && strlen(pos) == strlen(name) - HS_EXT_LEN) {
       remove_plugin(at, i);
+      at->max_mps = 0; // invalidate the measure and switch back to the estimate
       break;
     }
   }
@@ -279,6 +280,7 @@ static void add_to_analysis_plugins(const hs_sandbox_config *cfg,
       exit(EXIT_FAILURE);
     }
   }
+  at->max_mps = 0; // invalidate the measure and switch back to the estimate
   pthread_mutex_unlock(&at->list_lock);
 }
 
@@ -305,6 +307,8 @@ static void init_analysis_thread(hs_analysis_plugins *plugins, int tid)
   at->tid = tid;
   at->stop = false;
   at->sample = false;
+  at->mm_delta_cnt = 0;
+  at->max_mps = 0;
 
   char name[255];
   int n = snprintf(name, sizeof name, "%s%d", hs_analysis_dir, tid);
@@ -376,6 +380,7 @@ static void analyze_message(hs_analysis_thread *at, bool sample)
       }
       if (matched) {
         p->im_limit = p->pm_im_limit;
+        ++p->pm_delta_cnt;
         ret = lsb_heka_pm_analysis(p->hsb, at->msg, sample);
         if (ret < 0) {
           const char *err = lsb_heka_get_error(p->hsb);
@@ -450,6 +455,7 @@ static void* input_thread(void *arg)
 
         // advance the checkpoint
         pthread_mutex_lock(&at->cp_lock);
+        ++at->mm_delta_cnt;
         at->cp.id = at->input.cp.id;
         at->cp.offset = at->input.cp.offset -
             (at->input.ib.readpos - at->input.ib.scanpos);
