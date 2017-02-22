@@ -172,7 +172,7 @@ static int get_max_mps(long long tt, int amps, int max_mps)
       max_mps = amps;
     }
   }
-  return max_mps ? max_mps : 1;
+  return max_mps;
 }
 
 
