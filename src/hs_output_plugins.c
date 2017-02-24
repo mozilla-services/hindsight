@@ -181,8 +181,8 @@ create_output_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
     destroy_output_plugin(p);
     return NULL;
   }
-  if (!hs_get_full_config(&ob, 'o', cfg, sbc)) {
-    hs_log(NULL, g_module, 3, "%s hs_get_full_config failed", sbc->cfg_name);
+  if (!hs_output_runtime_cfg(&ob, 'o', cfg, sbc)) {
+    hs_log(NULL, g_module, 3, "%s hs_output_runtime_cfg failed", sbc->cfg_name);
     lsb_free_output_buffer(&ob);
     free(state_file);
     destroy_output_plugin(p);

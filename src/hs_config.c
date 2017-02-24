@@ -20,13 +20,14 @@
 #include "hs_logger.h"
 #include "hs_util.h"
 
-const char *hs_input_dir = "input";
+const char *hs_input_dir    = "input";
 const char *hs_analysis_dir = "analysis";
-const char *hs_output_dir = "output";
-const char *hs_lua_ext = ".lua";
-const char *hs_cfg_ext = ".cfg";
-const char *hs_off_ext = ".off";
-const char *hs_err_ext = ".err";
+const char *hs_output_dir   = "output";
+const char *hs_lua_ext      = ".lua";
+const char *hs_cfg_ext      = ".cfg";
+const char *hs_off_ext      = ".off";
+const char *hs_err_ext      = ".err";
+const char *hs_rtc_ext      = ".rtc";
 
 static const char g_module[] = "config_parser";
 
@@ -71,7 +72,7 @@ static void init_sandbox_config(hs_sandbox_config *cfg)
   cfg->cfg_lua = NULL;
   cfg->message_matcher = NULL;
 
-  cfg->thread = 0;
+  cfg->thread = UINT_MAX;
   cfg->async_buffer_size = 0;
   cfg->output_limit = 1024 * 64;
   cfg->memory_limit = 1024 * 1024 * 8;
@@ -677,8 +678,9 @@ int hs_load_config(const char *fn, hs_config *cfg)
 
   ret = get_unsigned_int(L, LUA_GLOBALSINDEX, cfg_threads,
                          &cfg->analysis_threads);
-  if (cfg->analysis_threads < 1 || cfg->analysis_threads > 64) {
-    lua_pushfstring(L, "%s must be 1-64", cfg_threads);
+  if (cfg->analysis_threads < 1
+      || cfg->analysis_threads > HS_MAX_ANALYSIS_THREADS) {
+    lua_pushfstring(L, "%s must be 1-%d", cfg_threads, HS_MAX_ANALYSIS_THREADS);
     ret = 1;
     goto cleanup;
   }
@@ -790,7 +792,7 @@ int hs_process_load_cfg(const char *lpath, const char *rpath, const char *name)
 }
 
 
-bool hs_get_full_config(lsb_output_buffer *ob, char type, const hs_config *cfg,
+bool hs_output_runtime_cfg(lsb_output_buffer *ob, char type, const hs_config *cfg,
                         hs_sandbox_config *sbc)
 {
   lsb_outputf(ob, "-- original configuration\n");
@@ -842,11 +844,10 @@ bool hs_get_full_config(lsb_output_buffer *ob, char type, const hs_config *cfg,
   // just test the last write to make sure the buffer wasn't exhausted
   lsb_err_value ret = lsb_outputf(ob, "-- end Hindsight configuration\n");
 
-  char fcfg[] = ".fcfg";
-  char fn[strlen(sbc->dir) + 1 + strlen(sbc->cfg_name) + sizeof(fcfg)];
+  char fn[strlen(sbc->dir) + strlen(sbc->cfg_name) + strlen(hs_rtc_ext) + 2];
   char *p = strchr(sbc->cfg_name, '.');
   if (!p) return false;
-  snprintf(fn, sizeof(fn), "%s/%s%s", sbc->dir, p + 1, fcfg);
+  snprintf(fn, sizeof(fn), "%s/%s%s", sbc->dir, p + 1, hs_rtc_ext);
   FILE *fh = fopen(fn, "we");
   if (!fh) return false;
   fwrite(ob->buf, ob->pos, 1, fh);
