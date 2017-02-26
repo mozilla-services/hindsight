@@ -380,6 +380,7 @@ static char* create_name(const char *prefix, const char *fn)
 
   int ret = snprintf(name, len, "%s.%.*s", prefix, (int)ne_len, fn);
   if (ret < 0 || ret > (int)len - 1) {
+    free(name);
     return NULL;
   }
   return name;
