@@ -172,6 +172,7 @@ create_analysis_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
       hs_log(NULL, g_module, 3, "%s failed to construct the state_file path",
              sbc->cfg_name);
       destroy_analysis_plugin(p);
+      free(state_file);
       return NULL;
     }
   }
