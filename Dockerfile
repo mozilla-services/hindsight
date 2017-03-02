@@ -25,7 +25,7 @@ RUN sudo yum -y install wget && \
     sudo ln -s /usr/bin/cmake3 /usr/local/bin/cmake && \
 
     # Build the lua sandbox & extensions
-    cd /app/src && \ 
+    cd /app/src && \
     git clone https://github.com/mozilla-services/lua_sandbox_extensions.git && \
     cd lua_sandbox_extensions/ && \
     ./build/run.sh build && \
@@ -44,7 +44,7 @@ RUN sudo yum -y install wget && \
     # Setup run directory
     cd /app && \
     mkdir -p /app/cfg \
-             /app/input \ 
+             /app/input \
              /app/output/input \
              /app/load \
              /app/run/input \
