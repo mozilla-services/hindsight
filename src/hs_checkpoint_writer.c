@@ -172,7 +172,7 @@ static int get_max_mps(long long tt, int amps, int max_mps)
       max_mps = amps;
     }
   }
-  return max_mps ? max_mps : 1;
+  return max_mps;
 }
 
 
@@ -222,9 +222,10 @@ static void analysis_stats(hs_checkpoint_writer *cpw, hs_checkpoint_reader *cpr,
       int imps = cpi->input_delta_cnt / sample_sec;
       int mps  = (imps > amps) ? imps : amps;
       at->max_mps = get_max_mps(tt, amps, at->max_mps);
+      at->utilization = round_percentage(mps, at->max_mps);
       fprintf(cpi->utsv, "analysis%d\t%d\t%d\t%d\t%d\t%d\n", i,
               at->mm_delta_cnt,
-              round_percentage(mps, at->max_mps),
+              at->utilization,
               round_percentage(mmt, tt),
               round_percentage(pmt, tt),
               round_percentage(tet, tt));

@@ -15,14 +15,17 @@
 
 #define HS_EXT_LEN 4
 #define HS_MAX_PATH 260
+#define HS_MAX_ANALYSIS_THREADS 64
 
 extern const char *hs_input_dir;
 extern const char *hs_analysis_dir;
 extern const char *hs_output_dir;
 extern const char *hs_lua_ext;
 extern const char *hs_cfg_ext;
+extern const char *hs_rtc_ext;
 extern const char *hs_off_ext;
 extern const char *hs_err_ext;
+
 
 typedef struct hs_sandbox_config
 {
@@ -98,9 +101,11 @@ void hs_free_config(hs_config *cfg);
 /**
  * Loads the sandbox configuration from a file
  *
- * @param fn Filename
+ * @param dir Run or Load path
+ * @param fn Filename with proper extension
  * @param cfg Configuration structure to populate
- * @param dflt
+ * @param dflt Default sandbox setting
+ * @param type Type of sandbox 'i', 'a', 'o'
  *
  * @return bool false on failure
  */
@@ -123,7 +128,7 @@ int hs_load_config(const char *fn, hs_config *cfg);
 int hs_process_load_cfg(const char *lpath, const char *rpath, const char *name);
 
 
-bool hs_get_full_config(lsb_output_buffer *ob, char type, const hs_config *cfg,
-                        hs_sandbox_config *sbc);
+bool hs_output_runtime_cfg(lsb_output_buffer *ob, char type,
+                           const hs_config *cfg, hs_sandbox_config *sbc);
 
 #endif
