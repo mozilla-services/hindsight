@@ -118,7 +118,7 @@ static char* test_sandbox_input_config()
             cfg.filename);
   mu_assert(cfg.message_matcher == NULL, "received %s", cfg.message_matcher);
   mu_assert(cfg.async_buffer_size == 0, "received %d", cfg.async_buffer_size);
-  mu_assert(cfg.thread == 0, "received %d", cfg.thread);
+  mu_assert(cfg.thread == UINT_MAX, "received %d", cfg.thread);
 
   hs_free_sandbox_config(&cfg);
   return NULL;
@@ -159,7 +159,7 @@ static char* test_sandbox_output_config()
   mu_assert(strcmp(cfg.filename, "output.lua") == 0, "received %s",
             cfg.filename);
   mu_assert(cfg.async_buffer_size == 999, "received %d", cfg.async_buffer_size);
-  mu_assert(cfg.thread == 0, "received %d", cfg.thread);
+  mu_assert(cfg.thread == UINT_MAX, "received %d", cfg.thread);
 
   hs_free_sandbox_config(&cfg);
   return NULL;

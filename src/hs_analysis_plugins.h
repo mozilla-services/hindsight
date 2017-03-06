@@ -67,6 +67,7 @@ struct hs_analysis_thread {
   int       tid;
   int       mm_delta_cnt;
   int       max_mps;
+  int       utilization;
   bool      stop;
   bool      sample;
 };

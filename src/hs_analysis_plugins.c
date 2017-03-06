@@ -172,6 +172,7 @@ create_analysis_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
       hs_log(NULL, g_module, 3, "%s failed to construct the state_file path",
              sbc->cfg_name);
       destroy_analysis_plugin(p);
+      free(state_file);
       return NULL;
     }
   }
@@ -183,8 +184,8 @@ create_analysis_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
     destroy_analysis_plugin(p);
     return NULL;
   }
-  if (!hs_get_full_config(&ob, 'a', cfg, sbc)) {
-    hs_log(NULL, g_module, 3, "%s hs_get_full_config failed", sbc->cfg_name);
+  if (!hs_output_runtime_cfg(&ob, 'a', cfg, sbc)) {
+    hs_log(NULL, g_module, 3, "%s hs_output_runtime_cfg failed", sbc->cfg_name);
     lsb_free_output_buffer(&ob);
     free(state_file);
     destroy_analysis_plugin(p);
@@ -631,63 +632,42 @@ static void process_lua(hs_analysis_plugins *plugins, const char *name)
 }
 
 
-static int get_thread_id(const char *lpath, const char *rpath, const char *name)
+static unsigned get_tid(const char *path, const char *name)
 {
-  if (hs_has_ext(name, hs_cfg_ext)) {
-    int otid = -1, ntid = -2;
-    hs_sandbox_config sbc;
-    if (hs_load_sandbox_config(lpath, name, &sbc, NULL, 'a')) {
-      ntid = sbc.thread;
-      hs_free_sandbox_config(&sbc);
-    }
+  unsigned tid = UINT_MAX;
+  char fqfn[HS_MAX_PATH];
+  if (hs_get_fqfn(path, name, fqfn, sizeof(fqfn))) return tid;
 
-    if (hs_load_sandbox_config(rpath, name, &sbc, NULL, 'a')) {
-      otid = sbc.thread;
-      hs_free_sandbox_config(&sbc);
-    } else {
-      otid = ntid;
-    }
+  lua_State *L = luaL_newstate();
+  if (!L) return tid;
 
-    if (otid != ntid) { // mis-matched cfgs so remove the load .cfg
-      char path[HS_MAX_PATH];
-      if (hs_get_fqfn(lpath, name, path, sizeof(path))) {
-        hs_log(NULL, g_module, 0, "load off path too long");
-        exit(EXIT_FAILURE);
-      }
-      if (unlink(path)) {
-        hs_log(NULL, g_module, 3, "failed to delete: %s errno: %d", path,
-               errno);
-      }
-      return -1;
-    }
-    return otid;
-  } else if (hs_has_ext(name, hs_off_ext)) {
-    char cfg[HS_MAX_PATH];
-    strcpy(cfg, name);
-    strcpy(cfg + strlen(name) - HS_EXT_LEN, hs_cfg_ext);
-
-    hs_sandbox_config sbc;
-    if (hs_load_sandbox_config(rpath, cfg, &sbc, NULL, 'a')) {
-      hs_free_sandbox_config(&sbc);
-      return sbc.thread;
-    }
-
-    // no config was found so remove the .off flag
-    char path[HS_MAX_PATH];
-    if (hs_get_fqfn(lpath, name, path, sizeof(path))) {
-      hs_log(NULL, g_module, 0, "load off path too long");
-      exit(EXIT_FAILURE);
-    }
-    if (unlink(path)) {
-      hs_log(NULL, g_module, 3, "failed to delete: %s errno: %d", path, errno);
+  if (!luaL_dofile(L, fqfn)) {
+    lua_getglobal(L, "thread");
+    if (lua_type(L, -1) == LUA_TNUMBER) {
+      tid = (unsigned)lua_tointeger(L, -1);
     }
   }
-  return -2;
+  lua_close(L);
+  return tid;
+}
+
+
+static unsigned get_previous_tid(const char *rpath, const char *name)
+{
+  size_t len = strlen(name);
+  char rtc[len + 1];
+  strcpy(rtc, name);
+  strcpy(rtc + len - HS_EXT_LEN, hs_rtc_ext);
+  return get_tid(rpath, rtc);
 }
 
 
 void hs_load_analysis_startup(hs_analysis_plugins *plugins)
 {
+  const int threads = plugins->thread_cnt;
+  int plugins_per_thread[threads];
+  memset(plugins_per_thread, 0, sizeof(int) * threads);
+
   hs_config *cfg = plugins->cfg;
   const char *dir = cfg->run_path_analysis;
   DIR *dp = opendir(dir);
@@ -696,10 +676,42 @@ void hs_load_analysis_startup(hs_analysis_plugins *plugins)
     exit(EXIT_FAILURE);
   }
 
+  // pre count the provisioned threads to get better distribution of the
+  // dynamically provisioned threads
   struct dirent *entry;
+  while ((entry = readdir(dp))) {
+    if ((hs_has_ext(entry->d_name, hs_cfg_ext))) {
+      unsigned tid = get_tid(dir, entry->d_name);
+      if (tid == UINT_MAX) {
+        tid = get_previous_tid(dir, entry->d_name);
+      }
+      if (tid != UINT_MAX) {
+        ++plugins_per_thread[tid % threads];
+      }
+    }
+  }
+  rewinddir(dp);
+
   while ((entry = readdir(dp))) {
     hs_sandbox_config sbc;
     if (hs_load_sandbox_config(dir, entry->d_name, &sbc, &cfg->apd, 'a')) {
+      if (sbc.thread == UINT_MAX) {
+        sbc.thread = get_previous_tid(dir, entry->d_name);
+        if (sbc.thread == UINT_MAX) {
+          int min_cnt = INT_MAX;
+          for (int i = 0; i < threads; ++i) {
+            if (plugins_per_thread[i] == 0) {
+              sbc.thread = i;
+              break;
+            }
+            if (plugins_per_thread[i] < min_cnt) {
+              min_cnt = plugins_per_thread[i];
+              sbc.thread = i;
+            }
+          }
+          ++plugins_per_thread[sbc.thread % threads];
+        }
+      }
       hs_analysis_plugin *p = create_analysis_plugin(cfg, &sbc);
       if (p) {
         add_to_analysis_plugins(&sbc, plugins, p);
@@ -714,6 +726,91 @@ void hs_load_analysis_startup(hs_analysis_plugins *plugins)
 }
 
 
+static unsigned least_used_thread_id(hs_analysis_plugins *plugins)
+{
+  unsigned tid  = 0;
+  int min_util  = INT_MAX;
+  int min_cnt   = INT_MAX;
+
+  for (int i = 0; i < plugins->thread_cnt; ++i) {
+    hs_analysis_thread *at = &plugins->list[i];
+    pthread_mutex_lock(&at->list_lock);
+    if (at->utilization < min_util ||
+        (at->utilization == min_util && at->list_cnt < min_cnt)) {
+      min_util = at->utilization;
+      min_cnt = at->list_cnt;
+      tid = (unsigned)i;
+    }
+    pthread_mutex_unlock(&at->list_lock);
+  }
+  return tid;
+}
+
+
+static bool ext_exists(const char *dir, const char *name, const char *ext)
+{
+  char path[HS_MAX_PATH];
+  if (hs_get_fqfn(dir, name, path, sizeof(path))) {
+    hs_log(NULL, g_module, 0, "path too long");
+    exit(EXIT_FAILURE);
+  }
+  size_t pos = strlen(path) - HS_EXT_LEN;
+  strcpy(path + pos, ext);
+  return hs_file_exists(path);
+}
+
+
+static int get_thread_id(const char *lpath, const char *rpath, const char *name,
+                         unsigned *tid)
+{
+  if (hs_has_ext(name, hs_cfg_ext)) {
+    *tid = get_tid(lpath, name);
+    unsigned otid = *tid;
+    if (!ext_exists(rpath, name, hs_off_ext)
+        && !ext_exists(rpath, name, hs_err_ext)) {
+      otid = get_previous_tid(rpath, name);
+      if (*tid == UINT_MAX) {
+        *tid = otid;
+      }
+    }
+
+    if (otid != *tid) { // mis-matched cfgs so remove the load .cfg
+      char path[HS_MAX_PATH];
+      if (hs_get_fqfn(lpath, name, path, sizeof(path))) {
+        hs_log(NULL, g_module, 0, "load off path too long");
+        exit(EXIT_FAILURE);
+      }
+      if (unlink(path)) {
+        hs_log(NULL, g_module, 3, "failed to delete: %s errno: %d", path,
+               errno);
+      }
+      hs_log(NULL, g_module, 3, "plugin cannot be restarted on a different "
+             "thread: %s", name);
+      return false;
+    }
+    return true;
+  } else if (hs_has_ext(name, hs_off_ext)) {
+    char cfg[HS_MAX_PATH];
+    strcpy(cfg, name);
+    strcpy(cfg + strlen(name) - HS_EXT_LEN, hs_cfg_ext);
+    *tid = get_previous_tid(rpath, cfg);
+    if (*tid != UINT_MAX) {
+      return true;
+    }
+
+    // no .rtc was found so remove the .off flag
+    char path[HS_MAX_PATH];
+    if (hs_get_fqfn(lpath, name, path, sizeof(path))) {
+      hs_log(NULL, g_module, 0, "load off path too long");
+      exit(EXIT_FAILURE);
+    }
+    if (unlink(path)) {
+      hs_log(NULL, g_module, 3, "failed to delete: %s errno: %d", path, errno);
+    }
+  }
+  return false;
+}
+
 
 void hs_load_analysis_dynamic(hs_analysis_plugins *plugins, const char *name)
 {
@@ -726,26 +823,32 @@ void hs_load_analysis_dynamic(hs_analysis_plugins *plugins, const char *name)
     return;
   }
 
-  int tid = get_thread_id(lpath, rpath, name);
-  if (tid < 0) {
-    if (tid == -1) {
-      hs_log(NULL, g_module, 3, "plugin cannot be restarted on a different "
-             "thread: %s", name);
-    }
+  unsigned tid = UINT_MAX;
+  if (!get_thread_id(lpath, rpath, name, &tid)) {
     hs_log(NULL, g_module, 7, "%s ignored %s", __func__, name);
     return;
   }
 
-  tid %= plugins->thread_cnt;
+  bool dynamic = tid == UINT_MAX;
+  if (dynamic) {
+    tid  = least_used_thread_id(plugins);
+  }
+  int tidx = tid % plugins->thread_cnt;
+
   switch (hs_process_load_cfg(lpath, rpath, name)) {
-  case 0:
-    remove_from_analysis_plugins(&plugins->list[tid], name);
+  case 0: // remove
+    remove_from_analysis_plugins(&plugins->list[tidx], name);
     break;
   case 1: // load
-    remove_from_analysis_plugins(&plugins->list[tid], name);
     {
+      if (!dynamic) {
+        remove_from_analysis_plugins(&plugins->list[tidx], name);
+      }
       hs_sandbox_config sbc;
       if (hs_load_sandbox_config(rpath, name, &sbc, &cfg->apd, 'a')) {
+        if (sbc.thread == UINT_MAX) {
+          sbc.thread = tid;
+        }
         hs_analysis_plugin *p = create_analysis_plugin(cfg, &sbc);
         if (p) {
           add_to_analysis_plugins(&sbc, plugins, p);

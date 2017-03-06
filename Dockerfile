@@ -24,11 +24,32 @@ RUN sudo yum -y install wget && \
     sudo yum -y install lua-devel luarocks cmake3 make clang gcc git rpm-build sudo && \
     sudo ln -s /usr/bin/cmake3 /usr/local/bin/cmake && \
 
+    # Install confluent 3.1 for centos 7 for librdkafka-devel
+    echo [confluent] > confluent.repo && \
+    echo name=confluent >> confluent.repo && \
+    echo baseurl=http://packages.confluent.io/rpm/3.1/7 >> confluent.repo && \
+    echo gpgcheck=1 >> confluent.repo && \
+    echo gpgkey=http://packages.confluent.io/rpm/3.1/archive.key >> confluent.repo && \
+    sudo mv confluent.repo /etc/yum.repos.d && \
+
     # Build the lua sandbox & extensions
-    cd /app/src && \ 
+    cd /app/src && \
+    git clone https://github.com/mozilla-services/lua_sandbox.git && \
     git clone https://github.com/mozilla-services/lua_sandbox_extensions.git && \
     cd lua_sandbox_extensions/ && \
-    ./build/run.sh build && \
+    . /app/src/lua_sandbox/build/functions.sh && \
+    build_lsbe() { \
+        sudo yum -y install https://net-mozaws-prod-ops-rpmrepo-deps.s3.amazonaws.com/hindsight/parquet-cpp-0.0.1-Linux.rpm && \
+        install_packages c++-compiler librdkafka-devel openssl-devel postgresql-devel systemd-devel zlib-devel && \
+        rm -rf ./release && \
+        mkdir release && \
+        cd release && \
+        cmake -DCMAKE_BUILD_TYPE=release -DENABLE_ALL_EXT=true -DEXT_geoip=false -DEXT_snappy=false "-DCPACK_GENERATOR=${CPACK_GENERATOR}" .. && \
+        make && \
+        ctest -V && \
+        make packages; \
+    } && \
+    build_function="build_lsbe" main && \
     sudo rpm -ivh /app/src/lua_sandbox_extensions/release/luasandbox*Linux.rpm && \
 
     # Build hindsight
@@ -44,7 +65,7 @@ RUN sudo yum -y install wget && \
     # Setup run directory
     cd /app && \
     mkdir -p /app/cfg \
-             /app/input \ 
+             /app/input \
              /app/output/input \
              /app/load \
              /app/run/input \
