@@ -48,8 +48,8 @@ typedef struct hs_sandbox_config
   bool rm_cp_terminate;   // output sandbox only
 
   char read_queue;           // output sandbox only
-  unsigned char pm_im_limit; // analysis sandbox only
-  unsigned char te_im_limit; // analysis sandbox only
+  unsigned int pm_im_limit;  // analysis sandbox only
+  unsigned int te_im_limit;  // analysis sandbox only
 } hs_sandbox_config;
 
 typedef struct hs_config

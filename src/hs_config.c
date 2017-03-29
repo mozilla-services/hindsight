@@ -309,10 +309,10 @@ static int load_sandbox_defaults(lua_State *L,
   }
 
   if (strcmp(key, cfg_sb_apd) == 0) {
-    if (get_unsigned_char(L, 1, cfg_sb_pm_im_limit, &cfg->pm_im_limit)) {
+    if (get_unsigned_int(L, 1, cfg_sb_pm_im_limit, &cfg->pm_im_limit)) {
       return 1;
     }
-    if (get_unsigned_char(L, 1, cfg_sb_te_im_limit, &cfg->te_im_limit)) {
+    if (get_unsigned_int(L, 1, cfg_sb_te_im_limit, &cfg->te_im_limit)) {
       return 1;
     }
   }
@@ -544,9 +544,9 @@ bool hs_load_sandbox_config(const char *dir,
   if (type == 'a') {
     ret = get_unsigned_int(L, LUA_GLOBALSINDEX, cfg_sb_thread,
                            &cfg->thread);
-    ret = get_unsigned_char(L, LUA_GLOBALSINDEX, cfg_sb_pm_im_limit,
+    ret = get_unsigned_int(L, LUA_GLOBALSINDEX, cfg_sb_pm_im_limit,
                             &cfg->pm_im_limit);
-    ret = get_unsigned_char(L, LUA_GLOBALSINDEX, cfg_sb_te_im_limit,
+    ret = get_unsigned_int(L, LUA_GLOBALSINDEX, cfg_sb_te_im_limit,
                             &cfg->te_im_limit);
     if (ret) goto cleanup;
   }
