@@ -234,32 +234,6 @@ static int get_option_char(lua_State *L, int idx, const char *name,
 }
 
 
-static int get_unsigned_char(lua_State *L, int idx, const char *name,
-                             unsigned char *val)
-{
-  lua_getfield(L, idx, name);
-  int t = lua_type(L, -1);
-  double d;
-  switch (t) {
-  case LUA_TNUMBER:
-    d = lua_tonumber(L, -1);
-    if (d < 0 || d > UCHAR_MAX) {
-      lua_pushfstring(L, "%s must be an unsigned char", name);
-      return 1;
-    }
-    *val = (unsigned char)d;
-    break;
-  case LUA_TNIL:
-    break; // use the default
-  default:
-    lua_pushfstring(L, "%s must be set to a number", name);
-    return 1;
-  }
-  remove_item(L, idx, name);
-  return 0;
-}
-
-
 static int get_bool_item(lua_State *L, int idx, const char *name, bool *val)
 {
   lua_getfield(L, idx, name);
