@@ -160,6 +160,8 @@ static char* test_sandbox_output_config()
             cfg.filename);
   mu_assert(cfg.async_buffer_size == 999, "received %d", cfg.async_buffer_size);
   mu_assert(cfg.thread == UINT_MAX, "received %d", cfg.thread);
+  mu_assert(cfg.rm_cp_terminate == true, "received %d", cfg.rm_cp_terminate);
+  mu_assert(cfg.read_queue == 'i', "received %c", cfg.read_queue);
 
   hs_free_sandbox_config(&cfg);
   return NULL;
