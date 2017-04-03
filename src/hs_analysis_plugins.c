@@ -137,6 +137,9 @@ create_analysis_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
   // distribute when the timer_events will fire
   if (stagger) {
     p->ticker_expires = time(NULL) + rand() % stagger;
+#ifdef HINDSIGHT_CLI
+    p->ticker_expires = 0;
+#endif
   }
 
   p->mm = lsb_create_message_matcher(sbc->message_matcher);
@@ -435,9 +438,10 @@ static void* input_thread(void *arg)
   lsb_logger logger = { .context = NULL, .cb = hs_log };
   bool stop = false;
   bool sample = false;
-  bool next_available = false;
 #ifdef HINDSIGHT_CLI
+  long long cli_ns = 0;
   bool input_stop = false;
+  bool next = false;
   while (!(stop && input_stop)) {
 #else
   while (!stop) {
@@ -451,7 +455,14 @@ static void* input_thread(void *arg)
       if (lsb_find_heka_message(&msg, &at->input.ib, true, &discarded_bytes,
                                 &logger)) {
         at->msg = &msg;
+#ifdef HINDSIGHT_CLI
+        if (at->msg->timestamp > cli_ns) {
+          cli_ns = at->msg->timestamp;
+          at->current_t = cli_ns / 1000000000LL;
+        }
+#else
         at->current_t = time(NULL);
+#endif
         analyze_message(at, sample);
 
         // advance the checkpoint
@@ -464,25 +475,33 @@ static void* input_thread(void *arg)
         pthread_mutex_unlock(&at->cp_lock);
       } else {
         bytes_read = hs_read_file(&at->input);
-      }
-
-      if (!bytes_read
-          && (at->input.cp.offset >= at->plugins->cfg->output_size
-              || next_available)) {
-        next_available = hs_open_file(&at->input, hs_input_dir,
-                                      at->input.cp.id + 1);
+        // When the read gets to the end it will always check once for the next
+        // available file just incase the output_size was increased on the last
+        // restart.
 #ifdef HINDSIGHT_CLI
-        if (!next_available && stop) {
+        next = false;
+        if (!bytes_read
+            && (at->input.cp.offset >= at->plugins->cfg->output_size)) {
+          next = hs_open_file(&at->input, hs_input_dir, at->input.cp.id + 1);
+        }
+        if (!bytes_read && !next && stop) {
           input_stop = true;
+        }
+#else
+        if (!bytes_read
+            && (at->input.cp.offset >= at->plugins->cfg->output_size)) {
+          hs_open_file(&at->input, hs_input_dir, at->input.cp.id + 1);
         }
 #endif
       }
     } else { // still waiting on the first file
-      next_available = hs_open_file(&at->input, hs_input_dir, at->input.cp.id);
 #ifdef HINDSIGHT_CLI
-      if (!next_available && stop) {
+      next = hs_open_file(&at->input, hs_input_dir, at->input.cp.id);
+      if (!next && stop) {
         input_stop = true;
       }
+#else
+      hs_open_file(&at->input, hs_input_dir, at->input.cp.id);
 #endif
     }
 
@@ -492,7 +511,11 @@ static void* input_thread(void *arg)
       // trigger any pending timer events
       lsb_clear_heka_message(&msg); // create an idle/empty message
       at->msg = &msg;
+#ifdef HINDSIGHT_CLI
+      at->current_t = cli_ns / 1000000000LL;
+#else
       at->current_t = time(NULL);
+#endif
       analyze_message(at, sample);
       if (sample) {
         pthread_mutex_lock(&at->cp_lock);

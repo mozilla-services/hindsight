@@ -30,6 +30,7 @@ const char *hs_err_ext      = ".err";
 const char *hs_rtc_ext      = ".rtc";
 
 static const char g_module[] = "config_parser";
+static const char *g_queue_options[] = { "both", "input", "analysis", NULL };
 
 static const char *cfg_output_path = "output_path";
 static const char *cfg_output_size = "output_size";
@@ -63,6 +64,7 @@ static const char *cfg_sb_shutdown_terminate = "shutdown_on_terminate";
 static const char *cfg_sb_rm_cp_terminate = "remove_checkpoints_on_terminate";
 static const char *cfg_sb_pm_im_limit = "process_message_inject_limit";
 static const char *cfg_sb_te_im_limit = "timer_event_inject_limit";
+static const char *cfg_sb_read_queue = "read_queue";
 
 static void init_sandbox_config(hs_sandbox_config *cfg)
 {
@@ -83,6 +85,7 @@ static void init_sandbox_config(hs_sandbox_config *cfg)
   cfg->restricted_headers = true;
   cfg->shutdown_terminate = false;
   cfg->rm_cp_terminate = false;
+  cfg->read_queue = 'b';
 
   cfg->pm_im_limit = 0;
   cfg->te_im_limit = 10;
@@ -168,7 +171,6 @@ static int get_string_item(lua_State *L, int idx, const char *name, char **val,
   *val = malloc(len + 1);
   memcpy(*val, tmp, len + 1);
   remove_item(L, idx, name);
-
   return 0;
 }
 
@@ -193,10 +195,41 @@ static int get_unsigned_int(lua_State *L, int idx, const char *name,
   default:
     lua_pushfstring(L, "%s must be set to a number", name);
     return 1;
-    break;
   }
   remove_item(L, idx, name);
+  return 0;
+}
 
+
+static int get_option_char(lua_State *L, int idx, const char *name,
+                           char *val, const char *options[])
+{
+  lua_getfield(L, idx, name);
+  int t = lua_type(L, -1);
+  switch (t) {
+  case LUA_TSTRING:
+    {
+      bool found = false;
+      const char *s = lua_tostring(L, -1);
+      for (const char **p = options; *p != NULL && found != true; ++p) {
+        if (strcmp(*p, s) == 0) {
+          *val = s[0];
+          found = true;
+        }
+      }
+      if (!found) {
+        lua_pushfstring(L, "%s invalid option %s", name, s);
+        return 1;
+      }
+    }
+    break;
+  case LUA_TNIL:
+    break; // use the default
+  default:
+    lua_pushfstring(L, "%s must be set to a string", name);
+    return 1;
+  }
+  remove_item(L, idx, name);
   return 0;
 }
 
@@ -221,10 +254,8 @@ static int get_unsigned_char(lua_State *L, int idx, const char *name,
   default:
     lua_pushfstring(L, "%s must be set to a number", name);
     return 1;
-    break;
   }
   remove_item(L, idx, name);
-
   return 0;
 }
 
@@ -244,7 +275,6 @@ static int get_bool_item(lua_State *L, int idx, const char *name, bool *val)
     return 1;
   }
   remove_item(L, idx, name);
-
   return 0;
 }
 
@@ -289,6 +319,10 @@ static int load_sandbox_defaults(lua_State *L,
 
   if (strcmp(key, cfg_sb_opd) == 0) {
     if (get_bool_item(L, 1, cfg_sb_rm_cp_terminate, &cfg->rm_cp_terminate)) {
+      return 1;
+    }
+    if (get_option_char(L, 1, cfg_sb_read_queue, &cfg->read_queue,
+                        g_queue_options)) {
       return 1;
     }
   }
@@ -431,6 +465,7 @@ bool hs_load_sandbox_config(const char *dir,
     cfg->rm_cp_terminate = dflt->rm_cp_terminate;
     cfg->pm_im_limit = dflt->pm_im_limit;
     cfg->te_im_limit = dflt->te_im_limit;
+    cfg->read_queue = dflt->read_queue;
   }
 
   int ret = luaL_dostring(L, cfg->cfg_lua);
@@ -523,6 +558,9 @@ bool hs_load_sandbox_config(const char *dir,
 
     ret = get_bool_item(L, LUA_GLOBALSINDEX, cfg_sb_rm_cp_terminate,
                         &cfg->rm_cp_terminate);
+
+    ret = get_option_char(L, LUA_GLOBALSINDEX, cfg_sb_read_queue,
+                        &cfg->read_queue, g_queue_options);
     if (ret) goto cleanup;
   }
 
@@ -533,7 +571,6 @@ cleanup:
     return false;
   }
   lua_close(L);
-
   return true;
 }
 
@@ -712,7 +749,6 @@ cleanup:
     hs_log(NULL, g_module, 3, "loading %s failed: %s", fn, lua_tostring(L, -1));
   }
   lua_close(L);
-
   return ret;
 }
 
@@ -794,7 +830,7 @@ int hs_process_load_cfg(const char *lpath, const char *rpath, const char *name)
 
 
 bool hs_output_runtime_cfg(lsb_output_buffer *ob, char type, const hs_config *cfg,
-                        hs_sandbox_config *sbc)
+                           hs_sandbox_config *sbc)
 {
   lsb_outputf(ob, "-- original configuration\n");
   lsb_outputf(ob, "%s\n", sbc->cfg_lua);
@@ -840,6 +876,17 @@ bool hs_output_runtime_cfg(lsb_output_buffer *ob, char type, const hs_config *cf
     lsb_outputf(ob, "async_buffer_size = %u\n", sbc->async_buffer_size);
     lsb_outputf(ob, "remove_checkpoints_on_terminate = %s\n",
                 sbc->rm_cp_terminate ? "true" : "false");
+    switch (sbc->read_queue) {
+    case 'i':
+      lsb_outputf(ob, "read_queue = \"input\"\n");
+      break;
+    case 'a':
+      lsb_outputf(ob, "read_queue = \"analysis\"\n");
+      break;
+    default:
+      lsb_outputf(ob, "read_queue = \"both\"\n");
+      break;
+    }
   }
 
   // just test the last write to make sure the buffer wasn't exhausted
@@ -853,7 +900,6 @@ bool hs_output_runtime_cfg(lsb_output_buffer *ob, char type, const hs_config *cf
   if (!fh) return false;
   fwrite(ob->buf, ob->pos, 1, fh);
   fclose(fh);
-
   return ret ? false : true;
 }
 

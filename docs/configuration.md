@@ -86,6 +86,7 @@ analysis_defaults = {
 output_defaults = {
   -- see: Default Sandbox Configuration Variables
   -- remove_checkpoints_on_terminate = false
+  -- read_queue = "both"
 }
 ```
 
@@ -129,6 +130,8 @@ output_defaults = {
   plugin is terminated (default false).  This prevents the data from being
   pruned until the plugin can be fixed but it can also cause the system to back
   pressure as it will start filling the disk.
+* **read_queue** - specifies which queue the output plugin consumes
+  (both|input|analysis) defaults to both.
 
 ----
 

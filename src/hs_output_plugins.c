@@ -118,11 +118,15 @@ create_output_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
   p->sequence_id = 1;
   p->ticker_interval = sbc->ticker_interval;
   p->rm_cp_terminate = sbc->rm_cp_terminate;
+  p->read_queue = sbc->read_queue;
   p->shutdown_terminate = sbc->shutdown_terminate;
   int stagger = p->ticker_interval > 60 ? 60 : p->ticker_interval;
   // distribute when the timer_events will fire
   if (stagger) {
     p->ticker_expires = time(NULL) + rand() % stagger;
+#ifdef HINDSIGHT_CLI
+    p->ticker_expires = 0;
+#endif
   }
 
   if (sbc->async_buffer_size > 0) {
@@ -206,10 +210,10 @@ create_output_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
 }
 
 
-static void shutdown_timer_event(hs_output_plugin *p)
+static void shutdown_timer_event(hs_output_plugin *p, time_t current_t)
 {
   if (lsb_heka_is_running(p->hsb)) {
-    if (lsb_heka_timer_event(p->hsb, time(NULL), true)) {
+    if (lsb_heka_timer_event(p->hsb, current_t, true)) {
       hs_log(NULL, p->name, 3, "terminated: %s", lsb_heka_get_error(p->hsb));
     }
   }
@@ -217,10 +221,9 @@ static void shutdown_timer_event(hs_output_plugin *p)
 
 
 static int output_message(hs_output_plugin *p, lsb_heka_message *msg,
-                          bool sample)
+                          bool sample, time_t current_t)
 {
   int ret = 0, te_ret = 0;
-  time_t current_t = time(NULL);
   unsigned long long start;
   unsigned long long mmdelta = 0;
 
@@ -311,17 +314,18 @@ static void* input_thread(void *arg)
   hs_output_plugin *p = (hs_output_plugin *)arg;
   hs_log(NULL, p->name, 6, "starting");
 
-  size_t discarded_bytes;
+  size_t db;
   size_t bytes_read[2] = { 0 };
   int ret = 0;
   bool stop = false;
   bool sample = false;
-  bool next_input_available = false;
-  bool next_analysis_available = false;
+  time_t current_t = 0;
   lsb_logger logger = { .context = NULL, .cb = hs_log };
 #ifdef HINDSIGHT_CLI
-  bool input_stop = false;
-  bool analysis_stop = false;
+  long long cli_ns = 0;
+  bool input_stop = p->read_queue == 'a';
+  bool analysis_stop = p->read_queue == 'i';
+  bool next = false;
   while (!(stop && input_stop && analysis_stop)) {
 #else
   while (!stop) {
@@ -331,65 +335,69 @@ static void* input_thread(void *arg)
     sample = p->sample;
     pthread_mutex_unlock(&p->cp_lock);
 
-    if (p->input.fh && !pim) {
-      if (lsb_find_heka_message(&im, &p->input.ib, true, &discarded_bytes,
-                                &logger)) {
-        pim = &im;
-      } else {
-        bytes_read[0] = hs_read_file(&p->input);
-      }
-
-      // when the read gets to the end it will always check once for the next
-      // available file just incase the output_size was increased on the last
-      // restart
-      if (!bytes_read[0]
-          && (p->input.cp.offset >= p->plugins->cfg->output_size
-              || next_input_available)) {
-        next_input_available = hs_open_file(&p->input, hs_input_dir,
-                                            p->input.cp.id + 1);
+    if (p->read_queue >= 'b') {
+      if (p->input.fh && !pim) {
+        if (lsb_find_heka_message(&im, &p->input.ib, true, &db, &logger)) {
+          pim = &im;
+        } else {
+          bytes_read[0] = hs_read_file(&p->input);
 #ifdef HINDSIGHT_CLI
-        if (!next_input_available && stop) {
-          input_stop = true;
+          next = false;
+          if (!bytes_read[0]
+              && (p->input.cp.offset >= p->plugins->cfg->output_size)) {
+            next = hs_open_file(&p->input, hs_input_dir, p->input.cp.id + 1);
+          }
+          if (!bytes_read[0] && !next && stop) {
+            input_stop = true;
+          }
+#else
+          if (!bytes_read[0]
+              && (p->input.cp.offset >= p->plugins->cfg->output_size)) {
+            hs_open_file(&p->input, hs_input_dir, p->input.cp.id + 1);
+          }
+#endif
         }
-#endif
-      }
-    } else if (!p->input.fh) { // still waiting on the first file
-      next_input_available = hs_open_file(&p->input, hs_input_dir,
-                                          p->input.cp.id);
+      } else if (!p->input.fh) { // still waiting on the first file
 #ifdef HINDSIGHT_CLI
-      if (!next_input_available && stop) {
-        input_stop = true;
-      }
+        next = hs_open_file(&p->input, hs_input_dir, p->input.cp.id);
+        if (!next && stop) input_stop = true;
+#else
+        hs_open_file(&p->input, hs_input_dir, p->input.cp.id);
 #endif
+      }
     }
 
-    if (p->analysis.fh && !pam) {
-      if (lsb_find_heka_message(&am, &p->analysis.ib, true, &discarded_bytes,
-                                &logger)) {
-        pam = &am;
-      } else {
-        bytes_read[1] = hs_read_file(&p->analysis);
-      }
-
-      if (!bytes_read[1]
-          && (p->analysis.cp.offset >= p->plugins->cfg->output_size
-              || next_analysis_available)) {
-        next_analysis_available = hs_open_file(&p->analysis, hs_analysis_dir,
-                                               p->analysis.cp.id + 1);
+    if (p->read_queue <= 'b') {
+      if (p->analysis.fh && !pam) {
+        if (lsb_find_heka_message(&am, &p->analysis.ib, true, &db, &logger)) {
+          pam = &am;
+        } else {
+          bytes_read[1] = hs_read_file(&p->analysis);
 #ifdef HINDSIGHT_CLI
-        if (!next_analysis_available && stop) {
-          analysis_stop = true;
+          next = false;
+          if (!bytes_read[1]
+              && (p->analysis.cp.offset >= p->plugins->cfg->output_size)) {
+            next = hs_open_file(&p->analysis, hs_analysis_dir,
+                                p->analysis.cp.id + 1);
+          }
+          if (!bytes_read[1] && !next && input_stop && stop) {
+            analysis_stop = true;
+          }
+#else
+          if (!bytes_read[1]
+              && (p->analysis.cp.offset >=  p->plugins->cfg->output_size)) {
+            hs_open_file(&p->analysis, hs_analysis_dir, p->analysis.cp.id + 1);
+          }
+#endif
         }
-#endif
-      }
-    } else if (!p->analysis.fh) { // still waiting on the first file
-      next_analysis_available = hs_open_file(&p->analysis, hs_analysis_dir,
-                                             p->analysis.cp.id);
+      } else if (!p->analysis.fh) { // still waiting on the first file
 #ifdef HINDSIGHT_CLI
-      if (!next_analysis_available && stop) {
-        analysis_stop = true;
-      }
+        next = hs_open_file(&p->analysis, hs_analysis_dir, p->analysis.cp.id);
+        if (!next && input_stop && stop) analysis_stop = true;
+#else
+        hs_open_file(&p->analysis, hs_analysis_dir, p->analysis.cp.id);
 #endif
+      }
     }
 
     // if we have one send the oldest first
@@ -422,14 +430,22 @@ static void* input_thread(void *arg)
       }
       ++p->mm_delta_cnt;
       pthread_mutex_unlock(&p->cp_lock);
-      ret = output_message(p, msg, sample);
+#ifdef HINDSIGHT_CLI
+      if (msg->timestamp > cli_ns) {
+        cli_ns = msg->timestamp;
+        current_t = cli_ns / 1000000000LL;
+      }
+#else
+      current_t = time(NULL);
+#endif
+      ret = output_message(p, msg, sample, current_t);
       if (ret == LSB_HEKA_PM_RETRY) {
         while (!stop) {
           const char *err = lsb_heka_get_error(p->hsb);
           hs_log(NULL, p->name, 7, "retry message %llu err: %s", p->sequence_id,
                  err);
           sleep(1);
-          ret = output_message(p, msg, false);
+          ret = output_message(p, msg, false, current_t);
           if (ret == LSB_HEKA_PM_RETRY) {
             pthread_mutex_lock(&p->cp_lock);
             stop = p->stop;
@@ -447,7 +463,10 @@ static void* input_thread(void *arg)
       // trigger any pending timer events
       lsb_clear_heka_message(&im); // create an idle/empty message
       msg = &im;
-      output_message(p, msg, sample);
+#ifndef HINDSIGHT_CLI
+      current_t = time(NULL);
+#endif
+      output_message(p, msg, sample, current_t);
       if (sample) {
         pthread_mutex_lock(&p->cp_lock);
         p->sample = false;
@@ -458,21 +477,29 @@ static void* input_thread(void *arg)
     }
   }
 
-  shutdown_timer_event(p);
+#ifndef HINDSIGHT_CLI
+  current_t = time(NULL);
+#endif
+  shutdown_timer_event(p, current_t);
   lsb_free_heka_message(&am);
   lsb_free_heka_message(&im);
 
-  // hold the current checkpoints in memory incase we restart it
+// hold the current checkpoints in memory incase we restart it
   hs_output_plugins *plugins = p->plugins;
-  hs_update_input_checkpoint(plugins->cpr,
-                             hs_input_dir,
-                             p->name,
-                             &p->cp.input);
 
-  hs_update_input_checkpoint(plugins->cpr,
-                             hs_analysis_dir,
-                             p->name,
-                             &p->cp.analysis);
+  if (p->read_queue >= 'b') {
+    hs_update_input_checkpoint(plugins->cpr,
+                               hs_input_dir,
+                               p->name,
+                               &p->cp.input);
+  }
+
+  if (p->read_queue <= 'b') {
+    hs_update_input_checkpoint(plugins->cpr,
+                               hs_analysis_dir,
+                               p->name,
+                               &p->cp.analysis);
+  }
 
   if (stop) {
     hs_log(NULL, p->name, 6, "shutting down");
@@ -482,10 +509,14 @@ static void* input_thread(void *arg)
     hs_save_termination_err(plugins->cfg, p->name, err);
     if (p->rm_cp_terminate) {
       char key[HS_MAX_PATH];
-      snprintf(key, HS_MAX_PATH, "%s->%s", hs_input_dir, p->name);
-      hs_remove_checkpoint(plugins->cpr, key);
-      snprintf(key, HS_MAX_PATH, "%s->%s", hs_analysis_dir, p->name);
-      hs_remove_checkpoint(plugins->cpr, key);
+      if (p->read_queue >= 'b') {
+        snprintf(key, HS_MAX_PATH, "%s->%s", hs_input_dir, p->name);
+        hs_remove_checkpoint(plugins->cpr, key);
+      }
+      if (p->read_queue <= 'b') {
+        snprintf(key, HS_MAX_PATH, "%s->%s", hs_analysis_dir, p->name);
+        hs_remove_checkpoint(plugins->cpr, key);
+      }
     }
     pthread_mutex_lock(&plugins->list_lock);
     plugins->list[p->list_index] = NULL;
@@ -533,12 +564,16 @@ static void remove_from_output_plugins(hs_output_plugins *plugins,
     if (strstr(name, pos) && strlen(pos) == strlen(name) - HS_EXT_LEN) {
       remove_plugin(plugins, i);
       char key[HS_MAX_PATH];
-      snprintf(key, HS_MAX_PATH, "%s->%s.%.*s", hs_input_dir,
-               hs_output_dir, (int)strlen(name) - HS_EXT_LEN, name);
-      hs_remove_checkpoint(plugins->cpr, key);
-      snprintf(key, HS_MAX_PATH, "%s->%s.%.*s", hs_analysis_dir,
-               hs_output_dir, (int)strlen(name) - HS_EXT_LEN, name);
-      hs_remove_checkpoint(plugins->cpr, key);
+      if (p->read_queue >= 'b') {
+        snprintf(key, HS_MAX_PATH, "%s->%s.%.*s", hs_input_dir,
+                 hs_output_dir, (int)strlen(name) - HS_EXT_LEN, name);
+        hs_remove_checkpoint(plugins->cpr, key);
+      }
+      if (p->read_queue <= 'b') {
+        snprintf(key, HS_MAX_PATH, "%s->%s.%.*s", hs_analysis_dir,
+                 hs_output_dir, (int)strlen(name) - HS_EXT_LEN, name);
+        hs_remove_checkpoint(plugins->cpr, key);
+      }
       break;
     }
   }
@@ -589,21 +624,33 @@ static void add_to_output_plugins(hs_output_plugins *plugins,
   const char *path = dynamic ? NULL : p->plugins->cfg->output_path;
   // sync the output and read checkpoints
   // the read and output checkpoints can differ to allow for batching
-  hs_lookup_input_checkpoint(p->plugins->cpr,
-                             hs_input_dir,
-                             p->name,
-                             path,
-                             &p->input.cp);
-  p->cur.input.id = p->cp.input.id = p->input.cp.id;
-  p->cur.input.offset = p->cp.input.offset = p->input.cp.offset;
+  if (p->read_queue >= 'b') {
+    hs_lookup_input_checkpoint(p->plugins->cpr,
+                               hs_input_dir,
+                               p->name,
+                               path,
+                               &p->input.cp);
+    p->cur.input.id = p->cp.input.id = p->input.cp.id;
+    p->cur.input.offset = p->cp.input.offset = p->input.cp.offset;
+  } else {
+    char key[HS_MAX_PATH];
+    snprintf(key, HS_MAX_PATH, "%s->%s", hs_input_dir, p->name);
+    hs_remove_checkpoint(plugins->cpr, key);
+  }
 
-  hs_lookup_input_checkpoint(p->plugins->cpr,
-                             hs_analysis_dir,
-                             p->name,
-                             path,
-                             &p->analysis.cp);
-  p->cur.analysis.id = p->cp.analysis.id = p->analysis.cp.id;
-  p->cur.analysis.offset = p->cp.analysis.offset = p->analysis.cp.offset;
+  if (p->read_queue <= 'b') {
+    hs_lookup_input_checkpoint(p->plugins->cpr,
+                               hs_analysis_dir,
+                               p->name,
+                               path,
+                               &p->analysis.cp);
+    p->cur.analysis.id = p->cp.analysis.id = p->analysis.cp.id;
+    p->cur.analysis.offset = p->cp.analysis.offset = p->analysis.cp.offset;
+  } else {
+    char key[HS_MAX_PATH];
+    snprintf(key, HS_MAX_PATH, "%s->%s", hs_analysis_dir, p->name);
+    hs_remove_checkpoint(plugins->cpr, key);
+  }
 
   int ret = pthread_create(&p->thread, NULL, input_thread, (void *)p);
   if (ret) {

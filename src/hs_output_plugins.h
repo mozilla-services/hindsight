@@ -48,6 +48,7 @@ struct hs_output_plugin {
   bool      sample;
   bool      rm_cp_terminate;
   bool      shutdown_terminate;
+  char      read_queue;
   hs_input input;
   hs_input analysis;
 
