@@ -296,21 +296,27 @@ static void output_stats(hs_checkpoint_writer *cpw, hs_checkpoint_reader *cpr,
     pthread_mutex_lock(&p->cp_lock);
     // use the current read checkpoints to prevent batching from causing
     // backpressure
-    if (p->cur.input.id < cpi->min_input_id) {
-      cpi->min_input_id = p->cur.input.id;
-    }
-    if (p->cur.analysis.id < cpi->min_analysis_id) {
-      cpi->min_analysis_id = p->cur.analysis.id;
-    }
+    int imps = 0;
     if (!p->sample) p->sample = cpi->sample;
-    hs_update_input_checkpoint(cpr,
-                               hs_input_dir,
-                               p->name,
-                               &p->cp.input);
-    hs_update_input_checkpoint(cpr,
-                               hs_analysis_dir,
-                               p->name,
-                               &p->cp.analysis);
+    if (p->read_queue >= 'b') {
+      if (p->cur.input.id < cpi->min_input_id) {
+        cpi->min_input_id = p->cur.input.id;
+      }
+      hs_update_input_checkpoint(cpr,
+                                 hs_input_dir,
+                                 p->name,
+                                 &p->cp.input);
+      imps = cpi->input_delta_cnt / sample_sec;
+    }
+    if (p->read_queue <= 'b') {
+      if (p->cur.analysis.id < cpi->min_analysis_id) {
+        cpi->min_analysis_id = p->cur.analysis.id;
+      }
+      hs_update_input_checkpoint(cpr,
+                                 hs_analysis_dir,
+                                 p->name,
+                                 &p->cp.analysis);
+    }
     if (cpi->ptsv && cpi->utsv) {
       long long mmt = 0;
       long long pmt = 0;
@@ -338,7 +344,6 @@ static void output_stats(hs_checkpoint_writer *cpw, hs_checkpoint_reader *cpr,
 
       long long tt = mmt + pmt + tet;
       int amps = p->mm_delta_cnt / sample_sec;
-      int imps = cpi->input_delta_cnt / sample_sec;
       int mps  = (imps > amps) ? imps : amps;
       p->max_mps = get_max_mps(tt, amps, p->max_mps);
       fprintf(cpi->utsv, "%s\t%d\t%d\t%d\t%d\t%d\n", p->name,
