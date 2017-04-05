@@ -220,6 +220,7 @@ static void remove_plugin(hs_analysis_thread *at, int idx)
   destroy_analysis_plugin(p);
   p = NULL;
   --at->list_cnt;
+  at->max_mps = 0; // invalidate the measure and switch back to the estimate
 }
 
 
@@ -234,7 +235,6 @@ static void remove_from_analysis_plugins(hs_analysis_thread *at,
     char *pos = at->list[i]->name + tlen;
     if (strstr(name, pos) && strlen(pos) == strlen(name) - HS_EXT_LEN) {
       remove_plugin(at, i);
-      at->max_mps = 0; // invalidate the measure and switch back to the estimate
       break;
     }
   }
