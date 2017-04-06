@@ -44,9 +44,22 @@ void* sig_handler(void *arg)
 
   for (;;) {
     sigwait(&signal_set, &sig);
+    if (sigismember(&signal_set, SIGHUP)) {
+      if (sig == SIGHUP) {
+        break;
+      }
+      hs_log(NULL, g_module, 6, "forced stop signal received");
+      exit(EXIT_FAILURE);
+    }
     if (sig == SIGINT || sig == SIGTERM) {
       hs_log(NULL, g_module, 6, "stop signal received");
       sem_post(&g_shutdown);
+#ifdef HINDSIGHT_CLI
+      sigaddset(&signal_set, SIGINT);
+      sigaddset(&signal_set, SIGTERM);
+      sigaddset(&signal_set, SIGHUP);
+      continue;
+#endif
       break;
     } else {
       hs_log(NULL, g_module, 6, "unexpected signal received %d", sig);
@@ -211,6 +224,7 @@ int main(int argc, char *argv[])
   hs_wait_output_plugins(&ops);
   hs_write_checkpoints(&cpw, &cpr);
   hs_free_output_plugins(&ops);
+  pthread_kill(sig_thread, SIGHUP);
 #else
   // non CLI mode should shut everything down immediately
   hs_stop_input_plugins(&ips);
