@@ -208,21 +208,31 @@ int main(int argc, char *argv[])
     }
     close(load);
   }
+  int rv = EXIT_SUCCESS;
 
 #ifdef HINDSIGHT_CLI
   hs_stop_input_plugins(&ips);
   hs_wait_input_plugins(&ips);
   hs_write_checkpoints(&cpw, &cpr);
+  if (ips.terminated) {
+    rv = 2;
+  }
   hs_free_input_plugins(&ips);
 
   hs_stop_analysis_plugins(&aps);
   hs_wait_analysis_plugins(&aps);
+  if (aps.terminated) {
+    rv |= 4;
+  }
   hs_write_checkpoints(&cpw, &cpr);
   hs_free_analysis_plugins(&aps);
 
   hs_stop_output_plugins(&ops);
   hs_wait_output_plugins(&ops);
   hs_write_checkpoints(&cpw, &cpr);
+  if (ops.terminated) {
+    rv |= 8;
+  }
   hs_free_output_plugins(&ops);
   pthread_kill(sig_thread, SIGHUP);
 #else
@@ -250,5 +260,5 @@ int main(int argc, char *argv[])
   hs_log(NULL, g_module, 6, "exiting");
   hs_free_log();
   sem_destroy(&g_shutdown);
-  return 0;
+  return rv;
 }

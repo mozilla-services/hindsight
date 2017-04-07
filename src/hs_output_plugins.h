@@ -68,6 +68,9 @@ struct hs_output_plugins {
   int list_cap;
 
   pthread_mutex_t list_lock;
+#ifdef HINDSIGHT_CLI
+  bool            terminated;
+#endif
 };
 
 void hs_init_output_plugins(hs_output_plugins *plugins,

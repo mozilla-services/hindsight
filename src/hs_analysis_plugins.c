@@ -314,6 +314,10 @@ static void init_analysis_thread(hs_analysis_plugins *plugins, int tid)
   at->mm_delta_cnt = 0;
   at->max_mps = 0;
 
+#ifdef HINDSIGHT_CLI
+  at->terminated = false;
+#endif
+
   char name[255];
   int n = snprintf(name, sizeof name, "%s%d", hs_analysis_dir, tid);
   if (n < 0 || n >= (int)sizeof name) {
@@ -352,6 +356,9 @@ static void free_analysis_thread(hs_analysis_thread *at)
 
 static void terminate_sandbox(hs_analysis_thread *at, int i)
 {
+#ifdef HINDSIGHT_CLI
+  at->terminated = true;
+#endif
   const char *err = lsb_heka_get_error(at->list[i]->hsb);
   hs_log(NULL, at->list[i]->name, 3, "terminated: %s", err);
   hs_save_termination_err(at->plugins->cfg, at->list[i]->name, err);
@@ -570,6 +577,11 @@ void hs_wait_analysis_plugins(hs_analysis_plugins *plugins)
     if (pthread_join(plugins->threads[i], &thread_result)) {
       hs_log(NULL, g_module, 3, "thread could not be joined");
     }
+#ifdef HINDSIGHT_CLI
+    if (plugins->list[i].terminated) {
+      plugins->terminated = true;
+    }
+#endif
   }
   free(plugins->threads);
   plugins->threads = NULL;
