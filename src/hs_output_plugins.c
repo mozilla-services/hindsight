@@ -519,6 +519,9 @@ static void* input_thread(void *arg)
       }
     }
     pthread_mutex_lock(&plugins->list_lock);
+#ifdef HINDSIGHT_CLI
+    plugins->terminated = true;
+#endif
     plugins->list[p->list_index] = NULL;
     if (pthread_detach(p->thread)) {
       hs_log(NULL, p->name, 3, "thread could not be detached");
@@ -669,6 +672,9 @@ void hs_init_output_plugins(hs_output_plugins *plugins,
   plugins->list = NULL;
   plugins->list_cnt = 0;
   plugins->list_cap = 0;
+#ifdef HINDSIGHT_CLI
+  plugins->terminated = false;
+#endif
   if (pthread_mutex_init(&plugins->list_lock, NULL)) {
     perror("list_lock pthread_mutex_init failed");
     exit(EXIT_FAILURE);
@@ -687,6 +693,11 @@ void hs_wait_output_plugins(hs_output_plugins *plugins)
     if (pthread_join(p->thread, NULL)) {
       hs_log(NULL, p->name, 3, "thread could not be joined");
     }
+#ifdef HINDSIGHT_CLI
+    if (!lsb_heka_is_running(p->hsb)) {
+      plugins->terminated = true;
+    }
+#endif
     destroy_output_plugin(p);
     --plugins->list_cnt;
   }

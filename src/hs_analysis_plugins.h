@@ -49,6 +49,9 @@ struct hs_analysis_plugins {
   hs_checkpoint_reader  *cpr;
   int                   thread_cnt;
   hs_output             output;
+#ifdef HINDSIGHT_CLI
+  bool      terminated;
+#endif
 };
 
 struct hs_analysis_thread {
@@ -70,6 +73,9 @@ struct hs_analysis_thread {
   int       utilization;
   bool      stop;
   bool      sample;
+#ifdef HINDSIGHT_CLI
+  bool      terminated;
+#endif
 };
 
 void hs_init_analysis_plugins(hs_analysis_plugins *plugins,
