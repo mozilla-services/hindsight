@@ -15,6 +15,7 @@ So how much lighter and faster? see: [Performance](performance.md)
 * [Architecture](architecture.md)
 * [Configuration](configuration.md)
 * [Sandbox Documentation](http://mozilla-services.github.io/lua_sandbox/heka/index.html)
+* [hindsight_cli](hindsight_cli.md)
 
 
 ### Differences from Heka

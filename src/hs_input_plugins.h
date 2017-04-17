@@ -47,6 +47,9 @@ struct hs_input_plugins {
   int list_cap;
 
   hs_output output;
+#ifdef HINDSIGHT_CLI
+  bool      terminated;
+#endif
 };
 
 void hs_init_input_plugins(hs_input_plugins *plugins,
