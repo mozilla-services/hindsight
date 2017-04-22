@@ -2,12 +2,7 @@
 
 ## Overview
 
-Hindsight is a C based data processing infrastructure based on the [lua sandbox]
-(https://github.com/mozilla-services/lua_sandbox) project.  I have received
-several inquiries about a lighter weight and faster data pipeline with delivery
-guarantees to replace [Heka](https://github.com/mozilla-services/heka).
-Hindsight is that light weight skeleton around the same lua sandbox offering
-'at least once' delivery semantics.
+Hindsight is a C-based data processing infrastructure based on the [lua sandbox](https://github.com/mozilla-services/lua_sandbox) project. I have received several inquiries about a lighter weight and faster data pipeline with delivery guarantees to replace [Heka](https://github.com/mozilla-services/heka). Hindsight is that lightweight skeleton around the same Lua sandbox offering 'at least once' delivery semantics.
 
 * [Full Documentation](docs/index.md)
 * Support
