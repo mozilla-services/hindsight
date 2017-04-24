@@ -234,32 +234,6 @@ static int get_option_char(lua_State *L, int idx, const char *name,
 }
 
 
-static int get_unsigned_char(lua_State *L, int idx, const char *name,
-                             unsigned char *val)
-{
-  lua_getfield(L, idx, name);
-  int t = lua_type(L, -1);
-  double d;
-  switch (t) {
-  case LUA_TNUMBER:
-    d = lua_tonumber(L, -1);
-    if (d < 0 || d > UCHAR_MAX) {
-      lua_pushfstring(L, "%s must be an unsigned char", name);
-      return 1;
-    }
-    *val = (unsigned char)d;
-    break;
-  case LUA_TNIL:
-    break; // use the default
-  default:
-    lua_pushfstring(L, "%s must be set to a number", name);
-    return 1;
-  }
-  remove_item(L, idx, name);
-  return 0;
-}
-
-
 static int get_bool_item(lua_State *L, int idx, const char *name, bool *val)
 {
   lua_getfield(L, idx, name);
@@ -309,10 +283,10 @@ static int load_sandbox_defaults(lua_State *L,
   }
 
   if (strcmp(key, cfg_sb_apd) == 0) {
-    if (get_unsigned_char(L, 1, cfg_sb_pm_im_limit, &cfg->pm_im_limit)) {
+    if (get_unsigned_int(L, 1, cfg_sb_pm_im_limit, &cfg->pm_im_limit)) {
       return 1;
     }
-    if (get_unsigned_char(L, 1, cfg_sb_te_im_limit, &cfg->te_im_limit)) {
+    if (get_unsigned_int(L, 1, cfg_sb_te_im_limit, &cfg->te_im_limit)) {
       return 1;
     }
   }
@@ -544,9 +518,9 @@ bool hs_load_sandbox_config(const char *dir,
   if (type == 'a') {
     ret = get_unsigned_int(L, LUA_GLOBALSINDEX, cfg_sb_thread,
                            &cfg->thread);
-    ret = get_unsigned_char(L, LUA_GLOBALSINDEX, cfg_sb_pm_im_limit,
+    ret = get_unsigned_int(L, LUA_GLOBALSINDEX, cfg_sb_pm_im_limit,
                             &cfg->pm_im_limit);
-    ret = get_unsigned_char(L, LUA_GLOBALSINDEX, cfg_sb_te_im_limit,
+    ret = get_unsigned_int(L, LUA_GLOBALSINDEX, cfg_sb_te_im_limit,
                             &cfg->te_im_limit);
     if (ret) goto cleanup;
   }
