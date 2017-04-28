@@ -842,8 +842,8 @@ bool hs_output_runtime_cfg(lsb_output_buffer *ob, char type, const hs_config *cf
 
   if (type == 'a') {
     lsb_outputf(ob, "thread = %u\n", sbc->thread);
-    lsb_outputf(ob, "process_message_inject_limit = %hhu\n", sbc->pm_im_limit);
-    lsb_outputf(ob, "timer_event_inject_limit = %hhu\n", sbc->te_im_limit);
+    lsb_outputf(ob, "process_message_inject_limit = %u\n", sbc->pm_im_limit);
+    lsb_outputf(ob, "timer_event_inject_limit = %u\n", sbc->te_im_limit);
   }
 
   if (type == 'o') {
