@@ -117,11 +117,11 @@ output_defaults = {
 #### Default Analysis Sandbox Configuration Variables
 
 * **process_message_inject_limit** - the maximum number of messages the
-  `process_message` function can inject in a single invocation (count (0-255),
+  `process_message` function can inject in a single invocation (count,
   default 0).
 
 * **timer_event_inject_limit** - the maximum number of messages the
-  `timer_event` function can inject in a single invocation (count (0-255),
+  `timer_event` function can inject in a single invocation (count,
   default 10).
 
 #### Default Output Sandbox Configuration Variables
