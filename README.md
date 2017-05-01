@@ -2,10 +2,10 @@
 
 ## Overview
 
-Hindsight is a C based data processing infrastructure based on the [lua sandbox]
-(https://github.com/mozilla-services/lua_sandbox) project.  I have received
-several inquiries about a lighter weight and faster data pipeline with delivery
-guarantees to replace [Heka](https://github.com/mozilla-services/heka).
+Hindsight is a C based data processing infrastructure based on the
+[lua sandbox](https://github.com/mozilla-services/lua_sandbox) project.  I have
+received several inquiries about a lighter weight and faster data pipeline with
+delivery guarantees to replace [Heka](https://github.com/mozilla-services/heka).
 Hindsight is that light weight skeleton around the same lua sandbox offering
 'at least once' delivery semantics.
 
@@ -25,10 +25,10 @@ Hindsight is that light weight skeleton around the same lua sandbox offering
 ### CMake Build Instructions
 
     git clone https://github.com/mozilla-services/hindsight.git
-    cd hindsight 
+    cd hindsight
     mkdir release
     cd release
-    
+
     # Linux
     cmake -DCMAKE_BUILD_TYPE=release ..
     make
@@ -36,3 +36,24 @@ Hindsight is that light weight skeleton around the same lua sandbox offering
     cpack -G TGZ # (DEB|RPM|ZIP)
 
     # Cross platform support is planned but not supported yet
+
+## Releases
+
+* The master branch is the current release and is considered stable at all
+  times.
+* New versions can be released as frequently as every two weeks (our sprint
+  cycle). The only exception would be for a high priority patch.
+* All active work is flagged with the sprint milestone and tracked in the
+  project dashboard.
+* New releases occur the day after the sprint finishes.
+  * The version in the dev branch is updated
+  * The changes are merged into master
+  * A new tag is created
+
+## Contributions
+
+* All pull requests must be made against the dev branch, direct commits to
+  master are not permitted.
+* All non trivial contributions should start with an issue being filed (if it is
+  a new feature please propose your design/approach before doing any work as not
+  all feature requests are accepted).
