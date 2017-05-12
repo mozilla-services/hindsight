@@ -1,0 +1,390 @@
+
+<!DOCTYPE HTML>
+<html lang="" >
+    <head>
+        <meta charset="UTF-8">
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <title>Architecture · GitBook</title>
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="description" content="">
+        <meta name="generator" content="GitBook 3.2.2">
+        
+        
+        
+    
+    <link rel="stylesheet" href="gitbook/style.css">
+
+    
+            
+                
+                <link rel="stylesheet" href="gitbook/gitbook-plugin-highlight/website.css">
+                
+            
+                
+                <link rel="stylesheet" href="gitbook/gitbook-plugin-search/search.css">
+                
+            
+                
+                <link rel="stylesheet" href="gitbook/gitbook-plugin-fontsettings/website.css">
+                
+            
+        
+
+    
+
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+
+        
+    
+    
+    <meta name="HandheldFriendly" content="true"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <link rel="apple-touch-icon-precomposed" sizes="152x152" href="gitbook/images/apple-touch-icon-precomposed-152.png">
+    <link rel="shortcut icon" href="gitbook/images/favicon.ico" type="image/x-icon">
+
+    
+    <link rel="next" href="performance.html" />
+    
+    
+    <link rel="prev" href="./" />
+    
+
+    </head>
+    <body>
+        
+<div class="book">
+    <div class="book-summary">
+        
+            
+<div id="book-search-input" role="search">
+    <input type="text" placeholder="Type to search" />
+</div>
+
+            
+                <nav role="navigation">
+                
+
+
+<ul class="summary">
+    
+    
+
+    
+
+    
+        
+        
+    
+        <li class="chapter " data-level="1.1" data-path="./">
+            
+                <a href="./">
+            
+                    
+                    Hindsight (0.14.2)
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter active" data-level="1.2" data-path="architecture.html">
+            
+                <a href="architecture.html">
+            
+                    
+                    Architecture
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.3" data-path="performance.html">
+            
+                <a href="performance.html">
+            
+                    
+                    Performance
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.4" data-path="configuration.html">
+            
+                <a href="configuration.html">
+            
+                    
+                    Configuration
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.5" data-path="hindsight_cli.html">
+            
+                <a href="hindsight_cli.html">
+            
+                    
+                    Command Line Version
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6" >
+            
+                <a target="_blank" href="http://mozilla-services.github.io/lua_sandbox/heka/index.html">
+            
+                    
+                    Heka Sandbox Documentation
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.7" >
+            
+                <a target="_blank" href="http://mozilla-services.github.io/lua_sandbox_extensions/index.html">
+            
+                    
+                    Sandbox Extensions Documentation
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+    
+
+    <li class="divider"></li>
+
+    <li>
+        <a href="https://www.gitbook.com" target="blank" class="gitbook-link">
+            Published with GitBook
+        </a>
+    </li>
+</ul>
+
+
+                </nav>
+            
+        
+    </div>
+
+    <div class="book-body">
+        
+            <div class="body-inner">
+                
+                    
+
+<div class="book-header" role="navigation">
+    
+
+    <!-- Title -->
+    <h1>
+        <i class="fa fa-circle-o-notch fa-spin"></i>
+        <a href="." >Architecture</a>
+    </h1>
+</div>
+
+
+
+
+                    <div class="page-wrapper" tabindex="-1" role="main">
+                        <div class="page-inner">
+                            
+<div id="book-search-results">
+    <div class="search-noresults">
+    
+                                <section class="normal markdown-section">
+                                
+                                <h1 id="architecture">Architecture</h1>
+<p>Hindsight consists of three types of plugins: Input, Analysis, and Output. All
+plugins are written in Lua and based on the
+<a href="https://github.com/mozilla-services/lua_sandbox" target="_blank">Lua Sandbox</a> project.</p>
+<h2 id="input-plugins">Input Plugins</h2>
+<p>Input plugins are used to transform external data formats into a Heka messages
+for processing.  Each input plugin runs on a dedicated thread and all messages
+generated by the plugins are multiplexed to a single output stream.</p>
+<h2 id="analysis-plugins">Analysis Plugins</h2>
+<p>Analysis plugins are used for simple or complex event processing such as:
+aggregation, sessionization, anomaly detection etc.  Analysis plugins can share
+a thread of execution; the work distribution across threads is user configurable
+and can be tailored to specific use cases and needs e.g., by performance
+characteristics, work load distribution or type. Every analysis thread uses a
+dedicated reader to process the data stream produced by the input plugins. The
+messages generated by all analysis plugins are multiplexed to a single output
+stream.</p>
+<h2 id="output-plugins">Output Plugins</h2>
+<p>Output plugins are used transform the internal Heka messages into whatever
+format is needed e.g., txt, html, tsv, alternate binary encoding. The
+message/transformation can then be feed to other systems such as data
+warehouses, information retrieval indexes, dashboards, notifiers etc. Each
+output plugin runs on a dedicated thread and has its own readers to process the
+data stream produced by the input and analysis plugins. If the output plugin is
+subscribed to both the input and analysis streams they are multiplexed with the
+oldest message being delivered first.</p>
+<h2 id="sample-high-level-data-flow">Sample High Level Data Flow</h2>
+<p><img src="hindsight_data_flow.png" alt="Sample High Level Data Flow"></p>
+<h2 id="reliability">Reliability</h2>
+<h3 id="durability">Durability</h3>
+<p>The durability of the data is equal to durability of storage where the
+<code>output_path</code> (data stream files and state preservation files) is configured.</p>
+<h3 id="delivery-guarantee">Delivery Guarantee</h3>
+<p>The at least once delivery guarantee only applies to software failures. There
+are no guarantees if the underlying storage system fails. Crashing or killing
+the Hindsight process should not cause any messages to be lost or skipped and
+will, at most, duplicate/re-process one second of data on restart. However,
+sandbox state is only preserved on a clean shutdown i.e., if an analysis plugin
+was counting the number of messages going through the system, and the system was
+killed, the count would be reset to last saved state. This behaviour should be
+taken into account for any plugins performing and preserving stateful analysis.</p>
+<h3 id="dynamic-plugin-loading">Dynamic Plugin Loading</h3>
+<p>The Hindsight infrastructure can be run as a service with no initial business
+logic loaded since all plugin types can be dynamically loaded and unloaded as
+necessary.</p>
+<pre><code class="lang-lua">sandbox_load_path = <span class="hljs-string">&quot;hs_load&quot;</span>
+sandbox_run_path  = <span class="hljs-string">&quot;hs_run&quot;</span>
+</code></pre>
+<h3 id="starting-a-new-plugin">Starting a New Plugin</h3>
+<ol>
+<li><code>cp test.lua hs_load/analysis/test.lua</code></li>
+<li><code>cp my_test.cfg hs_load/analysis/my_test.cfg</code></li>
+<li><code>cp your_test.cfg hs_load/analysis/your_test.cfg</code></li>
+<li><em>Hindsight scans the directory</em></li>
+<li>test.lua is moved to hs_run/analysis/test.lua</li>
+<li>my_test.cfg is moved to hs_run/analysis/my_test.cfg</li>
+<li>Hindsight attempts to run my_test.cfg</li>
+<li>your_test.cfg is moved to hs_run/analysis/your_test.cfg</li>
+<li>Hindsight attempts to run your_test.cfg</li>
+</ol>
+<h3 id="restarting-a-plugin">Restarting a Plugin</h3>
+<ol>
+<li><code>cp my_test.cfg hs_load/analysis/my_test.cfg</code></li>
+<li><em>Hindsight scans the directory</em></li>
+<li>my_test.cfg is moved to hs_run/analysis/my_test.cfg</li>
+<li>Hindsight attempts to restart my_test.cfg (no data gaps/loss)</li>
+</ol>
+<h3 id="updating-the-business-logic">Updating the Business Logic</h3>
+<ol>
+<li><code>cp test.lua hs_load/analysis/test.lua</code></li>
+<li><em>Hindsight scans the directory</em> 1. test.lua is moved to
+hs_run/analysis/test.lua</li>
+<li>Hindsight attempts to restart my_test.cfg and your_test.cfg since they use
+the same underlying business logic (no data gaps/loss)</li>
+</ol>
+<h3 id="stopping-a-plugin">Stopping a Plugin</h3>
+<ol>
+<li><code>touch hs_load/analysis/my_test.off</code></li>
+<li><em>Hindsight scans the directory</em></li>
+<li>hs_load/analysis/my_test.off is deleted</li>
+<li>hs_run/analysis/my_test.cfg is renamed to hs_run/analysis/my_test.off</li>
+<li>Hindsight stops my_test.cfg</li>
+</ol>
+
+                                
+                                </section>
+                            
+    </div>
+    <div class="search-results">
+        <div class="has-results">
+            
+            <h1 class="search-results-title"><span class='search-results-count'></span> results matching "<span class='search-query'></span>"</h1>
+            <ul class="search-results-list"></ul>
+            
+        </div>
+        <div class="no-results">
+            
+            <h1 class="search-results-title">No results matching "<span class='search-query'></span>"</h1>
+            
+        </div>
+    </div>
+</div>
+
+                        </div>
+                    </div>
+                
+            </div>
+
+            
+                
+                <a href="./" class="navigation navigation-prev " aria-label="Previous page: Hindsight (0.14.2)">
+                    <i class="fa fa-angle-left"></i>
+                </a>
+                
+                
+                <a href="performance.html" class="navigation navigation-next " aria-label="Next page: Performance">
+                    <i class="fa fa-angle-right"></i>
+                </a>
+                
+            
+        
+    </div>
+
+    <script>
+        var gitbook = gitbook || [];
+        gitbook.push(function() {
+            gitbook.page.hasChanged({"page":{"title":"Architecture","level":"1.2","depth":1,"next":{"title":"Performance","level":"1.3","depth":1,"path":"performance.md","ref":"performance.md","articles":[]},"previous":{"title":"Hindsight (0.14.2)","level":"1.1","depth":1,"path":"README.md","ref":"README.md","articles":[]},"dir":"ltr"},"config":{"gitbook":"*","theme":"default","variables":{},"plugins":[],"pluginsConfig":{"highlight":{},"search":{},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"fontsettings":{"theme":"white","family":"sans","size":2},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"}},"file":{"path":"architecture.md","mtime":"2017-05-15T15:00:25.308Z","type":"markdown"},"gitbook":{"version":"3.2.2","time":"2017-05-15T15:01:59.000Z"},"basePath":".","book":{"language":""}});
+        });
+    </script>
+</div>
+
+        
+    <script src="gitbook/gitbook.js"></script>
+    <script src="gitbook/theme.js"></script>
+    
+        
+        <script src="gitbook/gitbook-plugin-search/search-engine.js"></script>
+        
+    
+        
+        <script src="gitbook/gitbook-plugin-search/search.js"></script>
+        
+    
+        
+        <script src="gitbook/gitbook-plugin-lunr/lunr.min.js"></script>
+        
+    
+        
+        <script src="gitbook/gitbook-plugin-lunr/search-lunr.js"></script>
+        
+    
+        
+        <script src="gitbook/gitbook-plugin-sharing/buttons.js"></script>
+        
+    
+        
+        <script src="gitbook/gitbook-plugin-fontsettings/fontsettings.js"></script>
+        
+    
+
+    </body>
+</html>
+

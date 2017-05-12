@@ -1,0 +1,375 @@
+
+<!DOCTYPE HTML>
+<html lang="" >
+    <head>
+        <meta charset="UTF-8">
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <title>Performance · GitBook</title>
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="description" content="">
+        <meta name="generator" content="GitBook 3.2.2">
+        
+        
+        
+    
+    <link rel="stylesheet" href="gitbook/style.css">
+
+    
+            
+                
+                <link rel="stylesheet" href="gitbook/gitbook-plugin-highlight/website.css">
+                
+            
+                
+                <link rel="stylesheet" href="gitbook/gitbook-plugin-search/search.css">
+                
+            
+                
+                <link rel="stylesheet" href="gitbook/gitbook-plugin-fontsettings/website.css">
+                
+            
+        
+
+    
+
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+
+        
+    
+    
+    <meta name="HandheldFriendly" content="true"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <link rel="apple-touch-icon-precomposed" sizes="152x152" href="gitbook/images/apple-touch-icon-precomposed-152.png">
+    <link rel="shortcut icon" href="gitbook/images/favicon.ico" type="image/x-icon">
+
+    
+    <link rel="next" href="configuration.html" />
+    
+    
+    <link rel="prev" href="architecture.html" />
+    
+
+    </head>
+    <body>
+        
+<div class="book">
+    <div class="book-summary">
+        
+            
+<div id="book-search-input" role="search">
+    <input type="text" placeholder="Type to search" />
+</div>
+
+            
+                <nav role="navigation">
+                
+
+
+<ul class="summary">
+    
+    
+
+    
+
+    
+        
+        
+    
+        <li class="chapter " data-level="1.1" data-path="./">
+            
+                <a href="./">
+            
+                    
+                    Hindsight (0.14.2)
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.2" data-path="architecture.html">
+            
+                <a href="architecture.html">
+            
+                    
+                    Architecture
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter active" data-level="1.3" data-path="performance.html">
+            
+                <a href="performance.html">
+            
+                    
+                    Performance
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.4" data-path="configuration.html">
+            
+                <a href="configuration.html">
+            
+                    
+                    Configuration
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.5" data-path="hindsight_cli.html">
+            
+                <a href="hindsight_cli.html">
+            
+                    
+                    Command Line Version
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6" >
+            
+                <a target="_blank" href="http://mozilla-services.github.io/lua_sandbox/heka/index.html">
+            
+                    
+                    Heka Sandbox Documentation
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.7" >
+            
+                <a target="_blank" href="http://mozilla-services.github.io/lua_sandbox_extensions/index.html">
+            
+                    
+                    Sandbox Extensions Documentation
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+    
+
+    <li class="divider"></li>
+
+    <li>
+        <a href="https://www.gitbook.com" target="blank" class="gitbook-link">
+            Published with GitBook
+        </a>
+    </li>
+</ul>
+
+
+                </nav>
+            
+        
+    </div>
+
+    <div class="book-body">
+        
+            <div class="body-inner">
+                
+                    
+
+<div class="book-header" role="navigation">
+    
+
+    <!-- Title -->
+    <h1>
+        <i class="fa fa-circle-o-notch fa-spin"></i>
+        <a href="." >Performance</a>
+    </h1>
+</div>
+
+
+
+
+                    <div class="page-wrapper" tabindex="-1" role="main">
+                        <div class="page-inner">
+                            
+<div id="book-search-results">
+    <div class="search-noresults">
+    
+                                <section class="normal markdown-section">
+                                
+                                <h2 id="performance">Performance</h2>
+<p>It is very preliminary but I setup a test using some Nginx logs. The logs were split into three files each containing 
+1,002,646 log lines. The test consists of parsing the Nginx logs, converting them to a Heka protobuf stream, and writing 
+them back to disk.  The configurations were setup to be as equivalent as posssible (single output, similar flush 
+intervals, and individual readers for each file in the concurrent test). The configs can be found here: 
+<a href="https://github.com/mozilla-services/hindsight/tree/master/benchmarks" target="_blank">https://github.com/mozilla-services/hindsight/tree/master/benchmarks</a>.</p>
+<h3 id="test-hardware">Test Hardware</h3>
+<ul>
+<li>Lenovo x230 Thinkpad</li>
+<li>Memory 8GB</li>
+<li>Processor Intel Core i7-3520M CPU @ 2.90GHz x 4</li>
+<li>Disk SSD</li>
+</ul>
+<h3 id="test-1---processing-a-single-log-file">Test 1 - Processing a single log file</h3>
+<h4 id="hindsight-08">Hindsight (0.8)</h4>
+<ul>
+<li>RSS: 3276</li>
+<li>VIRT: 253148</li>
+<li>SHR: 1140</li>
+<li>Processing time: 9.88 seconds</li>
+<li>Log Lines/sec: 101482</li>
+</ul>
+<h4 id="heka-09">Heka (0.9)</h4>
+<ul>
+<li>RSS: 39764</li>
+<li>VIRT: 662204</li>
+<li>SHR: 5240</li>
+<li>Processing time: 63 seconds</li>
+<li>Log Lines/sec: 15,915</li>
+</ul>
+<h4 id="summary">Summary</h4>
+<ul>
+<li>Approximately 12x less resident memory</li>
+<li>Approximately 2.5 less virtual memory</li>
+<li>Over 6x the throughput</li>
+<li><p>Hindsight (kill -9) Caused some corruption in the stream but no messages were lost and 3 were duplicated.</p>
+<ul>
+<li>Error unmarshalling message at offset: 275181251 error: proto: field/encoding mismatch: wrong type for field</li>
+<li>Corruption detected at offset: 275181251 bytes: 317</li>
+<li>Processed: 1002650, matched: 1002649 messages</li>
+</ul>
+</li>
+<li><p>Heka (kill -9) record count: 1,002,595 so at least 51 records were lost.</p>
+</li>
+</ul>
+<h3 id="test-2---processing-all-three-log-files-concurrently">Test 2 - Processing all three log files concurrently</h3>
+<h4 id="hindsight-08">Hindsight (0.8)</h4>
+<ul>
+<li>RSS: 5488</li>
+<li>VIRT: 327872</li>
+<li>SHR: 1128</li>
+<li>Processing time: 17.84 seconds</li>
+<li>Log Lines/sec: 168,606</li>
+</ul>
+<h4 id="heka-09">Heka (0.9)</h4>
+<ul>
+<li>RSS: 42060</li>
+<li>VIRT: 801432</li>
+<li>SHR: 5256</li>
+<li>Processing time: 198 second</li>
+<li>Log Lines/sec: 15,192  # actually slower than processing them sequentially</li>
+</ul>
+<h4 id="summary">Summary</h4>
+<ul>
+<li>Approximately 7.7x less resident memory</li>
+<li>Approximately 2.4x less virtual memory</li>
+<li>Over 11x the throughput</li>
+</ul>
+
+                                
+                                </section>
+                            
+    </div>
+    <div class="search-results">
+        <div class="has-results">
+            
+            <h1 class="search-results-title"><span class='search-results-count'></span> results matching "<span class='search-query'></span>"</h1>
+            <ul class="search-results-list"></ul>
+            
+        </div>
+        <div class="no-results">
+            
+            <h1 class="search-results-title">No results matching "<span class='search-query'></span>"</h1>
+            
+        </div>
+    </div>
+</div>
+
+                        </div>
+                    </div>
+                
+            </div>
+
+            
+                
+                <a href="architecture.html" class="navigation navigation-prev " aria-label="Previous page: Architecture">
+                    <i class="fa fa-angle-left"></i>
+                </a>
+                
+                
+                <a href="configuration.html" class="navigation navigation-next " aria-label="Next page: Configuration">
+                    <i class="fa fa-angle-right"></i>
+                </a>
+                
+            
+        
+    </div>
+
+    <script>
+        var gitbook = gitbook || [];
+        gitbook.push(function() {
+            gitbook.page.hasChanged({"page":{"title":"Performance","level":"1.3","depth":1,"next":{"title":"Configuration","level":"1.4","depth":1,"path":"configuration.md","ref":"configuration.md","articles":[]},"previous":{"title":"Architecture","level":"1.2","depth":1,"path":"architecture.md","ref":"architecture.md","articles":[]},"dir":"ltr"},"config":{"gitbook":"*","theme":"default","variables":{},"plugins":[],"pluginsConfig":{"highlight":{},"search":{},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"fontsettings":{"theme":"white","family":"sans","size":2},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"}},"file":{"path":"performance.md","mtime":"2016-10-27T15:12:33.001Z","type":"markdown"},"gitbook":{"version":"3.2.2","time":"2017-05-15T15:01:59.000Z"},"basePath":".","book":{"language":""}});
+        });
+    </script>
+</div>
+
+        
+    <script src="gitbook/gitbook.js"></script>
+    <script src="gitbook/theme.js"></script>
+    
+        
+        <script src="gitbook/gitbook-plugin-search/search-engine.js"></script>
+        
+    
+        
+        <script src="gitbook/gitbook-plugin-search/search.js"></script>
+        
+    
+        
+        <script src="gitbook/gitbook-plugin-lunr/lunr.min.js"></script>
+        
+    
+        
+        <script src="gitbook/gitbook-plugin-lunr/search-lunr.js"></script>
+        
+    
+        
+        <script src="gitbook/gitbook-plugin-sharing/buttons.js"></script>
+        
+    
+        
+        <script src="gitbook/gitbook-plugin-fontsettings/fontsettings.js"></script>
+        
+    
+
+    </body>
+</html>
+

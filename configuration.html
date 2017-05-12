@@ -1,0 +1,505 @@
+
+<!DOCTYPE HTML>
+<html lang="" >
+    <head>
+        <meta charset="UTF-8">
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <title>Configuration · GitBook</title>
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="description" content="">
+        <meta name="generator" content="GitBook 3.2.2">
+        
+        
+        
+    
+    <link rel="stylesheet" href="gitbook/style.css">
+
+    
+            
+                
+                <link rel="stylesheet" href="gitbook/gitbook-plugin-highlight/website.css">
+                
+            
+                
+                <link rel="stylesheet" href="gitbook/gitbook-plugin-search/search.css">
+                
+            
+                
+                <link rel="stylesheet" href="gitbook/gitbook-plugin-fontsettings/website.css">
+                
+            
+        
+
+    
+
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+
+        
+    
+    
+    <meta name="HandheldFriendly" content="true"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <link rel="apple-touch-icon-precomposed" sizes="152x152" href="gitbook/images/apple-touch-icon-precomposed-152.png">
+    <link rel="shortcut icon" href="gitbook/images/favicon.ico" type="image/x-icon">
+
+    
+    <link rel="next" href="hindsight_cli.html" />
+    
+    
+    <link rel="prev" href="performance.html" />
+    
+
+    </head>
+    <body>
+        
+<div class="book">
+    <div class="book-summary">
+        
+            
+<div id="book-search-input" role="search">
+    <input type="text" placeholder="Type to search" />
+</div>
+
+            
+                <nav role="navigation">
+                
+
+
+<ul class="summary">
+    
+    
+
+    
+
+    
+        
+        
+    
+        <li class="chapter " data-level="1.1" data-path="./">
+            
+                <a href="./">
+            
+                    
+                    Hindsight (0.14.2)
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.2" data-path="architecture.html">
+            
+                <a href="architecture.html">
+            
+                    
+                    Architecture
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.3" data-path="performance.html">
+            
+                <a href="performance.html">
+            
+                    
+                    Performance
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter active" data-level="1.4" data-path="configuration.html">
+            
+                <a href="configuration.html">
+            
+                    
+                    Configuration
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.5" data-path="hindsight_cli.html">
+            
+                <a href="hindsight_cli.html">
+            
+                    
+                    Command Line Version
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6" >
+            
+                <a target="_blank" href="http://mozilla-services.github.io/lua_sandbox/heka/index.html">
+            
+                    
+                    Heka Sandbox Documentation
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.7" >
+            
+                <a target="_blank" href="http://mozilla-services.github.io/lua_sandbox_extensions/index.html">
+            
+                    
+                    Sandbox Extensions Documentation
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+    
+
+    <li class="divider"></li>
+
+    <li>
+        <a href="https://www.gitbook.com" target="blank" class="gitbook-link">
+            Published with GitBook
+        </a>
+    </li>
+</ul>
+
+
+                </nav>
+            
+        
+    </div>
+
+    <div class="book-body">
+        
+            <div class="body-inner">
+                
+                    
+
+<div class="book-header" role="navigation">
+    
+
+    <!-- Title -->
+    <h1>
+        <i class="fa fa-circle-o-notch fa-spin"></i>
+        <a href="." >Configuration</a>
+    </h1>
+</div>
+
+
+
+
+                    <div class="page-wrapper" tabindex="-1" role="main">
+                        <div class="page-inner">
+                            
+<div id="book-search-results">
+    <div class="search-noresults">
+    
+                                <section class="normal markdown-section">
+                                
+                                <h3 id="hindsight-main-configuration">Hindsight Main Configuration</h3>
+<h4 id="configuration-variables">Configuration Variables</h4>
+<ul>
+<li><strong>output_path</strong> - base path where the Heka protobuf streams, checkpoints,
+state files, and statistics are stored<ul>
+<li>input (directory) - stores the Heka protobuf stream generated by all input
+plugins</li>
+<li>analysis (directory) - stores the Heka protobuf stream generated by all
+analysis plugins</li>
+<li>hindsight.cp - checkpoint file for all input, analysis and output threads</li>
+<li>plugins.tsv - performance metrics for all running plugins</li>
+<li>utilization.tsv - performance metrics for each thread</li>
+</ul>
+</li>
+<li><strong>output_size</strong> - size at which the output files are rolled (bytes, default
+  64MiB)</li>
+<li><strong>sandbox_load_path</strong> - base path that Hindsight scans for new cfgs and Lua
+  (string, default &quot;&quot; (dynamic loading disabled)).  If the string is not empty
+  the following directory structure must exist under the base path:<ul>
+<li>input (directory) - input plugin queue</li>
+<li>analysis (directory) - analysis plugin queue</li>
+<li>output (directory) - output plugin queue</li>
+</ul>
+</li>
+<li><strong>sandbox_run_path</strong> - base path containing the running cfgs and dynamically
+  loaded lua. The following directory structure must exist under the base
+  path:<ul>
+<li>input (directory) - input plugins</li>
+<li>analysis (directory) - analysis plugins</li>
+<li>output (directory) - output plugins</li>
+</ul>
+</li>
+<li><strong>sandbox_install_path</strong> - base path to the install location of the sandbox
+  packages default: <code>/usr/share/luasandbox/sandboxes/heka</code>. This path should
+  contain the input, analysis, and output subdirectory structure.</li>
+<li><strong>analysis_threads</strong> - number of analysis threads to run (count, max 64)</li>
+<li><strong>analysis_lua_path</strong> - path used by the analysis plugins to look for Lua
+modules</li>
+<li><strong>analysis_lua_cpath</strong> - path used by the analysis plugins to look for Lua C
+modules</li>
+<li><strong>io_lua_path</strong> - path used by the input and output plugins to look for Lua
+modules</li>
+<li><strong>io_lua_cpath</strong> - path used by the input and output plugins to look for Lua C
+modules</li>
+<li><strong>max_message_size</strong> - maximum size of a valid message (bytes, default 64KiB)</li>
+<li><strong>backpressure</strong> - delta between the writer queue file and the slowest reader,
+when exceeded backpressure is applied  (message injection will be slowed)
+until the writer and reader are both on the same file (count, default 0 (no
+backpressure)) e.g.<pre><code class="lang-lua">backpressure = <span class="hljs-number">10</span> <span class="hljs-comment">-- [writer = 100.log, slowest reader = 89.log, delta = 11]</span>
+</code></pre>
+</li>
+<li><strong>backpressure_disk_free</strong> - Number of output file units (<code>N * &lt;output_size&gt;</code>).
+Backpressure is applied (message injection will be slowed) until the free
+space rises above this threshold (count, default 4 (0 to disable)) e.g.<pre><code class="lang-lua">backpressure_disk_free = <span class="hljs-number">4</span> <span class="hljs-comment">-- [256MiB when using the defaults]</span>
+</code></pre>
+</li>
+<li><strong>hostname</strong> - hostname used in logging/messages (default gethostname())</li>
+</ul>
+<pre><code class="lang-lua">output_path             = <span class="hljs-string">&quot;output&quot;</span>
+output_size             = <span class="hljs-number">64</span> * <span class="hljs-number">1024</span> * <span class="hljs-number">1024</span>
+sandbox_load_path       = <span class="hljs-string">&quot;load&quot;</span>
+sandbox_run_path        = <span class="hljs-string">&quot;run&quot;</span>
+sandbox_install_path    = <span class="hljs-string">&quot;/usr/share/luasandbox/sandboxes/heka&quot;</span>
+analysis_threads        = <span class="hljs-number">1</span>
+analysis_lua_path       = <span class="hljs-string">&quot;/usr/lib/luasandbox/modules/?.lua&quot;</span>
+analysis_lua_cpath      = <span class="hljs-string">&quot;/usr/lib/luasandbox/modules/?.so&quot;</span>
+io_lua_path             = analysis_lua_path ..  <span class="hljs-string">&quot;;/usr/lib/luasandbox/io_modules/?.lua&quot;</span>
+io_lua_cpath            = analysis_lua_cpath .. <span class="hljs-string">&quot;;/usr/lib/luasandbox/io_modules/?.so&quot;</span>
+max_message_size        = <span class="hljs-number">64</span> * <span class="hljs-number">1024</span>
+backpressure            = <span class="hljs-number">0</span>
+backpressure_disk_free  = <span class="hljs-number">4</span>
+<span class="hljs-comment">-- hostname                = &quot;hindsight.example.com&quot;</span>
+
+input_defaults = {
+  <span class="hljs-comment">-- see: Default Sandbox Configuration Variables</span>
+  <span class="hljs-comment">-- output_limit           = 64 * 1024</span>
+  <span class="hljs-comment">-- memory_limit           = 8 * 1024 * 1024</span>
+  <span class="hljs-comment">-- instruction_limit      = 1e6</span>
+  <span class="hljs-comment">-- preserve_data          = false</span>
+  <span class="hljs-comment">-- restricted_headers     = false</span>
+  <span class="hljs-comment">-- ticker_interval        = 0</span>
+  <span class="hljs-comment">-- shutdown_on_terminate  = false</span>
+}
+
+analysis_defaults = {
+  <span class="hljs-comment">-- see: Default Sandbox Configuration Variables</span>
+}
+
+output_defaults = {
+  <span class="hljs-comment">-- see: Default Sandbox Configuration Variables</span>
+  <span class="hljs-comment">-- remove_checkpoints_on_terminate = false</span>
+  <span class="hljs-comment">-- read_queue = &quot;both&quot;</span>
+}
+</code></pre>
+<h3 id="hindsight-sandbox-configuration">Hindsight Sandbox Configuration</h3>
+<h4 id="default-sandbox-configuration-variables">Default Sandbox Configuration Variables</h4>
+<ul>
+<li><strong>output_limit</strong> - the largest message an input or analysis plugin can inject
+into Hindsight (bytes, default 64KiB)</li>
+<li><strong>memory_limit</strong> - the maximum amount of memory a plugin can use before being
+terminated (bytes, default 8MiB)</li>
+<li><strong>instruction_limit</strong> - the maximum number of Lua instructions a plugin can
+execute in a single <code>process_message</code> or
+<code>timer_event</code> function call (count, default 1MM)</li>
+<li><strong>preserve_data</strong> - flag indicating if all global data should be saved on
+shutdown (bool, default false)</li>
+<li><strong>restricted_headers</strong> - flag indicating that the following header fields are
+not user modifiable <code>Hostname</code> and <code>Logger</code> (bool, default true (analysis),
+false (input/output))</li>
+<li><strong>ticker_interval</strong> (default 0)<ul>
+<li>For input plugins it is the poll interval when <code>process_message</code> is called
+see: <a href="https://mozilla-services.github.io/lua_sandbox/heka/input.html#polling" target="_blank">polling input plugins</a></li>
+<li>For analysis and output plugins it is the amount of time between
+<code>timer_event</code> function calls</li>
+</ul>
+</li>
+<li><strong>shutdown_on_terminate</strong> - cleanly shuts down Hindsight if this plugin is
+terminated (default false)</li>
+</ul>
+<h4 id="default-analysis-sandbox-configuration-variables">Default Analysis Sandbox Configuration Variables</h4>
+<ul>
+<li><p><strong>process_message_inject_limit</strong> - the maximum number of messages the
+<code>process_message</code> function can inject in a single invocation (count,
+default 0 (none)).</p>
+</li>
+<li><p><strong>timer_event_inject_limit</strong> - the maximum number of messages the
+<code>timer_event</code> function can inject in a single invocation (count,
+default 10).</p>
+</li>
+</ul>
+<h4 id="default-output-sandbox-configuration-variables">Default Output Sandbox Configuration Variables</h4>
+<ul>
+<li><strong>remove_checkpoints_on_terminate</strong> - removes the checkpoint entries when the
+plugin is terminated (default false).  This prevents the data from being
+pruned until the plugin can be fixed but it can also cause the system to back
+pressure as it will start filling the disk.</li>
+<li><strong>read_queue</strong> - specifies which queue the output plugin consumes
+(both|input|analysis) defaults to both.</li>
+</ul>
+<hr>
+<h4 id="common-plugin-configuration-variables">Common Plugin Configuration Variables</h4>
+<ul>
+<li><strong>filename</strong> - plugin source file (must have no path component and a <code>.lua</code>
+extension). Search order: sandbox_run_path, sandbox_install_path</li>
+</ul>
+<h5 id="reserved-hindsight-populates-the-following-variables-in-the-configuration">Reserved (Hindsight populates the following variables in the configuration)</h5>
+<ul>
+<li><strong>Logger</strong> - configuration filename without the <code>.cfg</code> extension prefixed with
+the sandbox type e.g., <code>analysis.myplugin</code></li>
+<li><strong>Pid</strong> - process ID</li>
+<li><strong>Hostname</strong> - configuration hostname.</li>
+<li><strong>path</strong> - Lua module search path (corresponding to the type of plugin)</li>
+<li><strong>cpath</strong> - Lua C module search path (corresponding to the type of plugin)</li>
+<li><strong>log_level</strong> - Integer specifying the syslog severity level, when set to
+debug (7) the sandbox print function will be wired into the Hindsight logger</li>
+</ul>
+<h6 id="for-inputoutput-plugins-these-additional-hindsight-configuration-options-are-available-from-readconfig">For input/output plugins these additional Hindsight configuration options are available from read_config()</h6>
+<ul>
+<li><strong>output_path</strong></li>
+<li><strong>output_size</strong></li>
+<li><strong>max_message_size</strong></li>
+<li><strong>sandbox_load_path</strong></li>
+<li><strong>sandbox_run_path</strong></li>
+<li><strong>sandbox_install_path</strong></li>
+</ul>
+<h5 id="user-defined">User Defined</h5>
+<ul>
+<li><em>key</em> (string | number) - user defined variable with a
+(string | number | boolean | table) value</li>
+</ul>
+<h6 id="user-defined-private-variable">User Defined Private Variable</h6>
+<ul>
+<li><strong>_*</strong>key* (string) - user defined variable beginning with an underscore
+(allows filtering in UI displays)</li>
+</ul>
+<h4 id="input-plugin-configuration-variables">Input Plugin Configuration Variables</h4>
+<ul>
+<li><a href="#default-sandbox-configuration-variables">Default Configuration Variables</a></li>
+<li><a href="#common-plugin-configuration-variables">Common Plugin Configuration Variables</a></li>
+</ul>
+<h4 id="analysis-plugin-configuration-variables">Analysis Plugin Configuration Variables</h4>
+<ul>
+<li><a href="#default-sandbox-configuration-variables">Default Configuration Variables</a></li>
+<li><a href="#common-plugin-configuration-variables">Common Plugin Configuration Variables</a></li>
+<li><strong>message_matcher</strong> - filter to select which messages this plugin receives see:
+<a href="https://mozilla-services.github.io/lua_sandbox/util/message_matcher.html" target="_blank">Message Matcher</a></li>
+<li><strong>thread</strong> - analysis thread the plugin will be run on (<code>thread % analysis_threads</code>)</li>
+</ul>
+<h4 id="output-plugin-configuration-variables">Output Plugin Configuration Variables</h4>
+<ul>
+<li><a href="#default-sandbox-configuration-variables">Default Configuration Variables</a></li>
+<li><a href="#common-plugin-configuration-variables">Common Plugin Configuration Variables</a></li>
+<li><strong>message_matcher</strong> - filter to select which messages this plugin receives see:
+<a href="https://mozilla-services.github.io/lua_sandbox/util/message_matcher.html" target="_blank">Message Matcher</a></li>
+<li><strong>async_buffer_size</strong> - when using asynchronous output this controls the
+number of message checkpoints to hold in memory. i.e., if the output can have
+1000 messages in flight the async_buffer_size should be set to 1000</li>
+</ul>
+
+                                
+                                </section>
+                            
+    </div>
+    <div class="search-results">
+        <div class="has-results">
+            
+            <h1 class="search-results-title"><span class='search-results-count'></span> results matching "<span class='search-query'></span>"</h1>
+            <ul class="search-results-list"></ul>
+            
+        </div>
+        <div class="no-results">
+            
+            <h1 class="search-results-title">No results matching "<span class='search-query'></span>"</h1>
+            
+        </div>
+    </div>
+</div>
+
+                        </div>
+                    </div>
+                
+            </div>
+
+            
+                
+                <a href="performance.html" class="navigation navigation-prev " aria-label="Previous page: Performance">
+                    <i class="fa fa-angle-left"></i>
+                </a>
+                
+                
+                <a href="hindsight_cli.html" class="navigation navigation-next " aria-label="Next page: Command Line Version">
+                    <i class="fa fa-angle-right"></i>
+                </a>
+                
+            
+        
+    </div>
+
+    <script>
+        var gitbook = gitbook || [];
+        gitbook.push(function() {
+            gitbook.page.hasChanged({"page":{"title":"Configuration","level":"1.4","depth":1,"next":{"title":"Command Line Version","level":"1.5","depth":1,"path":"hindsight_cli.md","ref":"hindsight_cli.md","articles":[]},"previous":{"title":"Performance","level":"1.3","depth":1,"path":"performance.md","ref":"performance.md","articles":[]},"dir":"ltr"},"config":{"gitbook":"*","theme":"default","variables":{},"plugins":[],"pluginsConfig":{"highlight":{},"search":{},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"fontsettings":{"theme":"white","family":"sans","size":2},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"}},"file":{"path":"configuration.md","mtime":"2017-05-15T15:00:25.308Z","type":"markdown"},"gitbook":{"version":"3.2.2","time":"2017-05-15T15:01:59.000Z"},"basePath":".","book":{"language":""}});
+        });
+    </script>
+</div>
+
+        
+    <script src="gitbook/gitbook.js"></script>
+    <script src="gitbook/theme.js"></script>
+    
+        
+        <script src="gitbook/gitbook-plugin-search/search-engine.js"></script>
+        
+    
+        
+        <script src="gitbook/gitbook-plugin-search/search.js"></script>
+        
+    
+        
+        <script src="gitbook/gitbook-plugin-lunr/lunr.min.js"></script>
+        
+    
+        
+        <script src="gitbook/gitbook-plugin-lunr/search-lunr.js"></script>
+        
+    
+        
+        <script src="gitbook/gitbook-plugin-sharing/buttons.js"></script>
+        
+    
+        
+        <script src="gitbook/gitbook-plugin-fontsettings/fontsettings.js"></script>
+        
+    
+
+    </body>
+</html>
+
