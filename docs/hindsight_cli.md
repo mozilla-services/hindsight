@@ -25,7 +25,7 @@ usage: hindsight_cli <cfg> <log_level>
    * 4 analysis plugin termination
    * 8 output plugin termination
 
-## Test Usage Example
+## Integration Test Example
 
-https://github.com/mozilla-services/lua_sandbox_extensions/tree/master/moz_telemetry/tests/hindsight
+[Mozilla Telemetry Integration Tests](https://github.com/mozilla-services/lua_sandbox_extensions/tree/master/moz_telemetry/tests/hindsight)
 
