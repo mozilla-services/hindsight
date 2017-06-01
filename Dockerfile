@@ -22,12 +22,11 @@ RUN sudo yum -y install https://dl.fedoraproject.org/pub/epel/7/x86_64/e/epel-re
     sudo ln -s /usr/bin/cmake3 /usr/local/bin/cmake && \
 
     # Install confluent 3.1 for centos 7 for librdkafka-devel
-    echo [confluent] > confluent.repo && \
-    echo name=confluent >> confluent.repo && \
-    echo baseurl=http://packages.confluent.io/rpm/3.1/7 >> confluent.repo && \
-    echo gpgcheck=1 >> confluent.repo && \
-    echo gpgkey=http://packages.confluent.io/rpm/3.1/archive.key >> confluent.repo && \
-    sudo mv confluent.repo /etc/yum.repos.d && \
+    echo -e "[confluent]\n\
+name=confluent\n\
+baseurl=http://packages.confluent.io/rpm/3.1/7\n\
+gpgcheck=1\n\
+gpgkey=http://packages.confluent.io/rpm/3.1/archive.key\n" | sudo tee /etc/yum.repos.d/confluent.repo && \
 
     # Build the lua sandbox & extensions
     cd /app/src && \
