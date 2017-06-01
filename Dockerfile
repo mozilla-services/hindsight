@@ -17,10 +17,7 @@ RUN yum -y update && \
 USER app
 WORKDIR /app
 
-RUN sudo yum -y install wget && \
-    wget https://dl.fedoraproject.org/pub/epel/7/x86_64/e/epel-release-7-9.noarch.rpm && \
-    sudo rpm -ivh epel-release-7-9.noarch.rpm && \
-    rm epel-release-7-9.noarch.rpm && \
+RUN sudo yum -y install https://dl.fedoraproject.org/pub/epel/7/x86_64/e/epel-release-7-9.noarch.rpm && \
     sudo yum -y install lua-devel luarocks cmake3 make clang gcc git rpm-build sudo && \
     sudo ln -s /usr/bin/cmake3 /usr/local/bin/cmake && \
 
