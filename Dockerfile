@@ -46,7 +46,7 @@ gpgkey=http://packages.confluent.io/rpm/3.1/archive.key\n" | sudo tee /etc/yum.r
         make packages; \
     } && \
     build_function="build_lsbe" main && \
-    sudo rpm -ivh /app/src/lua_sandbox_extensions/release/luasandbox*Linux.rpm && \
+    sudo yum install -y /app/src/lua_sandbox_extensions/release/luasandbox*Linux.rpm && \
 
     # Build hindsight
     cd /app/src/hindsight && \
@@ -56,7 +56,7 @@ gpgkey=http://packages.confluent.io/rpm/3.1/archive.key\n" | sudo tee /etc/yum.r
     make && \
     ctest3 && \
     cpack3 -G RPM && \
-    sudo rpm -ivh /app/src/hindsight/release/hindsight*Linux.rpm && \
+    sudo yum install -y /app/src/hindsight/release/hindsight*Linux.rpm && \
 
     # Setup run directory
     cd /app && \
@@ -74,7 +74,7 @@ gpgkey=http://packages.confluent.io/rpm/3.1/archive.key\n" | sudo tee /etc/yum.r
 
     # cleanup
     rm -rf /app/src && \
-    sudo yum -y remove cmake3 make clang git rpm-build && \
+    sudo yum -y remove cmake3 make clang git rpm-build c++-compiler librdkafka-devel openssl-devel postgresql-devel systemd-devel zlib-devel  && \
     sudo yum -y autoremove && \
     sudo yum -y clean all
 
