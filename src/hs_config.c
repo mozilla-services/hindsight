@@ -61,6 +61,7 @@ static const char *cfg_sb_thread = "thread";
 static const char *cfg_sb_async_buffer = "async_buffer_size";
 static const char *cfg_sb_matcher = "message_matcher";
 static const char *cfg_sb_shutdown_terminate = "shutdown_on_terminate";
+static const char *cfg_sb_shutdown_throttled = "shutdown_on_throttled";
 static const char *cfg_sb_rm_cp_terminate = "remove_checkpoints_on_terminate";
 static const char *cfg_sb_pm_im_limit = "process_message_inject_limit";
 static const char *cfg_sb_te_im_limit = "timer_event_inject_limit";
@@ -279,6 +280,10 @@ static int load_sandbox_defaults(lua_State *L,
 
   if (get_bool_item(L, 1, cfg_sb_shutdown_terminate,
                     &cfg->shutdown_terminate)) {
+    return 1;
+  }
+
+  if (get_unsigned_int(L, 1, cfg_sb_shutdown_throttled, &cfg->shutdown_throttled)) {
     return 1;
   }
 
@@ -844,6 +849,7 @@ bool hs_output_runtime_cfg(lsb_output_buffer *ob, char type, const hs_config *cf
     lsb_outputf(ob, "thread = %u\n", sbc->thread);
     lsb_outputf(ob, "process_message_inject_limit = %u\n", sbc->pm_im_limit);
     lsb_outputf(ob, "timer_event_inject_limit = %u\n", sbc->te_im_limit);
+    lsb_outputf(ob, "shutdown_on_throttled = %u\n", sbc->shutdown_throttled);
   }
 
   if (type == 'o') {

@@ -33,9 +33,11 @@ struct hs_analysis_plugin {
   hs_analysis_thread  *at;
   lsb_running_stats   mms;
   lsb_heka_stats      stats;
+  int                 throttled_messages;
   int                 ticker_interval;
   int                 pm_delta_cnt;
   bool                shutdown_terminate;
+  bool                shutdown_throttled;
   unsigned            im_limit;
   unsigned            pm_im_limit;
   unsigned            te_im_limit;

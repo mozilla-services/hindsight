@@ -80,6 +80,7 @@ static int inject_message(void *parent, const char *pb, size_t pb_len)
       if (p->at->plugins->output.cp.id == p->at->plugins->output.min_cp_id
           && release_dfbp) {
         backpressure = false;
+        p->throttled_messages = 0;
         hs_log(NULL, g_module, 4, "releasing backpressure");
       }
     }
@@ -92,7 +93,12 @@ static int inject_message(void *parent, const char *pb, size_t pb_len)
   pthread_mutex_unlock(&p->at->plugins->output.lock);
 
   if (bp) {
+    p->throttled_messages++;
     usleep(100000); // throttle to 10 messages per second
+    if (p->shutdown_throttled == p->throttled_messages) {
+      hs_log(NULL, p->name, 6, "shutting down on throttled messages > %u", p->shutdown_throttled);
+      kill(getpid(), SIGTERM);
+    }
   }
   return LSB_HEKA_IM_SUCCESS;
 }
@@ -132,6 +138,8 @@ create_analysis_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
   p->pm_im_limit = sbc->pm_im_limit;
   p->te_im_limit = sbc->te_im_limit;
   p->shutdown_terminate = sbc->shutdown_terminate;
+  p->shutdown_throttled = sbc->shutdown_throttled;
+  p->throttled_messages = 0;
   p->ticker_interval = sbc->ticker_interval;
   int stagger = p->ticker_interval > 60 ? 60 : p->ticker_interval;
   // distribute when the timer_events will fire

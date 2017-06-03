@@ -124,6 +124,9 @@ output_defaults = {
   `timer_event` function can inject in a single invocation (count,
   default 10).
 
+* **shutdown_on_throttled** - the maximum number of throttled messages
+  an analysis plugin would tolerate before shutting itself down.
+
 #### Default Output Sandbox Configuration Variables
 
 * **remove_checkpoints_on_terminate** - removes the checkpoint entries when the
