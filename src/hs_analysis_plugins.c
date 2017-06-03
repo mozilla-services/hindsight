@@ -94,7 +94,7 @@ static int inject_message(void *parent, const char *pb, size_t pb_len)
 
   if (bp) {
     p->throttled_messages++;
-    usleep(100000); // throttle to 10 messages per second
+    usleep(p->at->plugins->cfg->backpressure_throttle * 10000); // throttle to default 10 messages per second, configurable
     if (p->shutdown_throttled == p->throttled_messages) {
       hs_log(NULL, p->name, 6, "shutting down on throttled messages > %u", p->shutdown_throttled);
       kill(getpid(), SIGTERM);

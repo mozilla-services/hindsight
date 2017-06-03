@@ -46,6 +46,7 @@ static const char *cfg_max_message_size = "max_message_size";
 static const char *cfg_hostname = "hostname";
 static const char *cfg_backpressure = "backpressure";
 static const char *cfg_backpressure_df = "backpressure_disk_free";
+static const char *cfg_backpressure_throttle = "backpressure_throttle";
 
 static const char *cfg_sb_ipd = "input_defaults";
 static const char *cfg_sb_apd = "analysis_defaults";
@@ -115,6 +116,7 @@ static void init_config(hs_config *cfg)
   cfg->max_message_size = 1024 * 64;
   cfg->backpressure = 0;
   cfg->backpressure_df = 4;
+  cfg->backpressure_throttle = 10;
   cfg->pid = (int)getpid();
   init_sandbox_config(&cfg->ipd);
   init_sandbox_config(&cfg->apd);
@@ -591,6 +593,10 @@ int hs_load_config(const char *fn, hs_config *cfg)
 
   ret = get_unsigned_int(L, LUA_GLOBALSINDEX, cfg_backpressure_df,
                          &cfg->backpressure_df);
+  if (ret) goto cleanup;
+
+  ret = get_unsigned_int(L, LUA_GLOBALSINDEX, cfg_backpressure_throttle,
+                         &cfg->backpressure_throttle);
   if (ret) goto cleanup;
 
   ret = get_string_item(L, LUA_GLOBALSINDEX, cfg_load_path, &cfg->load_path,
