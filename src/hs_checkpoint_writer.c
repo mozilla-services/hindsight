@@ -125,14 +125,14 @@ static void input_stats(hs_checkpoint_writer *cpw, hs_checkpoint_reader *cpr,
       if (cpi->ptsv && cpi->utsv) {
         fprintf(cpi->ptsv, "%s\t"
                 "%llu\t%llu\t"
-                "%llu\t%llu\t"
+                "%llu\t%llu\t%llu\t"
                 "%llu\t%llu\t%llu\t%llu\t"
                 "0\t0\t"
                 "%.0f\t%.0f\t"
                 "%.0f\t%.0f\n",
                 p->name,
                 p->stats.im_cnt, p->stats.im_bytes,
-                p->stats.pm_cnt, p->stats.pm_failures,
+                p->stats.pm_cnt, p->stats.pm_failures, 0,
                 p->stats.mem_cur, p->stats.mem_max,
                 p->stats.out_max, p->stats.ins_max,
                 // no message matcher p->stats
@@ -236,14 +236,14 @@ static void analysis_stats(hs_checkpoint_writer *cpw, hs_checkpoint_reader *cpr,
 
         fprintf(cpi->ptsv, "%s\t"
                 "%llu\t%llu\t"
-                "%llu\t%llu\t"
+                "%llu\t%llu\t%llu\t"
                 "%llu\t%llu\t%llu\t%llu\t"
                 "%.0f\t%.0f\t"
                 "%.0f\t%.0f\t"
                 "%.0f\t%.0f\n",
                 p->name,
                 p->stats.im_cnt, p->stats.im_bytes,
-                p->stats.pm_cnt, p->stats.pm_failures,
+                p->stats.pm_cnt, p->stats.pm_failures, p->throttled_messages,
                 p->stats.mem_cur, p->stats.mem_max,
                 p->stats.out_max, p->stats.ins_max,
                 p->mms.mean, lsb_sd_running_stats(&p->mms),
@@ -323,14 +323,14 @@ static void output_stats(hs_checkpoint_writer *cpw, hs_checkpoint_reader *cpr,
       long long tet = 0;
       fprintf(cpi->ptsv, "%s\t"
               "%llu\t%llu\t"
-              "%llu\t%llu\t"
+              "%llu\t%llu\t%llu\t"
               "%llu\t%llu\t%llu\t%llu\t"
               "%.0f\t%.0f\t"
               "%.0f\t%.0f\t"
               "%.0f\t%.0f\n",
               p->name,
               p->stats.im_cnt, p->stats.im_bytes,
-              p->stats.pm_cnt, p->stats.pm_failures,
+              p->stats.pm_cnt, p->stats.pm_failures, 0,
               p->stats.mem_cur, p->stats.mem_max,
               p->stats.out_max, p->stats.ins_max,
               p->mms.mean, lsb_sd_running_stats(&p->mms),
@@ -391,7 +391,7 @@ void hs_write_checkpoints(hs_checkpoint_writer *cpw, hs_checkpoint_reader *cpr)
       fprintf(cpi.ptsv, "Plugin\t"
               "Inject Message Count\tInject Message Bytes\t"
               "Process Message Count\tProcess Message Failures\t"
-              "Current Memory\t"
+              "Throttled Messages\tCurrent Memory\t"
               "Max Memory\tMax Output\tMax Instructions\t"
               "Message Matcher Avg (ns)\tMessage Matcher SD (ns)\t"
               "Process Message Avg (ns)\tProcess Message SD (ns)\t"
