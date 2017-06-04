@@ -46,6 +46,7 @@ static const char *cfg_max_message_size = "max_message_size";
 static const char *cfg_hostname = "hostname";
 static const char *cfg_backpressure = "backpressure";
 static const char *cfg_backpressure_df = "backpressure_disk_free";
+static const char *cfg_backpressure_throttle = "backpressure_throttle";
 
 static const char *cfg_sb_ipd = "input_defaults";
 static const char *cfg_sb_apd = "analysis_defaults";
@@ -61,6 +62,7 @@ static const char *cfg_sb_thread = "thread";
 static const char *cfg_sb_async_buffer = "async_buffer_size";
 static const char *cfg_sb_matcher = "message_matcher";
 static const char *cfg_sb_shutdown_terminate = "shutdown_on_terminate";
+static const char *cfg_sb_shutdown_throttled = "shutdown_on_throttled";
 static const char *cfg_sb_rm_cp_terminate = "remove_checkpoints_on_terminate";
 static const char *cfg_sb_pm_im_limit = "process_message_inject_limit";
 static const char *cfg_sb_te_im_limit = "timer_event_inject_limit";
@@ -114,6 +116,7 @@ static void init_config(hs_config *cfg)
   cfg->max_message_size = 1024 * 64;
   cfg->backpressure = 0;
   cfg->backpressure_df = 4;
+  cfg->backpressure_throttle = 10;
   cfg->pid = (int)getpid();
   init_sandbox_config(&cfg->ipd);
   init_sandbox_config(&cfg->apd);
@@ -279,6 +282,10 @@ static int load_sandbox_defaults(lua_State *L,
 
   if (get_bool_item(L, 1, cfg_sb_shutdown_terminate,
                     &cfg->shutdown_terminate)) {
+    return 1;
+  }
+
+  if (get_unsigned_int(L, 1, cfg_sb_shutdown_throttled, &cfg->shutdown_throttled)) {
     return 1;
   }
 
@@ -588,6 +595,10 @@ int hs_load_config(const char *fn, hs_config *cfg)
                          &cfg->backpressure_df);
   if (ret) goto cleanup;
 
+  ret = get_unsigned_int(L, LUA_GLOBALSINDEX, cfg_backpressure_throttle,
+                         &cfg->backpressure_throttle);
+  if (ret) goto cleanup;
+
   ret = get_string_item(L, LUA_GLOBALSINDEX, cfg_load_path, &cfg->load_path,
                         "");
   if (ret) goto cleanup;
@@ -844,6 +855,7 @@ bool hs_output_runtime_cfg(lsb_output_buffer *ob, char type, const hs_config *cf
     lsb_outputf(ob, "thread = %u\n", sbc->thread);
     lsb_outputf(ob, "process_message_inject_limit = %u\n", sbc->pm_im_limit);
     lsb_outputf(ob, "timer_event_inject_limit = %u\n", sbc->te_im_limit);
+    lsb_outputf(ob, "shutdown_on_throttled = %u\n", sbc->shutdown_throttled);
   }
 
   if (type == 'o') {

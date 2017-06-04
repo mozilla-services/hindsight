@@ -45,6 +45,7 @@ typedef struct hs_sandbox_config
   bool preserve_data;
   bool restricted_headers;
   bool shutdown_terminate;
+  unsigned shutdown_throttled;
   bool rm_cp_terminate;   // output sandbox only
 
   char     read_queue;    // output sandbox only

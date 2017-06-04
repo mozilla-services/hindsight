@@ -51,6 +51,13 @@ backpressure = 10 -- [writer = 100.log, slowest reader = 89.log, delta = 11]
 ```lua
 backpressure_disk_free = 4 -- [256MiB when using the defaults]
 ```
+
+* **backpressure_throttle** - How many messages per second backpressure should
+  throttle with (count, default 10)
+```lua
+backpressure_throttle = 10
+````
+
 * **hostname** - hostname used in logging/messages (default gethostname())
 
 ```lua
@@ -67,6 +74,7 @@ io_lua_cpath            = analysis_lua_cpath .. ";/usr/lib/luasandbox/io_modules
 max_message_size        = 64 * 1024
 backpressure            = 0
 backpressure_disk_free  = 4
+backpressure_throttle   = 10
 -- hostname                = "hindsight.example.com"
 
 input_defaults = {
@@ -124,6 +132,9 @@ output_defaults = {
 * **timer_event_inject_limit** - the maximum number of messages the
   `timer_event` function can inject in a single invocation (count,
   default 10).
+
+* **shutdown_on_throttled** - the maximum number of throttled messages
+  an analysis plugin would tolerate before shutting itself down.
 
 #### Default Output Sandbox Configuration Variables
 
