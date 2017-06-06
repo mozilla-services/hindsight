@@ -17,20 +17,16 @@ RUN yum -y update && \
 USER app
 WORKDIR /app
 
-RUN sudo yum -y install wget && \
-    wget https://dl.fedoraproject.org/pub/epel/7/x86_64/e/epel-release-7-9.noarch.rpm && \
-    sudo rpm -ivh epel-release-7-9.noarch.rpm && \
-    rm epel-release-7-9.noarch.rpm && \
+RUN sudo yum -y install https://dl.fedoraproject.org/pub/epel/7/x86_64/e/epel-release-7-9.noarch.rpm && \
     sudo yum -y install lua-devel luarocks cmake3 make clang gcc git rpm-build sudo && \
     sudo ln -s /usr/bin/cmake3 /usr/local/bin/cmake && \
 
     # Install confluent 3.1 for centos 7 for librdkafka-devel
-    echo [confluent] > confluent.repo && \
-    echo name=confluent >> confluent.repo && \
-    echo baseurl=http://packages.confluent.io/rpm/3.1/7 >> confluent.repo && \
-    echo gpgcheck=1 >> confluent.repo && \
-    echo gpgkey=http://packages.confluent.io/rpm/3.1/archive.key >> confluent.repo && \
-    sudo mv confluent.repo /etc/yum.repos.d && \
+    echo -e "[confluent]\n\
+name=confluent\n\
+baseurl=http://packages.confluent.io/rpm/3.1/7\n\
+gpgcheck=1\n\
+gpgkey=http://packages.confluent.io/rpm/3.1/archive.key\n" | sudo tee /etc/yum.repos.d/confluent.repo && \
 
     # Build the lua sandbox & extensions
     cd /app/src && \
@@ -50,7 +46,7 @@ RUN sudo yum -y install wget && \
         make packages; \
     } && \
     build_function="build_lsbe" main && \
-    sudo rpm -ivh /app/src/lua_sandbox_extensions/release/luasandbox*Linux.rpm && \
+    sudo yum install -y /app/src/lua_sandbox_extensions/release/luasandbox*Linux.rpm && \
 
     # Build hindsight
     cd /app/src/hindsight && \
@@ -60,7 +56,7 @@ RUN sudo yum -y install wget && \
     make && \
     ctest3 && \
     cpack3 -G RPM && \
-    sudo rpm -ivh /app/src/hindsight/release/hindsight*Linux.rpm && \
+    sudo yum install -y /app/src/hindsight/release/hindsight*Linux.rpm && \
 
     # Setup run directory
     cd /app && \
@@ -78,7 +74,7 @@ RUN sudo yum -y install wget && \
 
     # cleanup
     rm -rf /app/src && \
-    sudo yum -y remove cmake3 make clang git rpm-build && \
+    sudo yum -y remove cmake3 make clang git rpm-build c++-compiler librdkafka-devel openssl-devel postgresql-devel systemd-devel zlib-devel  && \
     sudo yum -y autoremove && \
     sudo yum -y clean all
 
