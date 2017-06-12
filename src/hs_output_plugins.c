@@ -271,8 +271,8 @@ static int output_message(hs_output_plugin *p, lsb_heka_message *msg,
       }
     }
 
-    // advance the checkpoint if not batching/async
-    if (ret <= 0 && !p->batching) {
+    // advance the checkpoint if not batching/asyc/retrying
+    if (ret <= 0 && !p->batching && ret != LSB_HEKA_PM_RETRY) {
       update_checkpoint(p);
     }
   }
