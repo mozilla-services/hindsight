@@ -807,6 +807,11 @@ void hs_load_output_startup(hs_output_plugins *plugins)
                       p->name);
         add_to_output_plugins(plugins, p, false);
       } else {
+#ifdef HINDSIGHT_CLI
+        pthread_mutex_lock(&plugins->list_lock);
+        plugins->terminated = true;
+        pthread_mutex_unlock(&plugins->list_lock);
+#endif
         hs_log(NULL, g_module, 3, "%s create_output_plugin failed",
                sbc.cfg_name);
       }
@@ -846,6 +851,11 @@ void hs_load_output_dynamic(hs_output_plugins *plugins, const char *name)
                         p->name);
           add_to_output_plugins(plugins, p, true);
         } else {
+#ifdef HINDSIGHT_CLI
+          pthread_mutex_lock(&plugins->list_lock);
+          plugins->terminated = true;
+          pthread_mutex_unlock(&plugins->list_lock);
+#endif
           hs_log(NULL, g_module, 3, "%s create_output_plugin failed",
                  sbc.cfg_name);
         }
