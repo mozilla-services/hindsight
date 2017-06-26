@@ -751,6 +751,9 @@ void hs_load_analysis_startup(hs_analysis_plugins *plugins)
       if (p) {
         add_to_analysis_plugins(&sbc, plugins, p);
       } else {
+#ifdef HINDSIGHT_CLI
+        plugins->terminated = true;
+#endif
         hs_log(NULL, g_module, 3, "%s create_analysis_plugin failed",
                sbc.cfg_name);
       }
@@ -888,6 +891,9 @@ void hs_load_analysis_dynamic(hs_analysis_plugins *plugins, const char *name)
         if (p) {
           add_to_analysis_plugins(&sbc, plugins, p);
         } else {
+#ifdef HINDSIGHT_CLI
+          plugins->terminated = true;
+#endif
           hs_log(NULL, g_module, 3, "%s create_analysis_plugin failed",
                  sbc.cfg_name);
         }
