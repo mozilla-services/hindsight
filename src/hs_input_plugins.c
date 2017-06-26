@@ -649,8 +649,11 @@ void hs_load_input_startup(hs_input_plugins *plugins)
         p->plugins = plugins;
         add_to_input_plugins(plugins, p);
       } else {
-        hs_log(NULL, g_module, 3, "%s create_inputs_plugin failed",
-               entry->d_name);
+#ifdef HINDSIGHT_CLI
+        pthread_mutex_lock(&plugins->list_lock);
+        plugins->terminated = true;
+        pthread_mutex_unlock(&plugins->list_lock);
+#endif
       }
     }
   }
@@ -689,6 +692,11 @@ void hs_load_input_dynamic(hs_input_plugins *plugins, const char *name)
           p->plugins = plugins;
           add_to_input_plugins(plugins, p);
         } else {
+#ifdef HINDSIGHT_CLI
+          pthread_mutex_lock(&plugins->list_lock);
+          plugins->terminated = true;
+          pthread_mutex_unlock(&plugins->list_lock);
+#endif
           hs_log(NULL, g_module, 3, "%s create_input_plugin failed", name);
         }
       }
