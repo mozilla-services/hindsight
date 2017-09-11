@@ -40,7 +40,8 @@ gpgkey=http://packages.confluent.io/rpm/3.1/archive.key\n" | sudo tee /etc/yum.r
         rm -rf ./release && \
         mkdir release && \
         cd release && \
-        cmake -DCMAKE_BUILD_TYPE=release -DENABLE_ALL_EXT=true -DEXT_geoip=false -DEXT_snappy=false "-DCPACK_GENERATOR=${CPACK_GENERATOR}" .. && \
+        cmake -DCMAKE_BUILD_TYPE=release -DENABLE_ALL_EXT=true -DEXT_geoip=false -DEXT_snappy=false \
+        -DEXT_jose=false -DEXT_moz_pioneer=false -DEXT_moz_security=false "-DCPACK_GENERATOR=${CPACK_GENERATOR}" .. && \
         make && \
         ctest -V && \
         make packages; \
