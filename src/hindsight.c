@@ -78,12 +78,12 @@ int main(int argc, char *argv[])
 
   if (sem_init(&g_shutdown, 0, 1)) {
     perror("g_shutdown sem_init failed");
-    exit(EXIT_FAILURE);
+    return EXIT_FAILURE;
   }
 
   if (sem_wait(&g_shutdown)) {
     perror("g_shutdown sem_wait failed");
-    exit(EXIT_FAILURE);
+    return EXIT_FAILURE;
   }
 
   int loglevel = 6;
@@ -126,7 +126,7 @@ int main(int argc, char *argv[])
   sigfillset(&signal_set);
   if (pthread_sigmask(SIG_SETMASK, &signal_set, NULL)) {
     perror("pthread_sigmask failed");
-    exit(EXIT_FAILURE);
+    return EXIT_FAILURE;
   }
   pthread_t sig_thread;
   if (pthread_create(&sig_thread, NULL, sig_handler, NULL)) {
