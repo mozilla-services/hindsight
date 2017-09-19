@@ -551,6 +551,10 @@ void hs_init_analysis_plugins(hs_analysis_plugins *plugins,
   plugins->cfg = cfg;
   plugins->cpr = cpr;
 
+#ifdef HINDSIGHT_CLI
+  plugins->terminated = false;
+#endif
+
   plugins->list = malloc(sizeof(hs_analysis_thread) * cfg->analysis_threads);
   for (unsigned i = 0; i < cfg->analysis_threads; ++i) {
     init_analysis_thread(plugins, i);

@@ -17,7 +17,7 @@ RUN yum -y update && \
 USER app
 WORKDIR /app
 
-RUN sudo yum -y install https://dl.fedoraproject.org/pub/epel/7/x86_64/e/epel-release-7-9.noarch.rpm && \
+RUN sudo yum -y install epel-release.noarch && \
     sudo yum -y install lua-devel luarocks cmake3 make clang gcc git rpm-build sudo && \
     sudo ln -s /usr/bin/cmake3 /usr/local/bin/cmake && \
 
@@ -40,7 +40,8 @@ gpgkey=http://packages.confluent.io/rpm/3.1/archive.key\n" | sudo tee /etc/yum.r
         rm -rf ./release && \
         mkdir release && \
         cd release && \
-        cmake -DCMAKE_BUILD_TYPE=release -DENABLE_ALL_EXT=true -DEXT_geoip=false -DEXT_snappy=false "-DCPACK_GENERATOR=${CPACK_GENERATOR}" .. && \
+        cmake -DCMAKE_BUILD_TYPE=release -DENABLE_ALL_EXT=true -DEXT_geoip=false -DEXT_snappy=false \
+        -DEXT_jose=false -DEXT_moz_pioneer=false -DEXT_moz_security=false "-DCPACK_GENERATOR=${CPACK_GENERATOR}" .. && \
         make && \
         ctest -V && \
         make packages; \
