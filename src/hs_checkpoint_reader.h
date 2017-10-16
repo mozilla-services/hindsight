@@ -14,7 +14,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-#define HS_MAX_IP_CHECKPOINT 4096
+#define HS_MAX_IP_CHECKPOINT 8192
 
 typedef enum {
   HS_CP_NONE,
