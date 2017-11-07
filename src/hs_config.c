@@ -866,10 +866,9 @@ bool hs_output_runtime_cfg(lsb_output_buffer *ob, char type, const hs_config *cf
   // just test the last write to make sure the buffer wasn't exhausted
   lsb_err_value ret = lsb_outputf(ob, "-- end Hindsight configuration\n");
 
-  char fn[strlen(sbc->dir) + strlen(sbc->cfg_name) + strlen(hs_rtc_ext) + 2];
-  char *p = strchr(sbc->cfg_name, '.');
-  if (!p) return false;
-  snprintf(fn, sizeof(fn), "%s/%s%s", sbc->dir, p + 1, hs_rtc_ext);
+  char fn[strlen(cfg->output_path) + strlen(sbc->cfg_name) +
+    strlen(hs_rtc_ext) + 2];
+  snprintf(fn, sizeof(fn), "%s/%s%s", cfg->output_path, sbc->cfg_name, hs_rtc_ext);
   FILE *fh = fopen(fn, "we");
   if (!fh) return false;
   fwrite(ob->buf, ob->pos, 1, fh);

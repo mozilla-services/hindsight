@@ -15,13 +15,14 @@
     64MiB)
 * **sandbox_load_path** - base path that Hindsight scans for new cfgs and Lua
     (string, default "" (dynamic loading disabled)).  If the string is not empty
-    the following directory structure must exist under the base path:
+    the following directory structure must exist under the base path and be
+    writable by Hindsight:
   * input (directory) - input plugin queue
   * analysis (directory) - analysis plugin queue
   * output (directory) - output plugin queue
 * **sandbox_run_path** - base path containing the running cfgs and dynamically
     loaded lua. The following directory structure must exist under the base
-    path:
+    path and be writable by Hindsight when dynamic loading is configured:
   * input (directory) - input plugins
   * analysis (directory) - analysis plugins
   * output (directory) - output plugins
