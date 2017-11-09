@@ -716,9 +716,34 @@ void hs_load_analysis_startup(hs_analysis_plugins *plugins)
     exit(EXIT_FAILURE);
   }
 
+  struct dirent *entry;
+  // todo remove this code after the migration
+  // migrate any existing rtc files to the new location
+  while ((entry = readdir(dp))) {
+    if ((hs_has_ext(entry->d_name, hs_rtc_ext))) {
+      char ofn[HS_MAX_PATH];
+      char nfn[HS_MAX_PATH];
+      if (hs_get_fqfn(dir, entry->d_name, ofn, sizeof(ofn))) {
+        hs_log(NULL, g_module, 0, "path too long");
+        exit(EXIT_FAILURE);
+      }
+      int rv = snprintf(nfn, sizeof(nfn), "%s/%s.%s", cfg->output_path,
+                        hs_analysis_dir, entry->d_name);
+      if (rv < 0 || rv > (int)(sizeof(nfn) - 1)) {
+        hs_log(NULL, g_module, 0, "path too long");
+        exit(EXIT_FAILURE);
+      }
+      if (rename(ofn, nfn) != 0) {
+        hs_log(NULL, g_module, 0, "rename failed %s %s", strerror(errno), ofn);
+        exit(EXIT_FAILURE);
+      }
+    }
+  }
+  rewinddir(dp);
+  // end todo
+
   // pre count the provisioned threads to get better distribution of the
   // dynamically provisioned threads
-  struct dirent *entry;
   while ((entry = readdir(dp))) {
     if ((hs_has_ext(entry->d_name, hs_cfg_ext))) {
       unsigned tid = get_tid(dir, entry->d_name);

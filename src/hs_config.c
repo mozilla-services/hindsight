@@ -409,7 +409,8 @@ bool hs_load_sandbox_config(const char *dir,
     if (hs_get_fqfn(dir, fn, fqfn, sizeof(fqfn))) {
       return false;
     }
-  } else if (hs_has_ext(fn, hs_err_ext)) {
+  } else if (hs_has_ext(fn, hs_err_ext) || hs_has_ext(fn, hs_rtc_ext)) {
+    // todo the rtc check can be removed after the migration Issue #128
     if (!hs_get_fqfn(dir, fn, fqfn, sizeof(fqfn))) {
       unlink(fqfn);
     }
