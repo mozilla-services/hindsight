@@ -35,19 +35,50 @@ gpgkey=http://packages.confluent.io/rpm/3.1/archive.key\n" | sudo tee /etc/yum.r
     cd lua_sandbox_extensions/ && \
     . /app/src/lua_sandbox/build/functions.sh && \
     build_lsbe() { \
-        sudo yum -y install https://net-mozaws-prod-ops-rpmrepo-deps.s3.amazonaws.com/hindsight/parquet-cpp-0.0.1-Linux.rpm && \
         install_packages c++-compiler librdkafka-devel openssl-devel postgresql-devel systemd-devel zlib-devel && \
         rm -rf ./release && \
         mkdir release && \
         cd release && \
-        cmake -DCMAKE_BUILD_TYPE=release -DENABLE_ALL_EXT=true -DEXT_geoip=false -DEXT_snappy=false \
-        -DEXT_jose=false -DEXT_moz_pioneer=false -DEXT_moz_security=false "-DCPACK_GENERATOR=${CPACK_GENERATOR}" .. && \
+        cmake -DCMAKE_BUILD_TYPE=release \
+        -DEXT_aws=off \
+        -DEXT_bloom_filter=on \
+        -DEXT_circular_buffer=on \
+        -DEXT_cjson=on \
+        -DEXT_compat=on \
+        -DEXT_cuckoo_filter=on \
+        -DEXT_elasticsearch=on \
+        -DEXT_geoip=off \
+        -DEXT_heka=on \
+        -DEXT_hyperloglog=on \
+        -DEXT_jose=off \
+        -DEXT_kafka=on \
+        -DEXT_lfs=on \
+        -DEXT_lpeg=on \
+        -DEXT_lsb=on \
+        -DEXT_moz_ingest=on \
+        -DEXT_moz_logging=on \
+        -DEXT_moz_pioneer=off \
+        -DEXT_moz_security=off \
+        -DEXT_moz_telemetry=on \
+        -DEXT_openssl=on \
+        -DEXT_parquet=off \
+        -DEXT_postgres=on \
+        -DEXT_rjson=on \
+        -DEXT_sax=on \
+        -DEXT_snappy=off \
+        -DEXT_socket=on \
+        -DEXT_ssl=on \
+        -DEXT_struct=on \
+        -DEXT_syslog=on \
+        -DEXT_systemd=on \
+        -DEXT_zlib=on \
+	"-DCPACK_GENERATOR=${CPACK_GENERATOR}" .. && \
         make && \
         ctest -V && \
         make packages; \
     } && \
     build_function="build_lsbe" main && \
-    sudo yum install -y /app/src/lua_sandbox_extensions/release/luasandbox*Linux.rpm && \
+    sudo yum install -y /app/src/lua_sandbox_extensions/release/luasandbox*.rpm && \
 
     # Build hindsight
     cd /app/src/hindsight && \
@@ -57,7 +88,7 @@ gpgkey=http://packages.confluent.io/rpm/3.1/archive.key\n" | sudo tee /etc/yum.r
     make && \
     ctest3 && \
     cpack3 -G RPM && \
-    sudo yum install -y /app/src/hindsight/release/hindsight*Linux.rpm && \
+    sudo yum install -y /app/src/hindsight/release/hindsight*.rpm && \
 
     # Setup run directory
     cd /app && \
