@@ -718,7 +718,7 @@ void hs_load_analysis_startup(hs_analysis_plugins *plugins)
 
   struct dirent *entry;
   // todo remove this code after the migration
-  // migrate any existing rtc files to the new location
+  // best effort - migrate any existing rtc files to the new location
   while ((entry = readdir(dp))) {
     if ((hs_has_ext(entry->d_name, hs_rtc_ext))) {
       char ofn[HS_MAX_PATH];
@@ -734,8 +734,19 @@ void hs_load_analysis_startup(hs_analysis_plugins *plugins)
         exit(EXIT_FAILURE);
       }
       if (rename(ofn, nfn) != 0) {
-        hs_log(NULL, g_module, 0, "rename failed %s %s", strerror(errno), ofn);
-        exit(EXIT_FAILURE);
+        char buf[BUFSIZ];
+        size_t size;
+        FILE *ofh = fopen(ofn, "rb");
+        FILE *nfh = fopen(nfn, "wb");
+        if (ofh && nfh) {
+          while ((size = fread(buf, 1, BUFSIZ, ofh))) {
+            fwrite(buf, 1, size, nfh);
+          }
+        } else {
+          hs_log(NULL, g_module, 3, "migration failed %s", ofn);
+        }
+        if (ofh) fclose(ofh);
+        if (nfh) fclose(nfh);
       }
     }
   }
