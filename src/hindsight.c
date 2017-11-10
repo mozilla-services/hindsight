@@ -103,6 +103,7 @@ int main(int argc, char *argv[])
   int watch[3] = {0};
   int load = 0;
   if (cfg.load_path[0] != 0) {
+    bool err = false;
     load = inotify_init1(IN_NONBLOCK | IN_CLOEXEC);
     if (load < 0) {
       hs_free_config(&cfg);
@@ -111,10 +112,32 @@ int main(int argc, char *argv[])
     }
     watch[0] = inotify_add_watch(load, cfg.load_path_input,
                                  IN_CLOSE_WRITE | IN_MOVED_TO);
+    if (watch[0] < 0) {
+      hs_log(NULL, g_module, 0, "%s: directory does not exist",
+             cfg.load_path_input);
+      err = true;
+    }
+
     watch[1] = inotify_add_watch(load, cfg.load_path_analysis,
                                  IN_CLOSE_WRITE | IN_MOVED_TO);
+    if (watch[1] < 0) {
+      hs_log(NULL, g_module, 0, "%s: directory does not exist",
+             cfg.load_path_analysis);
+      err = true;
+    }
+
     watch[2] = inotify_add_watch(load, cfg.load_path_output,
                                  IN_CLOSE_WRITE | IN_MOVED_TO);
+    if (watch[2] < 0) {
+      hs_log(NULL, g_module, 0, "%s: directory does not exist",
+             cfg.load_path_output);
+      err = true;
+    }
+
+    if (err) {
+      hs_free_config(&cfg);
+      return EXIT_FAILURE;
+    }
   }
 
   hs_checkpoint_reader cpr;

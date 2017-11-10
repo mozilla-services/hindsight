@@ -188,7 +188,8 @@ create_analysis_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
     return NULL;
   }
   if (!hs_output_runtime_cfg(&ob, 'a', cfg, sbc)) {
-    hs_log(NULL, g_module, 3, "%s hs_output_runtime_cfg failed", sbc->cfg_name);
+    hs_log(NULL, g_module, 3, "failed to write %s/%s%s", cfg->output_path,
+           sbc->cfg_name, hs_rtc_ext);
     lsb_free_output_buffer(&ob);
     free(state_file);
     destroy_analysis_plugin(p);
@@ -691,13 +692,13 @@ static unsigned get_tid(const char *path, const char *name)
 }
 
 
-static unsigned get_previous_tid(const char *rpath, const char *name)
+static unsigned get_previous_tid(const char *opath, const char *name)
 {
-  size_t len = strlen(name);
+  size_t len = strlen(hs_analysis_dir) + strlen(name) + 1;
   char rtc[len + 1];
-  strcpy(rtc, name);
+  snprintf(rtc, sizeof(rtc), "%s.%s", hs_analysis_dir, name);
   strcpy(rtc + len - HS_EXT_LEN, hs_rtc_ext);
-  return get_tid(rpath, rtc);
+  return get_tid(opath, rtc);
 }
 
 
@@ -715,14 +716,50 @@ void hs_load_analysis_startup(hs_analysis_plugins *plugins)
     exit(EXIT_FAILURE);
   }
 
+  struct dirent *entry;
+  // todo remove this code after the migration
+  // best effort - migrate any existing rtc files to the new location
+  while ((entry = readdir(dp))) {
+    if ((hs_has_ext(entry->d_name, hs_rtc_ext))) {
+      char ofn[HS_MAX_PATH];
+      char nfn[HS_MAX_PATH];
+      if (hs_get_fqfn(dir, entry->d_name, ofn, sizeof(ofn))) {
+        hs_log(NULL, g_module, 0, "path too long");
+        exit(EXIT_FAILURE);
+      }
+      int rv = snprintf(nfn, sizeof(nfn), "%s/%s.%s", cfg->output_path,
+                        hs_analysis_dir, entry->d_name);
+      if (rv < 0 || rv > (int)(sizeof(nfn) - 1)) {
+        hs_log(NULL, g_module, 0, "path too long");
+        exit(EXIT_FAILURE);
+      }
+      if (rename(ofn, nfn) != 0) {
+        char buf[BUFSIZ];
+        size_t size;
+        FILE *ofh = fopen(ofn, "rb");
+        FILE *nfh = fopen(nfn, "wb");
+        if (ofh && nfh) {
+          while ((size = fread(buf, 1, BUFSIZ, ofh))) {
+            fwrite(buf, 1, size, nfh);
+          }
+        } else {
+          hs_log(NULL, g_module, 3, "migration failed %s", ofn);
+        }
+        if (ofh) fclose(ofh);
+        if (nfh) fclose(nfh);
+      }
+    }
+  }
+  rewinddir(dp);
+  // end todo
+
   // pre count the provisioned threads to get better distribution of the
   // dynamically provisioned threads
-  struct dirent *entry;
   while ((entry = readdir(dp))) {
     if ((hs_has_ext(entry->d_name, hs_cfg_ext))) {
       unsigned tid = get_tid(dir, entry->d_name);
       if (tid == UINT_MAX) {
-        tid = get_previous_tid(dir, entry->d_name);
+        tid = get_previous_tid(cfg->output_path, entry->d_name);
       }
       if (tid != UINT_MAX) {
         ++plugins_per_thread[tid % threads];
@@ -735,7 +772,7 @@ void hs_load_analysis_startup(hs_analysis_plugins *plugins)
     hs_sandbox_config sbc;
     if (hs_load_sandbox_config(dir, entry->d_name, &sbc, &cfg->apd, 'a')) {
       if (sbc.thread == UINT_MAX) {
-        sbc.thread = get_previous_tid(dir, entry->d_name);
+        sbc.thread = get_previous_tid(cfg->output_path, entry->d_name);
         if (sbc.thread == UINT_MAX) {
           int min_cnt = INT_MAX;
           for (int i = 0; i < threads; ++i) {
@@ -802,15 +839,14 @@ static bool ext_exists(const char *dir, const char *name, const char *ext)
 }
 
 
-static int get_thread_id(const char *lpath, const char *rpath, const char *name,
-                         unsigned *tid)
+static int get_thread_id(hs_config *cfg, const char *name, unsigned *tid)
 {
   if (hs_has_ext(name, hs_cfg_ext)) {
-    *tid = get_tid(lpath, name);
+    *tid = get_tid(cfg->load_path_analysis, name);
     unsigned otid = *tid;
-    if (!ext_exists(rpath, name, hs_off_ext)
-        && !ext_exists(rpath, name, hs_err_ext)) {
-      otid = get_previous_tid(rpath, name);
+    if (!ext_exists(cfg->run_path_analysis, name, hs_off_ext)
+        && !ext_exists(cfg->run_path_analysis, name, hs_err_ext)) {
+      otid = get_previous_tid(cfg->output_path, name);
       if (*tid == UINT_MAX) {
         *tid = otid;
       }
@@ -818,7 +854,7 @@ static int get_thread_id(const char *lpath, const char *rpath, const char *name,
 
     if (otid != *tid) { // mis-matched cfgs so remove the load .cfg
       char path[HS_MAX_PATH];
-      if (hs_get_fqfn(lpath, name, path, sizeof(path))) {
+      if (hs_get_fqfn(cfg->load_path_analysis, name, path, sizeof(path))) {
         hs_log(NULL, g_module, 0, "load off path too long");
         exit(EXIT_FAILURE);
       }
@@ -832,17 +868,16 @@ static int get_thread_id(const char *lpath, const char *rpath, const char *name,
     }
     return true;
   } else if (hs_has_ext(name, hs_off_ext)) {
-    char cfg[HS_MAX_PATH];
-    strcpy(cfg, name);
-    strcpy(cfg + strlen(name) - HS_EXT_LEN, hs_cfg_ext);
-    *tid = get_previous_tid(rpath, cfg);
+    char path[HS_MAX_PATH];
+    strcpy(path, name);
+    strcpy(path + strlen(name) - HS_EXT_LEN, hs_cfg_ext);
+    *tid = get_previous_tid(cfg->output_path, path);
     if (*tid != UINT_MAX) {
       return true;
     }
 
     // no .rtc was found so remove the .off flag
-    char path[HS_MAX_PATH];
-    if (hs_get_fqfn(lpath, name, path, sizeof(path))) {
+    if (hs_get_fqfn(cfg->load_path_analysis, name, path, sizeof(path))) {
       hs_log(NULL, g_module, 0, "load off path too long");
       exit(EXIT_FAILURE);
     }
@@ -866,7 +901,7 @@ void hs_load_analysis_dynamic(hs_analysis_plugins *plugins, const char *name)
   }
 
   unsigned tid = UINT_MAX;
-  if (!get_thread_id(lpath, rpath, name, &tid)) {
+  if (!get_thread_id(cfg, name, &tid)) {
     hs_log(NULL, g_module, 7, "%s ignored %s", __func__, name);
     return;
   }

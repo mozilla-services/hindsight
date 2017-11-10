@@ -275,7 +275,8 @@ create_input_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
     return NULL;
   }
   if (!hs_output_runtime_cfg(&ob, 'i', cfg, sbc)) {
-    hs_log(NULL, g_module, 3, "%s hs_output_runtime_cfg failed", sbc->cfg_name);
+    hs_log(NULL, g_module, 3, "failed to write %s/%s%s", cfg->output_path,
+           sbc->cfg_name, hs_rtc_ext);
     lsb_free_output_buffer(&ob);
     free(state_file);
     destroy_input_plugin(p);
