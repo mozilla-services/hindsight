@@ -94,7 +94,7 @@
                 <a href="./">
             
                     
-                    Hindsight (0.14.4)
+                    Hindsight (0.14.6)
             
                 </a>
             
@@ -243,7 +243,8 @@ analysis plugins</li>
   64MiB)</li>
 <li><strong>sandbox_load_path</strong> - base path that Hindsight scans for new cfgs and Lua
   (string, default &quot;&quot; (dynamic loading disabled)).  If the string is not empty
-  the following directory structure must exist under the base path:<ul>
+  the following directory structure must exist under the base path and be
+  writable by Hindsight:<ul>
 <li>input (directory) - input plugin queue</li>
 <li>analysis (directory) - analysis plugin queue</li>
 <li>output (directory) - output plugin queue</li>
@@ -251,7 +252,7 @@ analysis plugins</li>
 </li>
 <li><strong>sandbox_run_path</strong> - base path containing the running cfgs and dynamically
   loaded lua. The following directory structure must exist under the base
-  path:<ul>
+  path and be writable by Hindsight when dynamic loading is configured:<ul>
 <li>input (directory) - input plugins</li>
 <li>analysis (directory) - analysis plugins</li>
 <li>output (directory) - output plugins</li>
@@ -466,7 +467,7 @@ number of message checkpoints to hold in memory. i.e., if the output can have
     <script>
         var gitbook = gitbook || [];
         gitbook.push(function() {
-            gitbook.page.hasChanged({"page":{"title":"Configuration","level":"1.4","depth":1,"next":{"title":"Command Line Version","level":"1.5","depth":1,"path":"hindsight_cli.md","ref":"hindsight_cli.md","articles":[]},"previous":{"title":"Performance","level":"1.3","depth":1,"path":"performance.md","ref":"performance.md","articles":[]},"dir":"ltr"},"config":{"gitbook":"*","theme":"default","variables":{},"plugins":[],"pluginsConfig":{"highlight":{},"search":{},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"fontsettings":{"theme":"white","family":"sans","size":2},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"}},"file":{"path":"configuration.md","mtime":"2017-05-15T15:00:25.308Z","type":"markdown"},"gitbook":{"version":"3.2.2","time":"2017-10-16T14:15:56.115Z"},"basePath":".","book":{"language":""}});
+            gitbook.page.hasChanged({"page":{"title":"Configuration","level":"1.4","depth":1,"next":{"title":"Command Line Version","level":"1.5","depth":1,"path":"hindsight_cli.md","ref":"hindsight_cli.md","articles":[]},"previous":{"title":"Performance","level":"1.3","depth":1,"path":"performance.md","ref":"performance.md","articles":[]},"dir":"ltr"},"config":{"gitbook":"*","theme":"default","variables":{},"plugins":[],"pluginsConfig":{"highlight":{},"search":{},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"fontsettings":{"theme":"white","family":"sans","size":2},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"}},"file":{"path":"configuration.md","mtime":"2017-11-10T19:03:23.866Z","type":"markdown"},"gitbook":{"version":"3.2.2","time":"2017-11-10T19:08:23.115Z"},"basePath":".","book":{"language":""}});
         });
     </script>
 </div>
