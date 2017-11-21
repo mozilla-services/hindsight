@@ -382,18 +382,22 @@ static void analyze_message(hs_analysis_thread *at, bool sample)
     p = at->list[i];
 
     ret = 0;
-    unsigned long long start;
-
     if (at->msg->raw.s) { // non idle/empty message
-      if (sample) start = lsb_get_time();
-      bool matched = lsb_eval_message_matcher(p->mm, at->msg);
+      bool matched;
       if (sample) {
+        unsigned long long start = lsb_get_time();
+        matched = lsb_eval_message_matcher(p->mm, at->msg);
         lsb_update_running_stats(&p->mms, lsb_get_time() - start);
+        p->pm_sample = true;
+      } else {
+        matched = lsb_eval_message_matcher(p->mm, at->msg);
       }
+
       if (matched) {
         p->im_limit = p->pm_im_limit;
         ++p->pm_delta_cnt;
-        ret = lsb_heka_pm_analysis(p->hsb, at->msg, sample);
+        ret = lsb_heka_pm_analysis(p->hsb, at->msg, p->pm_sample);
+        p->pm_sample = false;
         if (ret < 0) {
           const char *err = lsb_heka_get_error(p->hsb);
           if (strlen(err) > 0) {
@@ -401,9 +405,6 @@ static void analyze_message(hs_analysis_thread *at, bool sample)
           }
         }
       }
-    }
-    if (sample) {
-      p->stats = lsb_heka_get_stats(p->hsb);
     }
 
     if (ret <= 0 && p->ticker_interval && at->current_t >= p->ticker_expires) {
@@ -413,6 +414,7 @@ static void analyze_message(hs_analysis_thread *at, bool sample)
     }
 
     if (ret > 0) terminate_sandbox(at, i);
+    if (sample) p->stats = lsb_heka_get_stats(p->hsb);
   }
   pthread_mutex_unlock(&at->list_lock);
 }
