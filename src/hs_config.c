@@ -58,6 +58,7 @@ static const char *cfg_sb_restricted_headers = "restricted_headers";
 static const char *cfg_sb_filename = "filename";
 static const char *cfg_sb_ticker_interval = "ticker_interval";
 static const char *cfg_sb_thread = "thread";
+static const char *cfg_sb_cpu_affinity = "cpu_affinity";
 static const char *cfg_sb_async_buffer = "async_buffer_size";
 static const char *cfg_sb_matcher = "message_matcher";
 static const char *cfg_sb_shutdown_terminate = "shutdown_on_terminate";
@@ -75,6 +76,7 @@ static void init_sandbox_config(hs_sandbox_config *cfg)
   cfg->message_matcher = NULL;
 
   cfg->thread = UINT_MAX;
+  cfg->cpu_affinity = false;
   cfg->async_buffer_size = 0;
   cfg->output_limit = 1024 * 64;
   cfg->memory_limit = 1024 * 1024 * 8;
@@ -519,6 +521,8 @@ bool hs_load_sandbox_config(const char *dir,
   if (type == 'a') {
     ret = get_unsigned_int(L, LUA_GLOBALSINDEX, cfg_sb_thread,
                            &cfg->thread);
+    ret = get_bool_item(L, LUA_GLOBALSINDEX, cfg_sb_cpu_affinity,
+                         &cfg->cpu_affinity);
     ret = get_unsigned_int(L, LUA_GLOBALSINDEX, cfg_sb_pm_im_limit,
                             &cfg->pm_im_limit);
     ret = get_unsigned_int(L, LUA_GLOBALSINDEX, cfg_sb_te_im_limit,
@@ -843,6 +847,8 @@ bool hs_output_runtime_cfg(lsb_output_buffer *ob, char type, const hs_config *cf
 
   if (type == 'a') {
     lsb_outputf(ob, "thread = %u\n", sbc->thread);
+    lsb_outputf(ob, "cpu_affinity = %s\n",
+              sbc->cpu_affinity ? "true" : "false");
     lsb_outputf(ob, "process_message_inject_limit = %u\n", sbc->pm_im_limit);
     lsb_outputf(ob, "timer_event_inject_limit = %u\n", sbc->te_im_limit);
   }

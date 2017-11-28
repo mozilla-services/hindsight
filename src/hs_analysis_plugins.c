@@ -6,6 +6,8 @@
 
 /** @brief Hindsight analysis plugin loader @file */
 
+#define _GNU_SOURCE
+
 #include "hs_analysis_plugins.h"
 
 #include <ctype.h>
@@ -16,6 +18,7 @@
 #include <luasandbox/util/protobuf.h>
 #include <luasandbox_output.h>
 #include <pthread.h>
+#include <sched.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
@@ -132,6 +135,7 @@ create_analysis_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
   p->pm_im_limit = sbc->pm_im_limit;
   p->te_im_limit = sbc->te_im_limit;
   p->shutdown_terminate = sbc->shutdown_terminate;
+  p->cpu_affinity = sbc->cpu_affinity;
   p->ticker_interval = sbc->ticker_interval;
   int stagger = p->ticker_interval > 60 ? 60 : p->ticker_interval;
   // distribute when the timer_events will fire
@@ -258,6 +262,7 @@ static void add_to_analysis_plugins(const hs_sandbox_config *cfg,
   int idx = -1;
   int thread = cfg->thread % plugins->cfg->analysis_threads;
   hs_analysis_thread *at = &plugins->list[thread];
+  at->cpu_affinity = p->cpu_affinity;
   p->at = at;
 
   pthread_mutex_lock(&at->list_lock);
@@ -435,8 +440,20 @@ static void shutdown_timer_event(hs_analysis_thread *at)
 
 static void* input_thread(void *arg)
 {
+  cpu_set_t set;
   hs_analysis_thread *at = (hs_analysis_thread *)arg;
   hs_log(NULL, g_module, 6, "starting thread: %d", at->tid);
+
+  if (at->cpu_affinity) {
+    CPU_ZERO(&set);
+    CPU_SET(at->tid, &set);
+
+    if (sched_setaffinity(0, sizeof(set), &set) == -1) {
+      hs_log(NULL, g_module, 6, "failed to set CPU affinity for thead: %d", at->tid);
+    } else {
+      hs_log(NULL, g_module, 6, "set CPU affinity for thead: %d", at->tid);
+    }
+  }
 
   lsb_heka_message msg;
   lsb_init_heka_message(&msg, 8);
