@@ -36,6 +36,7 @@ struct hs_analysis_plugin {
   int                 ticker_interval;
   int                 pm_delta_cnt;
   bool                shutdown_terminate;
+  bool                pm_sample;
   unsigned            im_limit;
   unsigned            pm_im_limit;
   unsigned            te_im_limit;

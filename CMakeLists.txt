@@ -3,7 +3,7 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 cmake_minimum_required(VERSION 3.0 FATAL_ERROR)
-project(hindsight VERSION 0.14.6 LANGUAGES C)
+project(hindsight VERSION 0.14.7 LANGUAGES C)
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Hindsight")
 set(CPACK_PACKAGE_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
 set(CPACK_PACKAGE_VERSION_MINOR ${PROJECT_VERSION_MINOR})
@@ -35,7 +35,7 @@ if(CMAKE_HOST_UNIX)
   ${LIBDL_LIBRARY}
   ${LIBM_LIBRARY}
   ${LIBRT_LIBRARY})
-  add_definitions(-D_POSIX_C_SOURCE=199309L -D_XOPEN_SOURCE=600)
+  add_definitions(-D_POSIX_C_SOURCE=199506L -D_XOPEN_SOURCE=600)
 endif()
 
 set(INSTALL_SANDBOX_PATH ${CMAKE_INSTALL_DATAROOTDIR}/luasandbox/sandboxes)
