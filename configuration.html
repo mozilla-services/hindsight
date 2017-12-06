@@ -17,6 +17,10 @@
     
             
                 
+                <link rel="stylesheet" href="gitbook/gitbook-plugin-navigator/plugin.css">
+                
+            
+                
                 <link rel="stylesheet" href="gitbook/gitbook-plugin-highlight/website.css">
                 
             
@@ -94,7 +98,7 @@
                 <a href="./">
             
                     
-                    Hindsight (0.14.6)
+                    Hindsight (0.14.7)
             
                 </a>
             
@@ -225,8 +229,8 @@
     
                                 <section class="normal markdown-section">
                                 
-                                <h3 id="hindsight-main-configuration">Hindsight Main Configuration</h3>
-<h4 id="configuration-variables">Configuration Variables</h4>
+                                <h3 id="Hindsight_Main_Configuration">0.1. Hindsight Main Configuration</h3>
+<h4 id="Configuration_Variables">0.1.1. Configuration Variables</h4>
 <ul>
 <li><strong>output_path</strong> - base path where the Heka protobuf streams, checkpoints,
 state files, and statistics are stored<ul>
@@ -320,8 +324,8 @@ output_defaults = {
   <span class="hljs-comment">-- read_queue = &quot;both&quot;</span>
 }
 </code></pre>
-<h3 id="hindsight-sandbox-configuration">Hindsight Sandbox Configuration</h3>
-<h4 id="default-sandbox-configuration-variables">Default Sandbox Configuration Variables</h4>
+<h3 id="Hindsight_Sandbox_Configuration">0.2. Hindsight Sandbox Configuration</h3>
+<h4 id="Default_Sandbox_Configuration_Variables">0.2.1. Default Sandbox Configuration Variables</h4>
 <ul>
 <li><strong>output_limit</strong> - the largest message an input or analysis plugin can inject
 into Hindsight (bytes, default 64KiB)</li>
@@ -345,7 +349,7 @@ see: <a href="https://mozilla-services.github.io/lua_sandbox/heka/input.html#pol
 <li><strong>shutdown_on_terminate</strong> - cleanly shuts down Hindsight if this plugin is
 terminated (default false)</li>
 </ul>
-<h4 id="default-analysis-sandbox-configuration-variables">Default Analysis Sandbox Configuration Variables</h4>
+<h4 id="Default_Analysis_Sandbox_Configuration_Variables">0.2.2. Default Analysis Sandbox Configuration Variables</h4>
 <ul>
 <li><p><strong>process_message_inject_limit</strong> - the maximum number of messages the
 <code>process_message</code> function can inject in a single invocation (count,
@@ -356,7 +360,7 @@ default 0 (none)).</p>
 default 10).</p>
 </li>
 </ul>
-<h4 id="default-output-sandbox-configuration-variables">Default Output Sandbox Configuration Variables</h4>
+<h4 id="Default_Output_Sandbox_Configuration_Variables">0.2.3. Default Output Sandbox Configuration Variables</h4>
 <ul>
 <li><strong>remove_checkpoints_on_terminate</strong> - removes the checkpoint entries when the
 plugin is terminated (default false).  This prevents the data from being
@@ -366,12 +370,12 @@ pressure as it will start filling the disk.</li>
 (both|input|analysis) defaults to both.</li>
 </ul>
 <hr>
-<h4 id="common-plugin-configuration-variables">Common Plugin Configuration Variables</h4>
+<h4 id="Common_Plugin_Configuration_Variables">0.2.4. Common Plugin Configuration Variables</h4>
 <ul>
 <li><strong>filename</strong> - plugin source file (must have no path component and a <code>.lua</code>
 extension). Search order: sandbox_run_path, sandbox_install_path</li>
 </ul>
-<h5 id="reserved-hindsight-populates-the-following-variables-in-the-configuration">Reserved (Hindsight populates the following variables in the configuration)</h5>
+<h5 id="Reserved_(Hindsight_populates_the_following_variables_in_the_configuration)">Reserved (Hindsight populates the following variables in the configuration)</h5>
 <ul>
 <li><strong>Logger</strong> - configuration filename without the <code>.cfg</code> extension prefixed with
 the sandbox type e.g., <code>analysis.myplugin</code></li>
@@ -382,7 +386,7 @@ the sandbox type e.g., <code>analysis.myplugin</code></li>
 <li><strong>log_level</strong> - Integer specifying the syslog severity level, when set to
 debug (7) the sandbox print function will be wired into the Hindsight logger</li>
 </ul>
-<h6 id="for-inputoutput-plugins-these-additional-hindsight-configuration-options-are-available-from-readconfig">For input/output plugins these additional Hindsight configuration options are available from read_config()</h6>
+<h6 id="For_input_output_plugins_these_additional_Hindsight_configuration_options_are_available_from_read_config()">For input/output plugins these additional Hindsight configuration options are available from read_config()</h6>
 <ul>
 <li><strong>output_path</strong></li>
 <li><strong>output_size</strong></li>
@@ -391,22 +395,22 @@ debug (7) the sandbox print function will be wired into the Hindsight logger</li
 <li><strong>sandbox_run_path</strong></li>
 <li><strong>sandbox_install_path</strong></li>
 </ul>
-<h5 id="user-defined">User Defined</h5>
+<h5 id="User_Defined">User Defined</h5>
 <ul>
 <li><em>key</em> (string | number) - user defined variable with a
 (string | number | boolean | table) value</li>
 </ul>
-<h6 id="user-defined-private-variable">User Defined Private Variable</h6>
+<h6 id="User_Defined_Private_Variable">User Defined Private Variable</h6>
 <ul>
 <li><strong>_*</strong>key* (string) - user defined variable beginning with an underscore
 (allows filtering in UI displays)</li>
 </ul>
-<h4 id="input-plugin-configuration-variables">Input Plugin Configuration Variables</h4>
+<h4 id="Input_Plugin_Configuration_Variables">0.2.5. Input Plugin Configuration Variables</h4>
 <ul>
 <li><a href="#default-sandbox-configuration-variables">Default Configuration Variables</a></li>
 <li><a href="#common-plugin-configuration-variables">Common Plugin Configuration Variables</a></li>
 </ul>
-<h4 id="analysis-plugin-configuration-variables">Analysis Plugin Configuration Variables</h4>
+<h4 id="Analysis_Plugin_Configuration_Variables">0.2.6. Analysis Plugin Configuration Variables</h4>
 <ul>
 <li><a href="#default-sandbox-configuration-variables">Default Configuration Variables</a></li>
 <li><a href="#common-plugin-configuration-variables">Common Plugin Configuration Variables</a></li>
@@ -414,7 +418,7 @@ debug (7) the sandbox print function will be wired into the Hindsight logger</li
 <a href="https://mozilla-services.github.io/lua_sandbox/util/message_matcher.html" target="_blank">Message Matcher</a></li>
 <li><strong>thread</strong> - analysis thread the plugin will be run on (<code>thread % analysis_threads</code>)</li>
 </ul>
-<h4 id="output-plugin-configuration-variables">Output Plugin Configuration Variables</h4>
+<h4 id="Output_Plugin_Configuration_Variables">0.2.7. Output Plugin Configuration Variables</h4>
 <ul>
 <li><a href="#default-sandbox-configuration-variables">Default Configuration Variables</a></li>
 <li><a href="#common-plugin-configuration-variables">Common Plugin Configuration Variables</a></li>
@@ -424,7 +428,7 @@ debug (7) the sandbox print function will be wired into the Hindsight logger</li
 number of message checkpoints to hold in memory. i.e., if the output can have
 1000 messages in flight the async_buffer_size should be set to 1000</li>
 </ul>
-
+<div id="anchors-navbar"><i class="fa fa-anchor"></i><ul><p><a href="#"></a></p><li><a href="#">none</a></li><ul><li><a href="#Hindsight_Main_Configuration">0.1. Hindsight Main Configuration</a></li><ul><li><a href="#Configuration_Variables">0.1.1. Configuration Variables</a></li></ul><li><a href="#Hindsight_Sandbox_Configuration">0.2. Hindsight Sandbox Configuration</a></li><ul><li><a href="#Default_Sandbox_Configuration_Variables">0.2.1. Default Sandbox Configuration Variables</a></li><li><a href="#Default_Analysis_Sandbox_Configuration_Variables">0.2.2. Default Analysis Sandbox Configuration Variables</a></li><li><a href="#Default_Output_Sandbox_Configuration_Variables">0.2.3. Default Output Sandbox Configuration Variables</a></li><li><a href="#Common_Plugin_Configuration_Variables">0.2.4. Common Plugin Configuration Variables</a></li><li><a href="#Input_Plugin_Configuration_Variables">0.2.5. Input Plugin Configuration Variables</a></li><li><a href="#Analysis_Plugin_Configuration_Variables">0.2.6. Analysis Plugin Configuration Variables</a></li><li><a href="#Output_Plugin_Configuration_Variables">0.2.7. Output Plugin Configuration Variables</a></li></ul></ul></ul></div><a href="#" id="goTop"><i class="fa fa-arrow-up"></i></a>
                                 
                                 </section>
                             
@@ -467,7 +471,7 @@ number of message checkpoints to hold in memory. i.e., if the output can have
     <script>
         var gitbook = gitbook || [];
         gitbook.push(function() {
-            gitbook.page.hasChanged({"page":{"title":"Configuration","level":"1.4","depth":1,"next":{"title":"Command Line Version","level":"1.5","depth":1,"path":"hindsight_cli.md","ref":"hindsight_cli.md","articles":[]},"previous":{"title":"Performance","level":"1.3","depth":1,"path":"performance.md","ref":"performance.md","articles":[]},"dir":"ltr"},"config":{"gitbook":"*","theme":"default","variables":{},"plugins":[],"pluginsConfig":{"highlight":{},"search":{},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"fontsettings":{"theme":"white","family":"sans","size":2},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"}},"file":{"path":"configuration.md","mtime":"2017-11-10T19:03:23.866Z","type":"markdown"},"gitbook":{"version":"3.2.2","time":"2017-11-10T19:08:23.115Z"},"basePath":".","book":{"language":""}});
+            gitbook.page.hasChanged({"page":{"title":"Configuration","level":"1.4","depth":1,"next":{"title":"Command Line Version","level":"1.5","depth":1,"path":"hindsight_cli.md","ref":"hindsight_cli.md","articles":[]},"previous":{"title":"Performance","level":"1.3","depth":1,"path":"performance.md","ref":"performance.md","articles":[]},"dir":"ltr"},"config":{"gitbook":"*","theme":"default","variables":{},"plugins":["collapsible-menu","navigator"],"pluginsConfig":{"collapsible-menu":{},"navigator":{},"highlight":{},"search":{},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"fontsettings":{"theme":"white","family":"sans","size":2},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"}},"file":{"path":"configuration.md","mtime":"2017-11-17T17:00:56.877Z","type":"markdown"},"gitbook":{"version":"3.2.2","time":"2018-01-03T19:19:56.062Z"},"basePath":".","book":{"language":""}});
         });
     </script>
 </div>
@@ -475,6 +479,10 @@ number of message checkpoints to hold in memory. i.e., if the output can have
         
     <script src="gitbook/gitbook.js"></script>
     <script src="gitbook/theme.js"></script>
+    
+        
+        <script src="gitbook/gitbook-plugin-collapsible-menu/plugin.js"></script>
+        
     
         
         <script src="gitbook/gitbook-plugin-search/search-engine.js"></script>

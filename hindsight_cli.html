@@ -17,6 +17,10 @@
     
             
                 
+                <link rel="stylesheet" href="gitbook/gitbook-plugin-navigator/plugin.css">
+                
+            
+                
                 <link rel="stylesheet" href="gitbook/gitbook-plugin-highlight/website.css">
                 
             
@@ -92,7 +96,7 @@
                 <a href="./">
             
                     
-                    Hindsight (0.14.6)
+                    Hindsight (0.14.7)
             
                 </a>
             
@@ -223,12 +227,12 @@
     
                                 <section class="normal markdown-section">
                                 
-                                <h1 id="hindsight-cli">Hindsight CLI</h1>
+                                <h1 id="Hindsight_CLI">Hindsight CLI</h1>
 <p>The command line interface version of Hindsight is designed for non-real-time
 use (testing and reporting).  The usage is exactly the same as the hindsight
 executable but the behavior is different.</p>
 <pre><code>usage: hindsight_cli &lt;cfg&gt; &lt;log_level&gt;
-</code></pre><h2 id="behavioral-changes-compared-to-hindsight">Behavioral Changes Compared to Hindsight</h2>
+</code></pre><h2 id="Behavioral_Changes_Compared_to_Hindsight">1. Behavioral Changes Compared to Hindsight</h2>
 <ol>
 <li>It will initiate a shutdown when all inputs plugins have finished</li>
 <li>It will not exit until all the data has been process by every plugin</li>
@@ -247,9 +251,9 @@ e.g., 6 indicates an input and analysis termination.<ul>
 </ul>
 </li>
 </ol>
-<h2 id="integration-test-example">Integration Test Example</h2>
+<h2 id="Integration_Test_Example">2. Integration Test Example</h2>
 <p><a href="https://github.com/mozilla-services/lua_sandbox_extensions/tree/master/moz_telemetry/tests/hindsight" target="_blank">Mozilla Telemetry Integration Tests</a></p>
-
+<div id="anchors-navbar"><i class="fa fa-anchor"></i><ul><p><a href="#Hindsight_CLI">Hindsight CLI</a></p><li><a href="#Behavioral_Changes_Compared_to_Hindsight">1. Behavioral Changes Compared to Hindsight</a></li><li><a href="#Integration_Test_Example">2. Integration Test Example</a></li></ul></div><a href="#Behavioral_Changes_Compared_to_Hindsight" id="goTop"><i class="fa fa-arrow-up"></i></a>
                                 
                                 </section>
                             
@@ -288,7 +292,7 @@ e.g., 6 indicates an input and analysis termination.<ul>
     <script>
         var gitbook = gitbook || [];
         gitbook.push(function() {
-            gitbook.page.hasChanged({"page":{"title":"Command Line Version","level":"1.5","depth":1,"next":{"title":"Heka Sandbox Documentation","level":"1.6","depth":1,"url":"http://mozilla-services.github.io/lua_sandbox/heka/index.html","ref":"http://mozilla-services.github.io/lua_sandbox/heka/index.html","articles":[]},"previous":{"title":"Configuration","level":"1.4","depth":1,"path":"configuration.md","ref":"configuration.md","articles":[]},"dir":"ltr"},"config":{"gitbook":"*","theme":"default","variables":{},"plugins":[],"pluginsConfig":{"highlight":{},"search":{},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"fontsettings":{"theme":"white","family":"sans","size":2},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"}},"file":{"path":"hindsight_cli.md","mtime":"2017-05-15T15:00:25.308Z","type":"markdown"},"gitbook":{"version":"3.2.2","time":"2017-11-10T19:08:23.115Z"},"basePath":".","book":{"language":""}});
+            gitbook.page.hasChanged({"page":{"title":"Command Line Version","level":"1.5","depth":1,"next":{"title":"Heka Sandbox Documentation","level":"1.6","depth":1,"url":"http://mozilla-services.github.io/lua_sandbox/heka/index.html","ref":"http://mozilla-services.github.io/lua_sandbox/heka/index.html","articles":[]},"previous":{"title":"Configuration","level":"1.4","depth":1,"path":"configuration.md","ref":"configuration.md","articles":[]},"dir":"ltr"},"config":{"gitbook":"*","theme":"default","variables":{},"plugins":["collapsible-menu","navigator"],"pluginsConfig":{"collapsible-menu":{},"navigator":{},"highlight":{},"search":{},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"fontsettings":{"theme":"white","family":"sans","size":2},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"}},"file":{"path":"hindsight_cli.md","mtime":"2017-05-15T15:16:34.139Z","type":"markdown"},"gitbook":{"version":"3.2.2","time":"2018-01-03T19:19:56.062Z"},"basePath":".","book":{"language":""}});
         });
     </script>
 </div>
@@ -296,6 +300,10 @@ e.g., 6 indicates an input and analysis termination.<ul>
         
     <script src="gitbook/gitbook.js"></script>
     <script src="gitbook/theme.js"></script>
+    
+        
+        <script src="gitbook/gitbook-plugin-collapsible-menu/plugin.js"></script>
+        
     
         
         <script src="gitbook/gitbook-plugin-search/search-engine.js"></script>

@@ -4,7 +4,7 @@
     <head>
         <meta charset="UTF-8">
         <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
-        <title>Hindsight (0.14.6) · GitBook</title>
+        <title>Hindsight (0.14.7) · GitBook</title>
         <meta http-equiv="X-UA-Compatible" content="IE=edge" />
         <meta name="description" content="">
         <meta name="generator" content="GitBook 3.2.2">
@@ -15,6 +15,10 @@
     <link rel="stylesheet" href="gitbook/style.css">
 
     
+            
+                
+                <link rel="stylesheet" href="gitbook/gitbook-plugin-navigator/plugin.css">
+                
             
                 
                 <link rel="stylesheet" href="gitbook/gitbook-plugin-highlight/website.css">
@@ -92,7 +96,7 @@
                 <a href="./">
             
                     
-                    Hindsight (0.14.6)
+                    Hindsight (0.14.7)
             
                 </a>
             
@@ -208,7 +212,7 @@
     <!-- Title -->
     <h1>
         <i class="fa fa-circle-o-notch fa-spin"></i>
-        <a href="." >Hindsight (0.14.6)</a>
+        <a href="." >Hindsight (0.14.7)</a>
     </h1>
 </div>
 
@@ -223,8 +227,8 @@
     
                                 <section class="normal markdown-section">
                                 
-                                <h1 id="hindsight">Hindsight</h1>
-<h2 id="overview">Overview</h2>
+                                <h1 id="Hindsight">Hindsight</h1>
+<h2 id="Overview">1. Overview</h2>
 <p>Hindsight is a C based data processing infrastructure based on the
 <a href="https://github.com/mozilla-services/lua_sandbox" target="_blank">lua sandbox</a> project. I have
 received several inquiries about a lighter weight and faster data pipeline with
@@ -232,7 +236,7 @@ delivery guarantees to replace <a href="https://github.com/mozilla-services/heka
 Hindsight is that light weight skeleton around the same lua sandbox offering &apos;at
 least once&apos; delivery semantics.</p>
 <p>So how much lighter and faster? see: <a href="performance.html">Performance</a></p>
-<h2 id="table-of-contents">Table of Contents</h2>
+<h2 id="Table_of_Contents">2. Table of Contents</h2>
 <ul>
 <li><a href="architecture.html">Architecture</a></li>
 <li><a href="configuration.html">Configuration</a></li>
@@ -240,7 +244,7 @@ least once&apos; delivery semantics.</p>
 <li><a href="http://mozilla-services.github.io/lua_sandbox/heka/index.html" target="_blank">Heka Sandbox Documentation</a></li>
 <li><a href="http://mozilla-services.github.io/lua_sandbox_extensions/index.html" target="_blank">Sandbox Extensions Documentation</a></li>
 </ul>
-<h3 id="differences-from-heka">Differences from Heka</h3>
+<h3 id="Differences_from_Heka">2.1. Differences from Heka</h3>
 <ol>
 <li><a href="http://mozilla-services.github.io/lua_sandbox/heka/index.html#sandbox-api-changes-from-the-go-heka-sandbox" target="_blank">Sandbox API Differences</a></li>
 <li>The message matcher now uses Lua string match patterns instead of RE2
@@ -257,7 +261,7 @@ burden is removed from the plugin writer, this also alters the plugin API
 slightly and should greatly lower the checkpoint related IOPS when compared
 to Heka).</li>
 </ol>
-
+<div id="anchors-navbar"><i class="fa fa-anchor"></i><ul><p><a href="#Hindsight">Hindsight</a></p><li><a href="#Overview">1. Overview</a></li><li><a href="#Table_of_Contents">2. Table of Contents</a></li><ul><li><a href="#Differences_from_Heka">2.1. Differences from Heka</a></li></ul></ul></div><a href="#Overview" id="goTop"><i class="fa fa-arrow-up"></i></a>
                                 
                                 </section>
                             
@@ -296,7 +300,7 @@ to Heka).</li>
     <script>
         var gitbook = gitbook || [];
         gitbook.push(function() {
-            gitbook.page.hasChanged({"page":{"title":"Hindsight (0.14.6)","level":"1.1","depth":1,"next":{"title":"Architecture","level":"1.2","depth":1,"path":"architecture.md","ref":"architecture.md","articles":[]},"dir":"ltr"},"config":{"gitbook":"*","theme":"default","variables":{},"plugins":[],"pluginsConfig":{"highlight":{},"search":{},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"fontsettings":{"theme":"white","family":"sans","size":2},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"}},"file":{"path":"README.md","mtime":"2017-05-15T15:00:25.308Z","type":"markdown"},"gitbook":{"version":"3.2.2","time":"2017-11-10T19:08:23.115Z"},"basePath":".","book":{"language":""}});
+            gitbook.page.hasChanged({"page":{"title":"Hindsight (0.14.7)","level":"1.1","depth":1,"next":{"title":"Architecture","level":"1.2","depth":1,"path":"architecture.md","ref":"architecture.md","articles":[]},"dir":"ltr"},"config":{"gitbook":"*","theme":"default","variables":{},"plugins":["collapsible-menu","navigator"],"pluginsConfig":{"collapsible-menu":{},"navigator":{},"highlight":{},"search":{},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"fontsettings":{"theme":"white","family":"sans","size":2},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"}},"file":{"path":"README.md","mtime":"2017-05-15T15:16:34.139Z","type":"markdown"},"gitbook":{"version":"3.2.2","time":"2018-01-03T19:19:56.062Z"},"basePath":".","book":{"language":""}});
         });
     </script>
 </div>
@@ -304,6 +308,10 @@ to Heka).</li>
         
     <script src="gitbook/gitbook.js"></script>
     <script src="gitbook/theme.js"></script>
+    
+        
+        <script src="gitbook/gitbook-plugin-collapsible-menu/plugin.js"></script>
+        
     
         
         <script src="gitbook/gitbook-plugin-search/search-engine.js"></script>
