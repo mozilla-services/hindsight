@@ -63,6 +63,22 @@ static void update_checkpoint(hs_output_plugin *p)
 }
 
 
+static void remove_checkpoint_q(hs_output_plugins *plugins,
+                               const char *plugin_name,
+                               char q)
+{
+  char key[HS_MAX_PATH];
+  if (q >= 'b') {
+    snprintf(key, HS_MAX_PATH, "%s->%s", hs_input_dir, plugin_name);
+    hs_remove_checkpoint(plugins->cpr, key);
+  }
+  if (q <= 'b') {
+    snprintf(key, HS_MAX_PATH, "%s->%s", hs_analysis_dir, plugin_name);
+    hs_remove_checkpoint(plugins->cpr, key);
+  }
+}
+
+
 static int update_checkpoint_callback(void *parent, void *sequence_id)
 {
   hs_output_plugin *p = parent;
@@ -509,15 +525,7 @@ static void* input_thread(void *arg)
     hs_log(NULL, p->name, 6, "detaching received: %d msg: %s", ret, err);
     hs_save_termination_err(plugins->cfg, p->name, err);
     if (p->rm_cp_terminate) {
-      char key[HS_MAX_PATH];
-      if (p->read_queue >= 'b') {
-        snprintf(key, HS_MAX_PATH, "%s->%s", hs_input_dir, p->name);
-        hs_remove_checkpoint(plugins->cpr, key);
-      }
-      if (p->read_queue <= 'b') {
-        snprintf(key, HS_MAX_PATH, "%s->%s", hs_analysis_dir, p->name);
-        hs_remove_checkpoint(plugins->cpr, key);
-      }
+      remove_checkpoint_q(plugins, p->name, p->read_queue);
     }
     pthread_mutex_lock(&plugins->list_lock);
 #ifdef HINDSIGHT_CLI
@@ -554,9 +562,10 @@ static void remove_plugin(hs_output_plugins *plugins, int idx)
 }
 
 
-static void remove_from_output_plugins(hs_output_plugins *plugins,
-                                       const char *name)
+static bool
+remove_from_output_plugins(hs_output_plugins *plugins, const char *name)
 {
+  bool removed = false;
   const size_t tlen = strlen(hs_output_dir) + 1;
   hs_output_plugin *p;
   pthread_mutex_lock(&plugins->list_lock);
@@ -567,21 +576,12 @@ static void remove_from_output_plugins(hs_output_plugins *plugins,
     char *pos = p->name + tlen;
     if (strstr(name, pos) && strlen(pos) == strlen(name) - HS_EXT_LEN) {
       remove_plugin(plugins, i);
-      char key[HS_MAX_PATH];
-      if (p->read_queue >= 'b') {
-        snprintf(key, HS_MAX_PATH, "%s->%s.%.*s", hs_input_dir,
-                 hs_output_dir, (int)strlen(name) - HS_EXT_LEN, name);
-        hs_remove_checkpoint(plugins->cpr, key);
-      }
-      if (p->read_queue <= 'b') {
-        snprintf(key, HS_MAX_PATH, "%s->%s.%.*s", hs_analysis_dir,
-                 hs_output_dir, (int)strlen(name) - HS_EXT_LEN, name);
-        hs_remove_checkpoint(plugins->cpr, key);
-      }
+      removed = true;
       break;
     }
   }
   pthread_mutex_unlock(&plugins->list_lock);
+  return removed;
 }
 
 
@@ -637,9 +637,7 @@ static void add_to_output_plugins(hs_output_plugins *plugins,
     p->cur.input.id = p->cp.input.id = p->input.cp.id;
     p->cur.input.offset = p->cp.input.offset = p->input.cp.offset;
   } else {
-    char key[HS_MAX_PATH];
-    snprintf(key, HS_MAX_PATH, "%s->%s", hs_input_dir, p->name);
-    hs_remove_checkpoint(plugins->cpr, key);
+    remove_checkpoint_q(plugins, p->name, 'i');
   }
 
   if (p->read_queue <= 'b') {
@@ -651,9 +649,7 @@ static void add_to_output_plugins(hs_output_plugins *plugins,
     p->cur.analysis.id = p->cp.analysis.id = p->analysis.cp.id;
     p->cur.analysis.offset = p->cp.analysis.offset = p->analysis.cp.offset;
   } else {
-    char key[HS_MAX_PATH];
-    snprintf(key, HS_MAX_PATH, "%s->%s", hs_analysis_dir, p->name);
-    hs_remove_checkpoint(plugins->cpr, key);
+    remove_checkpoint_q(plugins, p->name, 'a');
   }
 
   int ret = pthread_create(&p->thread, NULL, input_thread, (void *)p);
@@ -823,26 +819,46 @@ void hs_load_output_startup(hs_output_plugins *plugins)
 }
 
 
-void hs_load_output_dynamic(hs_output_plugins *plugins, const char *name)
+static void remove_checkpoints(hs_output_plugins *plugins, const char *filename)
+{
+  char key[HS_MAX_PATH];
+  int fnlen = strlen(filename);
+
+  snprintf(key, HS_MAX_PATH, "%s->%s.%.*s", hs_input_dir,
+           hs_output_dir, fnlen - HS_EXT_LEN, filename);
+  hs_remove_checkpoint(plugins->cpr, key);
+
+  snprintf(key, HS_MAX_PATH, "%s->%s.%.*s", hs_analysis_dir,
+           hs_output_dir, fnlen - HS_EXT_LEN, filename);
+  hs_remove_checkpoint(plugins->cpr, key);
+}
+
+
+void hs_load_output_dynamic(hs_output_plugins *plugins, const char *filename)
 {
   hs_config *cfg = plugins->cfg;
   const char *lpath = cfg->load_path_output;
   const char *rpath = cfg->run_path_output;
 
-  if (hs_has_ext(name, hs_lua_ext)) {
-    process_lua(plugins, name);
+  if (hs_has_ext(filename, hs_lua_ext)) {
+    process_lua(plugins, filename);
     return;
   }
 
-  switch (hs_process_load_cfg(lpath, rpath, name)) {
-  case 0:
-    remove_from_output_plugins(plugins, name);
+  switch (hs_process_load_cfg(lpath, rpath, filename)) {
+  case 0: // stop
+    if (remove_from_output_plugins(plugins, filename)) {
+      remove_checkpoints(plugins, filename);
+    }
     break;
-  case 1: // load
-    remove_from_output_plugins(plugins, name);
+  case 1: // load/reload
     {
+      bool rm_cp_terminate = false;
+      bool loaded = false;
+      bool removed = remove_from_output_plugins(plugins, filename);
       hs_sandbox_config sbc;
-      if (hs_load_sandbox_config(rpath, name, &sbc, &cfg->opd, 'o')) {
+      if (hs_load_sandbox_config(rpath, filename, &sbc, &cfg->opd, 'o')) {
+        rm_cp_terminate = sbc.rm_cp_terminate;
         hs_output_plugin *p = create_output_plugin(cfg, &sbc);
         if (p) {
           p->plugins = plugins;
@@ -851,6 +867,7 @@ void hs_load_output_dynamic(hs_output_plugins *plugins, const char *name)
           hs_init_input(&p->analysis, cfg->max_message_size, cfg->output_path,
                         p->name);
           add_to_output_plugins(plugins, p, true);
+          loaded = true;
         } else {
 #ifdef HINDSIGHT_CLI
           pthread_mutex_lock(&plugins->list_lock);
@@ -862,10 +879,13 @@ void hs_load_output_dynamic(hs_output_plugins *plugins, const char *name)
         }
         hs_free_sandbox_config(&sbc);
       }
+      if (removed && !loaded && rm_cp_terminate) {
+        remove_checkpoints(plugins, filename);
+      }
     }
     break;
   default:
-    hs_log(NULL, g_module, 7, "%s ignored %s", __func__, name);
+    hs_log(NULL, g_module, 7, "%s ignored %s", __func__, filename);
     break;
   }
 }
