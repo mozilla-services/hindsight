@@ -40,6 +40,7 @@ static const char *cfg_install_path = "sandbox_install_path";
 static const char *cfg_threads = "analysis_threads";
 static const char *cfg_analysis_lua_path = "analysis_lua_path";
 static const char *cfg_analysis_lua_cpath = "analysis_lua_cpath";
+static const char *cfg_analysis_utilization_limit = "analysis_utilization_limit";
 static const char *cfg_io_lua_path = "io_lua_path";
 static const char *cfg_io_lua_cpath = "io_lua_cpath";
 static const char *cfg_max_message_size = "max_message_size";
@@ -111,6 +112,7 @@ static void init_config(hs_config *cfg)
   cfg->hostname = NULL;
   cfg->output_size = 1024 * 1024 * 64;
   cfg->analysis_threads = 1;
+  cfg->analysis_utilization_limit = 95;
   cfg->max_message_size = 1024 * 64;
   cfg->backpressure = 0;
   cfg->backpressure_df = 4;
@@ -189,6 +191,32 @@ static int get_unsigned_int(lua_State *L, int idx, const char *name,
       return 1;
     }
     *val = (unsigned)d;
+    break;
+  case LUA_TNIL:
+    break; // use the default
+  default:
+    lua_pushfstring(L, "%s must be set to a number", name);
+    return 1;
+  }
+  remove_item(L, idx, name);
+  return 0;
+}
+
+
+static int get_uint8(lua_State *L, int idx, const char *name,
+                     uint8_t *val)
+{
+  lua_getfield(L, idx, name);
+  int t = lua_type(L, -1);
+  double d;
+  switch (t) {
+  case LUA_TNUMBER:
+    d = lua_tonumber(L, -1);
+    if (d < 0 || d > UINT8_MAX) {
+      lua_pushfstring(L, "%s must be a uint8_t", name);
+      return 1;
+    }
+    *val = (uint8_t)d;
     break;
   case LUA_TNIL:
     break; // use the default
@@ -593,6 +621,14 @@ int hs_load_config(const char *fn, hs_config *cfg)
                         "");
   if (ret) goto cleanup;
 
+  ret = get_uint8(L, LUA_GLOBALSINDEX, cfg_analysis_utilization_limit,
+                  &cfg->analysis_utilization_limit);
+  if (cfg->analysis_utilization_limit > 100) {
+    lua_pushfstring(L, "%s must be 0-100", cfg_analysis_utilization_limit);
+    ret = 1;
+    goto cleanup;
+  }
+
   size_t len = strlen(cfg->load_path) + strlen(hs_input_dir) + 2;
   cfg->load_path_input = malloc(len);
   if (!cfg->load_path_input) {
@@ -689,8 +725,8 @@ int hs_load_config(const char *fn, hs_config *cfg)
            cfg->hostname);
   }
 
-  ret = get_unsigned_int(L, LUA_GLOBALSINDEX, cfg_threads,
-                         &cfg->analysis_threads);
+  ret = get_uint8(L, LUA_GLOBALSINDEX, cfg_threads,
+                  &cfg->analysis_threads);
   if (cfg->analysis_threads < 1
       || cfg->analysis_threads > HS_MAX_ANALYSIS_THREADS) {
     lua_pushfstring(L, "%s must be 1-%d", cfg_threads, HS_MAX_ANALYSIS_THREADS);

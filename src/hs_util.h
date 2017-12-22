@@ -101,4 +101,14 @@ void hs_save_termination_err(const hs_config *cfg,
                              const char *name,
                              const char *err);
 
+/**
+ * Deletes the specified file
+ *
+ * @param path Path to the file
+ * @param file Filename
+ *
+ * @return bool True if the file is removed
+ */
+bool hs_remove_file(const char *path, const char *file);
+
 #endif

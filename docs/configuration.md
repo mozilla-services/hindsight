@@ -30,6 +30,8 @@
     packages default: `/usr/share/luasandbox/sandboxes/heka`. This path should
     contain the input, analysis, and output subdirectory structure.
 * **analysis_threads** - number of analysis threads to run (count, max 64)
+* **analysis_utilization_limit** - percent utilization where dynamic loading is
+    blocked (0-100 default 95 (0 to disable))
 * **analysis_lua_path** - path used by the analysis plugins to look for Lua
   modules
 * **analysis_lua_cpath** - path used by the analysis plugins to look for Lua C

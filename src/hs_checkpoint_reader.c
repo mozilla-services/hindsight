@@ -11,6 +11,7 @@
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
+#include <inttypes.h>
 #include <luasandbox/lauxlib.h>
 #include <luasandbox/lualib.h>
 #include <stdlib.h>
@@ -305,11 +306,11 @@ void hs_remove_checkpoint(hs_checkpoint_reader *cpr,
 
 void hs_cleanup_checkpoints(hs_checkpoint_reader *cpr,
                             const char *run_path,
-                            int analysis_threads)
+                            uint8_t analysis_threads)
 {
   const char *key;
   const char *subkey;
-  int analysis_thread;
+  uint8_t analysis_thread;
   char type[HS_MAX_PATH];
   char name[HS_MAX_PATH];
   char path[HS_MAX_PATH];
@@ -321,7 +322,7 @@ void hs_cleanup_checkpoints(hs_checkpoint_reader *cpr,
       key = lua_tostring(cpr->values, -2);
       subkey = strstr(key, "->");
       subkey = subkey ? subkey + strlen("->") : key;
-      if (sscanf(subkey, "analysis%d", &analysis_thread) == 1) {
+      if (sscanf(subkey, "analysis%" SCNu8, &analysis_thread) == 1) {
         if (analysis_thread >= analysis_threads) {
           // analysis thread does not exist anymore
           remove_checkpoint(cpr, key);
