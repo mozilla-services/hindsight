@@ -221,6 +221,11 @@ static void remove_plugin(hs_analysis_thread *at, int idx)
   destroy_analysis_plugin(p);
   p = NULL;
   --at->list_cnt;
+  if (at->utilization > 5) {
+    at->utilization -= 5;
+  } else {
+    at->utilization = 0;
+  }
   at->max_mps = 0; // invalidate the measure and switch back to the estimate
 }
 
@@ -247,6 +252,11 @@ static void add_plugin(hs_analysis_thread *at, hs_analysis_plugin *p, int idx)
 {
   hs_log(NULL, p->name, 6, "adding to thread: %d", at->tid);
   at->list[idx] = p;
+ if (UINT8_MAX - at->utilization > 5) {
+    at->utilization += 5;
+  } else {
+    at->utilization = UINT8_MAX;
+  }
   ++at->list_cnt;
 }
 
@@ -809,9 +819,9 @@ void hs_load_analysis_startup(hs_analysis_plugins *plugins)
 
 static unsigned least_used_thread_id(hs_analysis_plugins *plugins)
 {
-  unsigned tid  = 0;
-  int min_util  = INT_MAX;
-  int min_cnt   = INT_MAX;
+  unsigned tid      = 0;
+  uint8_t min_util  = UINT8_MAX;
+  int min_cnt       = INT_MAX;
 
   for (int i = 0; i < plugins->thread_cnt; ++i) {
     hs_analysis_thread *at = &plugins->list[i];
@@ -823,6 +833,10 @@ static unsigned least_used_thread_id(hs_analysis_plugins *plugins)
       tid = (unsigned)i;
     }
     pthread_mutex_unlock(&at->list_lock);
+  }
+  if (plugins->cfg->analysis_utilization_limit &&
+      min_util >= plugins->cfg->analysis_utilization_limit) {
+      tid = UINT_MAX;
   }
   return tid;
 }
@@ -841,7 +855,7 @@ static bool ext_exists(const char *dir, const char *name, const char *ext)
 }
 
 
-static int get_thread_id(hs_config *cfg, const char *name, unsigned *tid)
+static bool get_thread_id(hs_config *cfg, const char *name, unsigned *tid)
 {
   if (hs_has_ext(name, hs_cfg_ext)) {
     *tid = get_tid(cfg->load_path_analysis, name);
@@ -855,17 +869,12 @@ static int get_thread_id(hs_config *cfg, const char *name, unsigned *tid)
     }
 
     if (otid != *tid) { // mis-matched cfgs so remove the load .cfg
-      char path[HS_MAX_PATH];
-      if (hs_get_fqfn(cfg->load_path_analysis, name, path, sizeof(path))) {
-        hs_log(NULL, g_module, 0, "load off path too long");
-        exit(EXIT_FAILURE);
-      }
-      if (unlink(path)) {
-        hs_log(NULL, g_module, 3, "failed to delete: %s errno: %d", path,
-               errno);
-      }
       hs_log(NULL, g_module, 3, "plugin cannot be restarted on a different "
              "thread: %s", name);
+      if (!hs_remove_file(cfg->load_path_analysis, name)) {
+        hs_log(NULL, g_module, 3, "failed to delete: %s/%s errno: %d",
+               cfg->load_path_analysis, name, errno);
+      }
       return false;
     }
     return true;
@@ -877,14 +886,10 @@ static int get_thread_id(hs_config *cfg, const char *name, unsigned *tid)
     if (*tid != UINT_MAX) {
       return true;
     }
-
     // no .rtc was found so remove the .off flag
-    if (hs_get_fqfn(cfg->load_path_analysis, name, path, sizeof(path))) {
-      hs_log(NULL, g_module, 0, "load off path too long");
-      exit(EXIT_FAILURE);
-    }
-    if (unlink(path)) {
-      hs_log(NULL, g_module, 3, "failed to delete: %s errno: %d", path, errno);
+    if (!hs_remove_file(cfg->load_path_analysis, name)) {
+      hs_log(NULL, g_module, 3, "failed to delete: %s/%s errno: %d",
+             cfg->load_path_analysis, name, errno);
     }
   }
   return false;
@@ -904,13 +909,25 @@ void hs_load_analysis_dynamic(hs_analysis_plugins *plugins, const char *name)
 
   unsigned tid = UINT_MAX;
   if (!get_thread_id(cfg, name, &tid)) {
-    hs_log(NULL, g_module, 7, "%s ignored %s", __func__, name);
+    hs_log(NULL, g_module, 7, "%s discarded %s", __func__, name);
+    if (!hs_remove_file(cfg->load_path_analysis, name)) {
+      hs_log(NULL, g_module, 3, "failed to delete: %s/%s errno: %d",
+             cfg->load_path_analysis, name, errno);
+    }
     return;
   }
 
   bool dynamic = tid == UINT_MAX;
   if (dynamic) {
     tid  = least_used_thread_id(plugins);
+  }
+  if (tid == UINT_MAX) {
+    hs_log(NULL, g_module, 7, "%s blocked (over capacity) %s", __func__, name);
+    if (!hs_remove_file(cfg->load_path_analysis, name)) {
+      hs_log(NULL, g_module, 3, "failed to delete: %s/%s errno: %d",
+             cfg->load_path_analysis, name, errno);
+    }
+    return;
   }
   int tidx = tid % plugins->thread_cnt;
 

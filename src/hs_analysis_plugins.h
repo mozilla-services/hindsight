@@ -16,6 +16,7 @@
 #include <pthread.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <time.h>
 
 #include "hs_config.h"
@@ -71,7 +72,7 @@ struct hs_analysis_thread {
   int       tid;
   int       mm_delta_cnt;
   int       max_mps;
-  int       utilization;
+  uint8_t   utilization;
   bool      stop;
   bool      sample;
 #ifdef HINDSIGHT_CLI

@@ -12,6 +12,7 @@
 #include <luasandbox/lua.h>
 #include <luasandbox/util/output_buffer.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #define HS_EXT_LEN 4
 #define HS_MAX_PATH 260
@@ -72,10 +73,11 @@ typedef struct hs_config
 
   unsigned max_message_size;
   unsigned output_size;
-  unsigned analysis_threads;
   unsigned backpressure;
   unsigned backpressure_df;
   int      pid;
+  uint8_t  analysis_threads;
+  uint8_t  analysis_utilization_limit;
 
   hs_sandbox_config ipd; // input plugin defaults
   hs_sandbox_config apd; // analysis plugin defaults
