@@ -1,0 +1,4 @@
+Timer	Count	Min	Max	Avg	SD
+bar	1	24	24	24	0
+widget	2	50	60	55	7.07107
+foo	4	100	123	109.5	9.88264
