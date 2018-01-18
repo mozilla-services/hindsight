@@ -98,7 +98,7 @@
                 <a href="./">
             
                     
-                    Hindsight (0.14.7)
+                    Hindsight (0.14.8)
             
                 </a>
             
@@ -158,7 +158,20 @@
             
         </li>
     
-        <li class="chapter " data-level="1.6" >
+        <li class="chapter " data-level="1.6" data-path="hindsight_timer_report.html">
+            
+                <a href="hindsight_timer_report.html">
+            
+                    
+                    Execution Profiling
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.7" >
             
                 <a target="_blank" href="http://mozilla-services.github.io/lua_sandbox/heka/index.html">
             
@@ -171,7 +184,7 @@
             
         </li>
     
-        <li class="chapter " data-level="1.7" >
+        <li class="chapter " data-level="1.8" >
             
                 <a target="_blank" href="http://mozilla-services.github.io/lua_sandbox_extensions/index.html">
             
@@ -266,6 +279,8 @@ analysis plugins</li>
   packages default: <code>/usr/share/luasandbox/sandboxes/heka</code>. This path should
   contain the input, analysis, and output subdirectory structure.</li>
 <li><strong>analysis_threads</strong> - number of analysis threads to run (count, max 64)</li>
+<li><strong>analysis_utilization_limit</strong> - percent utilization where dynamic loading is
+  blocked (0-100 default 95 (0 to disable))</li>
 <li><strong>analysis_lua_path</strong> - path used by the analysis plugins to look for Lua
 modules</li>
 <li><strong>analysis_lua_cpath</strong> - path used by the analysis plugins to look for Lua C
@@ -471,7 +486,7 @@ number of message checkpoints to hold in memory. i.e., if the output can have
     <script>
         var gitbook = gitbook || [];
         gitbook.push(function() {
-            gitbook.page.hasChanged({"page":{"title":"Configuration","level":"1.4","depth":1,"next":{"title":"Command Line Version","level":"1.5","depth":1,"path":"hindsight_cli.md","ref":"hindsight_cli.md","articles":[]},"previous":{"title":"Performance","level":"1.3","depth":1,"path":"performance.md","ref":"performance.md","articles":[]},"dir":"ltr"},"config":{"gitbook":"*","theme":"default","variables":{},"plugins":["collapsible-menu","navigator"],"pluginsConfig":{"collapsible-menu":{},"navigator":{},"highlight":{},"search":{},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"fontsettings":{"theme":"white","family":"sans","size":2},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"}},"file":{"path":"configuration.md","mtime":"2017-11-17T17:00:56.877Z","type":"markdown"},"gitbook":{"version":"3.2.2","time":"2018-01-03T19:19:56.062Z"},"basePath":".","book":{"language":""}});
+            gitbook.page.hasChanged({"page":{"title":"Configuration","level":"1.4","depth":1,"next":{"title":"Command Line Version","level":"1.5","depth":1,"path":"hindsight_cli.md","ref":"hindsight_cli.md","articles":[]},"previous":{"title":"Performance","level":"1.3","depth":1,"path":"performance.md","ref":"performance.md","articles":[]},"dir":"ltr"},"config":{"gitbook":"*","theme":"default","variables":{},"plugins":["collapsible-menu","navigator"],"pluginsConfig":{"collapsible-menu":{},"navigator":{},"highlight":{},"search":{},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"fontsettings":{"theme":"white","family":"sans","size":2},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"}},"file":{"path":"configuration.md","mtime":"2018-01-18T17:17:22.628Z","type":"markdown"},"gitbook":{"version":"3.2.2","time":"2018-01-18T18:03:17.694Z"},"basePath":".","book":{"language":""}});
         });
     </script>
 </div>

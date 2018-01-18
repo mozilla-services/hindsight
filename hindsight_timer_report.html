@@ -4,7 +4,7 @@
     <head>
         <meta charset="UTF-8">
         <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
-        <title>Hindsight (0.14.8) · GitBook</title>
+        <title>Execution Profiling · GitBook</title>
         <meta http-equiv="X-UA-Compatible" content="IE=edge" />
         <meta name="description" content="">
         <meta name="generator" content="GitBook 3.2.2">
@@ -61,8 +61,8 @@
     <link rel="shortcut icon" href="gitbook/images/favicon.ico" type="image/x-icon">
 
     
-    <link rel="next" href="architecture.html" />
     
+    <link rel="prev" href="hindsight_cli.html" />
     
 
     </head>
@@ -91,7 +91,7 @@
         
         
     
-        <li class="chapter active" data-level="1.1" data-path="./">
+        <li class="chapter " data-level="1.1" data-path="./">
             
                 <a href="./">
             
@@ -156,7 +156,7 @@
             
         </li>
     
-        <li class="chapter " data-level="1.6" data-path="hindsight_timer_report.html">
+        <li class="chapter active" data-level="1.6" data-path="hindsight_timer_report.html">
             
                 <a href="hindsight_timer_report.html">
             
@@ -225,7 +225,7 @@
     <!-- Title -->
     <h1>
         <i class="fa fa-circle-o-notch fa-spin"></i>
-        <a href="." >Hindsight (0.14.8)</a>
+        <a href="." >Execution Profiling</a>
     </h1>
 </div>
 
@@ -240,41 +240,47 @@
     
                                 <section class="normal markdown-section">
                                 
-                                <h1 id="Hindsight">Hindsight</h1>
-<h2 id="Overview">1. Overview</h2>
-<p>Hindsight is a C based data processing infrastructure based on the
-<a href="https://github.com/mozilla-services/lua_sandbox" target="_blank">lua sandbox</a> project. I have
-received several inquiries about a lighter weight and faster data pipeline with
-delivery guarantees to replace <a href="https://github.com/mozilla-services/heka" target="_blank">Heka</a>.
-Hindsight is that light weight skeleton around the same lua sandbox offering &apos;at
-least once&apos; delivery semantics.</p>
-<p>So how much lighter and faster? see: <a href="performance.html">Performance</a></p>
-<h2 id="Table_of_Contents">2. Table of Contents</h2>
-<ul>
-<li><a href="architecture.html">Architecture</a></li>
-<li><a href="configuration.html">Configuration</a></li>
-<li><a href="hindsight_cli.html">Command Line Version</a></li>
-<li><a href="http://mozilla-services.github.io/lua_sandbox/heka/index.html" target="_blank">Heka Sandbox Documentation</a></li>
-<li><a href="http://mozilla-services.github.io/lua_sandbox_extensions/index.html" target="_blank">Sandbox Extensions Documentation</a></li>
-</ul>
-<h3 id="Differences_from_Heka">2.1. Differences from Heka</h3>
-<ol>
-<li><a href="http://mozilla-services.github.io/lua_sandbox/heka/index.html#sandbox-api-changes-from-the-go-heka-sandbox" target="_blank">Sandbox API Differences</a></li>
-<li>The message matcher now uses Lua string match patterns instead of RE2
-expressions.</li>
-<li>Looping messages in Heka (injecting messages back to an earlier point in the
-pipeline) has always been a bad idea so it was removed. Most looping
-requirements can be flattened out: i.e., alerting can be handled in the output
-plugins, aggregation/sessionization can be handled in the inputs.</li>
-<li>Splitters/Decoders/Encoders no longer exist they simply become part of the
-input/output plugins respectively. The common functionality should now be broken
-out into Lua modules to allow for re-use in different plugins.</li>
-<li>Checkpoint are all managed by the Hindsight infrastructure (so much of the
-burden is removed from the plugin writer, this also alters the plugin API
-slightly and should greatly lower the checkpoint related IOPS when compared
-to Heka).</li>
-</ol>
-<div id="anchors-navbar"><i class="fa fa-anchor"></i><ul><p><a href="#Hindsight">Hindsight</a></p><li><a href="#Overview">1. Overview</a></li><li><a href="#Table_of_Contents">2. Table of Contents</a></li><ul><li><a href="#Differences_from_Heka">2.1. Differences from Heka</a></li></ul></ul></div><a href="#Overview" id="goTop"><i class="fa fa-arrow-up"></i></a>
+                                <h1 id="Hindsight_Timer_Report">Hindsight Timer Report</h1>
+<p>A command line utility that generates a report of timer measurements from the
+Hindsight log. The utility extracts matched sets of start/end prefixes and then
+computes the count, min, max, average and standard deviation outputting the
+results to stdout as a tsv. The prefix consists of
+(START_TIMER|END_TIMER):<timer_name> and is output with the print function
+(only available when Hindsight has debug logging enabled).</timer_name></p>
+<pre><code>usage: hindsight_timer_report &lt;hindsight log file&gt;
+</code></pre><h2 id="Code">1. Code</h2>
+<pre><code class="lang-lua"><span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;START_TIMER:foo&quot;</span>)
+<span class="hljs-comment">--- do foo</span>
+<span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;END_TIMER:foo&quot;</span>)
+</code></pre>
+<h2 id="Log">2. Log</h2>
+<pre><code>1515017287796327572 [debug] START_TIMER:foo
+1515017287796347586 [debug] END_TIMER:foo
+`
+</code></pre><h2 id="Output">3. Output</h2>
+<table>
+<thead>
+<tr>
+<th>Timer</th>
+<th>Count</th>
+<th>Min</th>
+<th>Max</th>
+<th>Avg</th>
+<th>SD</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>foo</td>
+<td>1</td>
+<td>20014</td>
+<td>20014</td>
+<td>20014</td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+<div id="anchors-navbar"><i class="fa fa-anchor"></i><ul><p><a href="#Hindsight_Timer_Report">Hindsight Timer Report</a></p><li><a href="#Code">1. Code</a></li><li><a href="#Log">2. Log</a></li><li><a href="#Output">3. Output</a></li></ul></div><a href="#Code" id="goTop"><i class="fa fa-arrow-up"></i></a>
                                 
                                 </section>
                             
@@ -301,10 +307,10 @@ to Heka).</li>
 
             
                 
-                
-                <a href="architecture.html" class="navigation navigation-next navigation-unique" aria-label="Next page: Architecture">
-                    <i class="fa fa-angle-right"></i>
+                <a href="hindsight_cli.html" class="navigation navigation-prev navigation-unique" aria-label="Previous page: Command Line Version">
+                    <i class="fa fa-angle-left"></i>
                 </a>
+                
                 
             
         
@@ -313,7 +319,7 @@ to Heka).</li>
     <script>
         var gitbook = gitbook || [];
         gitbook.push(function() {
-            gitbook.page.hasChanged({"page":{"title":"Hindsight (0.14.8)","level":"1.1","depth":1,"next":{"title":"Architecture","level":"1.2","depth":1,"path":"architecture.md","ref":"architecture.md","articles":[]},"dir":"ltr"},"config":{"gitbook":"*","theme":"default","variables":{},"plugins":["collapsible-menu","navigator"],"pluginsConfig":{"collapsible-menu":{},"navigator":{},"highlight":{},"search":{},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"fontsettings":{"theme":"white","family":"sans","size":2},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"}},"file":{"path":"README.md","mtime":"2017-05-15T15:00:25.308Z","type":"markdown"},"gitbook":{"version":"3.2.2","time":"2018-01-18T18:03:17.694Z"},"basePath":".","book":{"language":""}});
+            gitbook.page.hasChanged({"page":{"title":"Execution Profiling","level":"1.6","depth":1,"next":{"title":"Heka Sandbox Documentation","level":"1.7","depth":1,"url":"http://mozilla-services.github.io/lua_sandbox/heka/index.html","ref":"http://mozilla-services.github.io/lua_sandbox/heka/index.html","articles":[]},"previous":{"title":"Command Line Version","level":"1.5","depth":1,"path":"hindsight_cli.md","ref":"hindsight_cli.md","articles":[]},"dir":"ltr"},"config":{"gitbook":"*","theme":"default","variables":{},"plugins":["collapsible-menu","navigator"],"pluginsConfig":{"collapsible-menu":{},"navigator":{},"highlight":{},"search":{},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"fontsettings":{"theme":"white","family":"sans","size":2},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"}},"file":{"path":"hindsight_timer_report.md","mtime":"2018-01-18T18:02:58.881Z","type":"markdown"},"gitbook":{"version":"3.2.2","time":"2018-01-18T18:03:17.694Z"},"basePath":".","book":{"language":""}});
         });
     </script>
 </div>
