@@ -12,6 +12,7 @@
 #include <string.h>
 #include <sys/vfs.h>
 #include <time.h>
+#include <unistd.h>
 
 
 bool hs_file_exists(const char *fn)
@@ -119,4 +120,14 @@ void hs_save_termination_err(const hs_config *cfg,
     }
     fclose(fh);
   }
+}
+
+
+bool hs_remove_file(const char *path, const char *file)
+{
+  char fqfn[HS_MAX_PATH];
+  if (hs_get_fqfn(path, file, fqfn, sizeof(fqfn))) {
+    return false;
+  }
+  return unlink(fqfn) == 0 ? true : false;
 }

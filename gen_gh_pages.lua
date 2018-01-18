@@ -27,7 +27,11 @@ local function main()
     local output_dir = string.format("%s/gb-source", arg[3])
     local rv = os.execute(string.format("rsync -rav docs/ %s/", output_dir))
     if rv ~= 0 then error"rsync setup" end
+    local fh = assert(io.open(string.format("%s/book.json", output_dir), "w"))
+    fh:write([[{"plugins" : ["collapsible-menu", "navigator"]}]])
+    fh:close()
 
+    os.execute(string.format("cd %s;gitbook install", output_dir))
     os.execute(string.format("mv %s/index.md %s/README.md", output_dir, output_dir))
     output_menu(output_dir, args[1])
     os.execute(string.format("gitbook build %s", output_dir))

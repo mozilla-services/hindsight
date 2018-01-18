@@ -3,7 +3,7 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 cmake_minimum_required(VERSION 3.0 FATAL_ERROR)
-project(hindsight VERSION 0.14.7 LANGUAGES C)
+project(hindsight VERSION 0.14.8 LANGUAGES C)
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Hindsight")
 set(CPACK_PACKAGE_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
 set(CPACK_PACKAGE_VERSION_MINOR ${PROJECT_VERSION_MINOR})
@@ -44,6 +44,7 @@ set(EMPTY_DIR ${CMAKE_BINARY_DIR}/empty)
 file(MAKE_DIRECTORY ${EMPTY_DIR})
 install(DIRECTORY ${EMPTY_DIR}/ DESTINATION ${INSTALL_SANDBOX_PATH} ${DPERMISSION})
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/sandboxes/ DESTINATION ${INSTALL_SANDBOX_PATH}/heka ${DPERMISSION})
+install(PROGRAMS util/hindsight_timer_report.lua DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 add_subdirectory(src)
 

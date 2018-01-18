@@ -12,6 +12,7 @@
 #include <luasandbox/lua.h>
 #include <pthread.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 
 #define HS_MAX_IP_CHECKPOINT 8192
@@ -77,10 +78,10 @@ void hs_update_input_checkpoint(hs_checkpoint_reader *cpr,
 int hs_output_checkpoints(hs_checkpoint_reader *cpr, FILE *fh);
 
 void hs_remove_checkpoint(hs_checkpoint_reader *cpr,
-                                const char *key);
+                          const char *key);
 
 void hs_cleanup_checkpoints(hs_checkpoint_reader *cpr,
-                                  const char *run_path,
-                                  int analysis_threads);
+                            const char *run_path,
+                            uint8_t analysis_threads);
 
 #endif
