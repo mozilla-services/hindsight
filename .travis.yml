@@ -8,18 +8,18 @@ env:
         - DOCKER_IMAGE=centos:6 CMAKE_URL=auto
         - DOCKER_IMAGE=centos:7 CMAKE_URL=auto
         - DOCKER_IMAGE=debian:7 CMAKE_URL=auto
-        - DOCKER_IMAGE=debian:8
-        - DOCKER_IMAGE=debian:8 CC=clang
-        - DOCKER_IMAGE=debian:stretch
-        - DOCKER_IMAGE=fedora:latest
+        - DOCKER_IMAGE=debian:8 CMAKE_URL=auto
+        - DOCKER_IMAGE=debian:8 CMAKE_URL=auto CC=clang
+        - DOCKER_IMAGE=debian:stretch CMAKE_URL=auto
+        - DOCKER_IMAGE=fedora:latest CMAKE_URL=auto
         - DOCKER_IMAGE=ubuntu:12.04 CMAKE_URL=auto
-        - DOCKER_IMAGE=ubuntu:latest # LTS
-        - DOCKER_IMAGE=ubuntu:devel
+        - DOCKER_IMAGE=ubuntu:latest CMAKE_URL=auto # LTS
+        - DOCKER_IMAGE=ubuntu:devel CMAKE_URL=auto
         # used to build a container for mozilla/hindsight
         - BUILD_CONTAINER=1
 
 script:
-    - if [ ! -z "$DOCKER_IMAGE" ]; then ./build/run.sh build; fi
+    - if [ ! -z "$DOCKER_IMAGE" ]; then ./build/test.sh; fi
     - |
         if [ "$BUILD_CONTAINER" -eq 1 ]; then
             docker build -t "app:build" .

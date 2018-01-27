@@ -47,6 +47,7 @@ install(DIRECTORY ${CMAKE_SOURCE_DIR}/sandboxes/ DESTINATION ${INSTALL_SANDBOX_P
 install(PROGRAMS util/hindsight_timer_report.lua DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 add_subdirectory(src)
+add_subdirectory(tests)
 
 add_custom_target(docs COMMAND lua gen_gh_pages.lua
 "${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}"
