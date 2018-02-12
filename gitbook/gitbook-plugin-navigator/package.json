@@ -9,7 +9,7 @@
         "spec": "1.1.1",
         "type": "version"
       },
-      "/work/tmp/hindsight/release/gb-source"
+      "/work/hindsight/release/gb-source"
     ]
   ],
   "_from": "gitbook-plugin-navigator@1.1.1",
@@ -43,7 +43,7 @@
   "_shasum": "b5e17ce78d89cbecce430599f91c9ee0450a0b95",
   "_shrinkwrap": null,
   "_spec": "gitbook-plugin-navigator@1.1.1",
-  "_where": "/work/tmp/hindsight/release/gb-source",
+  "_where": "/work/hindsight/release/gb-source",
   "author": {
     "name": "zhangzq"
   },
