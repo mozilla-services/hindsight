@@ -569,10 +569,18 @@ void hs_init_analysis_plugins(hs_analysis_plugins *plugins,
 #endif
 
   plugins->list = malloc(sizeof(hs_analysis_thread) * cfg->analysis_threads);
+  if (!plugins->list) {
+    hs_log(NULL, g_module, 0, "plugins->list malloc failed");
+    exit(EXIT_FAILURE);
+  }
   for (unsigned i = 0; i < cfg->analysis_threads; ++i) {
     init_analysis_thread(plugins, i);
   }
   plugins->threads = malloc(sizeof(pthread_t *) * (cfg->analysis_threads));
+  if (!plugins->threads) {
+    hs_log(NULL, g_module, 0, "plugins->threads malloc failed");
+    exit(EXIT_FAILURE);
+  }
 }
 
 

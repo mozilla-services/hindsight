@@ -171,6 +171,10 @@ static int get_string_item(lua_State *L, int idx, const char *name, char **val,
     tmp = dflt;
   }
   *val = malloc(len + 1);
+  if (!*val) {
+    hs_log(NULL, g_module, 0, "%s malloc failed", __func__);
+    exit(EXIT_FAILURE);
+  }
   memcpy(*val, tmp, len + 1);
   remove_item(L, idx, name);
   return 0;
