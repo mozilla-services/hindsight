@@ -27,4 +27,4 @@ print("END_TIMER:foo")
 ## Output
 | Timer | Count | Min | Max | Avg | SD
 |---|---|---|---|---|---
-foo | 1 | 20014 | 20014 | 20014 | 0
+|foo | 1 | 20014 | 20014 | 20014 | 0
