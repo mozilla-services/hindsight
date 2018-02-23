@@ -61,6 +61,8 @@
     <link rel="shortcut icon" href="../gitbook/images/favicon.ico" type="image/x-icon">
 
     
+    <link rel="next" href="cookbooks.html" />
+    
     
 
     </head>
@@ -94,7 +96,7 @@
                 <a href="../">
             
                     
-                    Hindsight (0.14.9)
+                    Hindsight (0.14.10)
             
                 </a>
             
@@ -213,6 +215,19 @@
             
         </li>
     
+        <li class="chapter " data-level="2.2" data-path="cookbooks.html">
+            
+                <a href="cookbooks.html">
+            
+                    
+                    Common Configuration Cookbooks
+            
+                </a>
+            
+
+            
+        </li>
+    
 
     
 
@@ -293,7 +308,7 @@ variable</li>
 decoder/grammar module</li>
 </ul>
 <hr>
-<h2 id="Basic_Syslog_Decoder">2. Basic Syslog Decoder</h2>
+<h2 id="Basic_Syslog_Decoder_Module">2. Basic Syslog Decoder Module</h2>
 <p>This is an example of a basic syslog decoder that extracts the header
 information (timestamp, hostname, pid, programname) and the message string. The
 only thing required to configure the basic syslog decoder is the template
@@ -328,7 +343,7 @@ decoders_syslog = {
     | name: programname type: 0 representation: &lt;nil&gt; value: sshd
 </code></pre>
 <hr>
-<h2 id="Ad-hoc_printf_Syslog_Decoder">3. Ad-hoc printf Syslog Decoder</h2>
+<h2 id="Ad-hoc_printf_Decoder">3. Ad-hoc printf Decoder</h2>
 <p>This is an example of a syslog decoder using an ad-hoc printf parser.  The key
 in the sub_decoders hash is the programname from the syslog and its value is an
 array containing a
@@ -345,7 +360,7 @@ decoders_syslog = {
 
   sub_decoders = {
     foo = {
-      {{<span class="hljs-string">&quot;%s:%lu: invalid line&quot;</span>, <span class="hljs-string">&quot;path&quot;</span>, <span class="hljs-string">&quot;linenum&quot;</span>}, <span class="hljs-keyword">nil</span>},
+      { {<span class="hljs-string">&quot;%s:%lu: invalid line&quot;</span>, <span class="hljs-string">&quot;path&quot;</span>, <span class="hljs-string">&quot;linenum&quot;</span>}, <span class="hljs-keyword">nil</span>},
     },
   },
 }
@@ -368,7 +383,7 @@ decoders_syslog = {
     | name: programname type: 0 representation: &lt;nil&gt; value: foo
 </code></pre>
 <hr>
-<h2 id="Pre-defined_printf_Syslog_Decoder">4. Pre-defined printf Syslog Decoder</h2>
+<h2 id="Pre-defined_printf_Module_Decoder">4. Pre-defined printf Module Decoder</h2>
 <p>This is an example of a syslog decoder using a printf parser library. The value
 in the printf_messages array is the name of a module exporting another
 <a href="https://mozilla-services.github.io/lua_sandbox_extensions/lpeg/modules/lpeg/printf.html#load_messages" target="_blank">printf_messsage</a>
@@ -417,7 +432,7 @@ decoders_syslog = {
     | name: authmsg type: 0 representation: &lt;nil&gt; value: Accepted
 </code></pre>
 <hr>
-<h2 id="Pre-defined_printf_Syslog_Decoder_with_Transformation">5. Pre-defined printf Syslog Decoder with Transformation</h2>
+<h2 id="Pre-defined_printf_Module_Decoder_with_Transformation">5. Pre-defined printf Module Decoder with Transformation</h2>
 <p>This is an example of a syslog decoder using a printf parser library. The value
 in the printf_messages array is the name of a module exporting another
 <a href="https://mozilla-services.github.io/lua_sandbox_extensions/lpeg/modules/lpeg/printf.html#load_messages" target="_blank">printf_messsage</a>
@@ -481,7 +496,7 @@ maxminddb_heka = {
     | name: ssh_remote_ipaddr type: 0 representation: ipv4 value: 173.239.228.74
 </code></pre>
 <hr>
-<h2 id="Lua_Grammar_Module_(LPeg)_Syslog_Decoder">6. Lua Grammar Module (LPeg) Syslog Decoder</h2>
+<h2 id="Lua_Grammar_Module_Decoder">6. Lua Grammar Module Decoder</h2>
 <p>This is an example of a syslog decoder using a grammar module. The key in the
 sub_decoders hash is the programname from the syslog and its value is the module
 name and optional grammar name reference to apply to the matching messages.</p>
@@ -500,9 +515,9 @@ decoders_syslog = {
 }
 </code></pre>
 <h3 id="Input">6.2. Input</h3>
-<pre><code>Feb 14 19:20:21 ubuntu someapp[3453]: foo=bar a=14 baz=&quot;hello kitty&quot; cool%story=bro f %^asdf
+<pre><code>Feb 14 19:20:21 ubuntu someapp[3453]: foo=bar a=14 baz=&quot;hello kitty&quot; cool%story=bro f %^asdf ip=173.239.228.74
 </code></pre><h3 id="Output">6.3. Output</h3>
-<pre><code class="lang-rst">:Uuid: 37899ca9-e6b5-47fb-a3af-8f6e8362abb5
+<pre><code class="lang-rst">Uuid: 3cafda9a-261f-48b5-a288-cc6c0783ba3e
 :Timestamp: 2018-02-14T19:20:21.000000000Z
 :Type: &lt;nil&gt;
 :Logger: input.grammar_module
@@ -514,22 +529,164 @@ decoders_syslog = {
 :Fields:
     | name: a type: 0 representation: &lt;nil&gt; value: 14
     | name: foo type: 0 representation: &lt;nil&gt; value: bar
+    | name: cool%story type: 0 representation: &lt;nil&gt; value: bro
     | name: baz type: 0 representation: &lt;nil&gt; value: hello kitty
     | name: %^asdf type: 4 representation: &lt;nil&gt; value: true
     | name: programname type: 0 representation: &lt;nil&gt; value: someapp
-    | name: cool%story type: 0 representation: &lt;nil&gt; value: bro
     | name: f type: 4 representation: &lt;nil&gt; value: true
+    | name: ip type: 0 representation: &lt;nil&gt; value: 173.239.228.74
 </code></pre>
 <hr>
-<h2 id="Lua_Decoder_Module_Syslog_Decoder">7. Lua Decoder Module Syslog Decoder</h2>
+<h2 id="Lua_Grammar_Module_Decoder_with_Transformation">7. Lua Grammar Module Decoder with Transformation</h2>
+<p>This is an example of a syslog decoder using a grammar module. The key in the
+sub_decoders hash is the programname from the syslog and its value an array with
+a grammar module entry and a transformation table.</p>
+<h3 id="Configuration">7.1. Configuration</h3>
+<pre><code class="lang-lua">filename = <span class="hljs-string">&quot;file.lua&quot;</span>
+input_filename = <span class="hljs-string">&quot;grammar_module.log&quot;</span>
+send_decode_failures = <span class="hljs-keyword">true</span>
+decoder_module = <span class="hljs-string">&quot;decoders.syslog&quot;</span>
+
+decoders_syslog = {
+  template = <span class="hljs-string">&quot;%TIMESTAMP% %HOSTNAME% %syslogtag%%msg:::sp-if-no-1st-sp%%msg:::drop-last-lf%&quot;</span>,
+
+  sub_decoders = {
+    someapp = {
+    { {<span class="hljs-string">&quot;lpeg.logfmt&quot;</span>}, {ip = <span class="hljs-string">&quot;maxminddb.heka#add_geoip&quot;</span>}},
+    },
+  },
+}
+
+maxminddb_heka = {
+  databases = {
+    [<span class="hljs-string">&quot;GeoIP2-City.mmdb&quot;</span>] = {
+        _city = {<span class="hljs-string">&quot;city&quot;</span>, <span class="hljs-string">&quot;names&quot;</span>, <span class="hljs-string">&quot;en&quot;</span>},
+        _country = {<span class="hljs-string">&quot;country&quot;</span>, <span class="hljs-string">&quot;iso_code&quot;</span>}
+    },
+  }
+}
+</code></pre>
+<h3 id="Input">7.2. Input</h3>
+<pre><code>Feb 14 19:20:21 ubuntu someapp[3453]: foo=bar a=14 baz=&quot;hello kitty&quot; cool%story=bro f %^asdf ip=173.239.228.74
+</code></pre><h3 id="Output">7.3. Output</h3>
+<pre><code class="lang-rst">:Uuid: eade849f-e90f-4cc7-a817-265545d4e522
+:Timestamp: 2018-02-14T19:20:21.000000000Z
+:Type: &lt;nil&gt;
+:Logger: input.grammar_transform
+:Severity: 7
+:Payload: foo=bar a=14 baz=&quot;hello kitty&quot; cool%story=bro f %^asdf ip=173.239.228.74
+:EnvVersion: &lt;nil&gt;
+:Pid: 3453
+:Hostname: ubuntu
+:Fields:
+    | name: a type: 0 representation: &lt;nil&gt; value: 14
+    | name: baz type: 0 representation: &lt;nil&gt; value: hello kitty
+    | name: ip type: 0 representation: &lt;nil&gt; value: 173.239.228.74
+    | name: f type: 4 representation: &lt;nil&gt; value: true
+    | name: ip_country type: 0 representation: &lt;nil&gt; value: US
+    | name: ip_city type: 0 representation: &lt;nil&gt; value: San Jose
+    | name: %^asdf type: 4 representation: &lt;nil&gt; value: true
+    | name: programname type: 0 representation: &lt;nil&gt; value: someapp
+    | name: cool%story type: 0 representation: &lt;nil&gt; value: bro
+    | name: foo type: 0 representation: &lt;nil&gt; value: bar
+</code></pre>
+<hr>
+<h2 id="Lua_Grammar_Module_Decoder_with_Match_Arguments">8. Lua Grammar Module Decoder with Match Arguments</h2>
+<p>This is an example of a syslog decoder using a grammar module that takes
+additional match arguments. The key in the sub_decoders hash is the programname
+from the syslog and its value an array with a grammar module entry and nil
+transformation table.</p>
+<h3 id="Configuration">8.1. Configuration</h3>
+<pre><code class="lang-lua">filename = <span class="hljs-string">&quot;file.lua&quot;</span>
+input_filename = <span class="hljs-string">&quot;grammar_module.log&quot;</span>
+send_decode_failures = <span class="hljs-keyword">true</span>
+decoder_module = <span class="hljs-string">&quot;decoders.syslog&quot;</span>
+
+decoders_syslog = {
+  template = <span class="hljs-string">&quot;%TIMESTAMP% %HOSTNAME% %syslogtag%%msg:::sp-if-no-1st-sp%%msg:::drop-last-lf%&quot;</span>,
+
+  sub_decoders = {
+    someapp = {
+        { {<span class="hljs-string">&quot;syslog_docs#demo&quot;</span>, <span class="hljs-string">&quot;www.example.com&quot;</span>}, <span class="hljs-keyword">nil</span>},
+    },
+  },
+}
+</code></pre>
+<h3 id="Input">8.2. Input</h3>
+<pre><code>Feb 14 19:20:21 ubuntu someapp[3453]: foo=bar a=14 baz=&quot;hello kitty&quot; cool%story=bro f %^asdf ip=173.239.228.74
+</code></pre><h3 id="Output">8.3. Output</h3>
+<pre><code class="lang-rst">:Uuid: 0cde3ec6-b894-498e-aad6-abf3e4059342
+:Timestamp: 2018-02-14T19:20:21.000000000Z
+:Type: &lt;nil&gt;
+:Logger: input.grammar_args
+:Severity: 7
+:Payload: foo=bar a=14 baz=&quot;hello kitty&quot; cool%story=bro f %^asdf ip=173.239.228.74
+:EnvVersion: &lt;nil&gt;
+:Pid: 3453
+:Hostname: ubuntu
+:Fields:
+    | name: programname type: 0 representation: &lt;nil&gt; value: someapp
+    | name: real_hostname type: 0 representation: &lt;nil&gt; value: www.example.com
+</code></pre>
+<hr>
+<h2 id="Lua_Grammar_Builder_Module_Decoder">9. Lua Grammar Builder Module Decoder</h2>
+<p>This is an example of a syslog decoder using a grammar module that dynamically
+builds the needed grammar. The key in the sub_decoders hash is the programname
+from the syslog and its value is an array containing a
+<a href="https://mozilla-services.github.io/lua_sandbox_extensions/lpeg/modules/lpeg/common_log_format.html#build_nginx_grammar" target="_blank">grammar building function</a>
+and its required argument, the log_format configuration string. The
+transformation table is not used in this example.</p>
+<h3 id="Configuration">9.1. Configuration</h3>
+<pre><code class="lang-lua">filename = <span class="hljs-string">&quot;file.lua&quot;</span>
+input_filename = <span class="hljs-string">&quot;decoder_module.log&quot;</span>
+send_decode_failures = <span class="hljs-keyword">true</span>
+decoder_module = <span class="hljs-string">&quot;decoders.syslog&quot;</span>
+
+log_format = <span class="hljs-string">&apos;$remote_addr - $remote_user [$time_local] &quot;$request&quot; $status $body_bytes_sent &quot;$http_referer&quot; &quot;$http_user_agent&quot;&apos;</span>
+
+decoders_syslog = {
+  template = <span class="hljs-string">&quot;%TIMESTAMP% %HOSTNAME% %syslogtag%%msg:::sp-if-no-1st-sp%%msg:::drop-last-lf%&quot;</span>,
+
+  sub_decoders = {
+    nginx  = {
+        { {<span class="hljs-string">&quot;lpeg.common_log_format#build_nginx_grammar&quot;</span>, log_format}, <span class="hljs-keyword">nil</span>},
+    },
+  },
+}
+</code></pre>
+<h3 id="Input">9.2. Input</h3>
+<pre><code>Jan 23 08:50:02 ubuntu nginx[1234]: 127.0.0.1 - - [10/Feb/2014:08:46:41 -0800] &quot;GET / HTTP/1.1&quot; 304 0 &quot;-&quot; &quot;Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:26.0) Gecko/20100101 Firefox/26.0&quot;
+</code></pre><h3 id="Output">9.3. Output</h3>
+<pre><code class="lang-rst">:Uuid: 4d2347c9-26b6-4c7d-a703-edbf9335ecb8
+:Timestamp: 2018-01-23T08:50:02.000000000Z
+:Type: &lt;nil&gt;
+:Logger: input.function
+:Severity: 7
+:Payload: 127.0.0.1 - - [10/Feb/2014:08:46:41 -0800] &quot;GET / HTTP/1.1&quot; 304 0 &quot;-&quot; &quot;Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:26.0) Gecko/20100101 Firefox/26.0&quot;
+:EnvVersion: &lt;nil&gt;
+:Pid: 1234
+:Hostname: ubuntu
+:Fields:
+    | name: remote_user type: 0 representation: &lt;nil&gt; value: -
+    | name: http_user_agent type: 0 representation: &lt;nil&gt; value: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:26.0) Gecko/20100101 Firefox/26.0
+    | name: body_bytes_sent type: 3 representation: B value: 0
+    | name: remote_addr type: 0 representation: ipv4 value: 127.0.0.1
+    | name: time type: 3 representation: &lt;nil&gt; value: 1.392050801e+18
+    | name: request type: 0 representation: &lt;nil&gt; value: GET / HTTP/1.1
+    | name: programname type: 0 representation: &lt;nil&gt; value: nginx
+    | name: http_referer type: 0 representation: &lt;nil&gt; value: -
+    | name: status type: 3 representation: &lt;nil&gt; value: 304
+</code></pre>
+<hr>
+<h2 id="Lua_Decoder_Module">10. Lua Decoder Module</h2>
 <p>This is an example of a syslog decoder using a decoder module. The key in the
 sub_decoders hash is the programname from the syslog and its value is the module
 name to apply to the matching messages. The
 <a href="https://mozilla-services.github.io/lua_sandbox_extensions/lpeg/io_modules/decoders/nginx/access.html" target="_blank">decoders_nginx_access</a>
-table is the configuration information for the specified decoder. In this case
+table is the configuration information for the specified decoder.  In this case
 it is the log_format configuration value from the nginx.conf that produced this
 syslog entry.</p>
-<h3 id="Configuration">7.1. Configuration</h3>
+<h3 id="Configuration">10.1. Configuration</h3>
 <pre><code class="lang-lua">filename = <span class="hljs-string">&quot;file.lua&quot;</span>
 input_filename = <span class="hljs-string">&quot;decoder_module.log&quot;</span>
 send_decode_failures = <span class="hljs-keyword">true</span>
@@ -547,9 +704,9 @@ decoders_nginx_access = {
   log_format = <span class="hljs-string">&apos;$remote_addr - $remote_user [$time_local] &quot;$request&quot; $status $body_bytes_sent &quot;$http_referer&quot; &quot;$http_user_agent&quot;&apos;</span>
 }
 </code></pre>
-<h3 id="Input">7.2. Input</h3>
+<h3 id="Input">10.2. Input</h3>
 <pre><code>Jan 23 08:50:02 ubuntu nginx[1234]: 127.0.0.1 - - [10/Feb/2014:08:46:41 -0800] &quot;GET / HTTP/1.1&quot; 304 0 &quot;-&quot; &quot;Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:26.0) Gecko/20100101 Firefox/26.0&quot;
-</code></pre><h3 id="Output">7.3. Output</h3>
+</code></pre><h3 id="Output">10.3. Output</h3>
 <pre><code class="lang-rst">:Uuid: 544eef18-d932-4928-a927-3059e95d8d33
 :Timestamp: 2014-02-10T16:46:41.000000000Z
 :Type: &lt;nil&gt;
@@ -569,7 +726,7 @@ decoders_nginx_access = {
     | name: remote_user type: 0 representation: &lt;nil&gt; value: -
     | name: http_user_agent type: 0 representation: &lt;nil&gt; value: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:26.0) Gecko/20100101 Firefox/26.0
 </code></pre>
-<div id="anchors-navbar"><i class="fa fa-anchor"></i><ul><p><a href="#Using_Decoders_with_Input_Plugins">Using Decoders with Input Plugins</a></p><li><a href="#Definition_of_Terms">1. Definition of Terms</a></li><li><a href="#Basic_Syslog_Decoder">2. Basic Syslog Decoder</a></li><ul><li><a href="#Configuration">2.1. Configuration</a></li><li><a href="#Input">2.2. Input</a></li><li><a href="#Output">2.3. Output</a></li></ul><li><a href="#Ad-hoc_printf_Syslog_Decoder">3. Ad-hoc printf Syslog Decoder</a></li><ul><li><a href="#Configuration">3.1. Configuration</a></li><li><a href="#Input">3.2. Input</a></li><li><a href="#Output">3.3. Output</a></li></ul><li><a href="#Pre-defined_printf_Syslog_Decoder">4. Pre-defined printf Syslog Decoder</a></li><ul><li><a href="#Configuration">4.1. Configuration</a></li><li><a href="#Input">4.2. Input</a></li><li><a href="#Output">4.3. Output</a></li></ul><li><a href="#Pre-defined_printf_Syslog_Decoder_with_Transformation">5. Pre-defined printf Syslog Decoder with Transformation</a></li><ul><li><a href="#Configuration">5.1. Configuration</a></li><li><a href="#Input">5.2. Input</a></li><li><a href="#Output">5.3. Output</a></li></ul><li><a href="#Lua_Grammar_Module_(LPeg)_Syslog_Decoder">6. Lua Grammar Module (LPeg) Syslog Decoder</a></li><ul><li><a href="#Configuration">6.1. Configuration</a></li><li><a href="#Input">6.2. Input</a></li><li><a href="#Output">6.3. Output</a></li></ul><li><a href="#Lua_Decoder_Module_Syslog_Decoder">7. Lua Decoder Module Syslog Decoder</a></li><ul><li><a href="#Configuration">7.1. Configuration</a></li><li><a href="#Input">7.2. Input</a></li><li><a href="#Output">7.3. Output</a></li></ul></ul></div><a href="#Definition_of_Terms" id="goTop"><i class="fa fa-arrow-up"></i></a>
+<div id="anchors-navbar"><i class="fa fa-anchor"></i><ul><p><a href="#Using_Decoders_with_Input_Plugins">Using Decoders with Input Plugins</a></p><li><a href="#Definition_of_Terms">1. Definition of Terms</a></li><li><a href="#Basic_Syslog_Decoder_Module">2. Basic Syslog Decoder Module</a></li><ul><li><a href="#Configuration">2.1. Configuration</a></li><li><a href="#Input">2.2. Input</a></li><li><a href="#Output">2.3. Output</a></li></ul><li><a href="#Ad-hoc_printf_Decoder">3. Ad-hoc printf Decoder</a></li><ul><li><a href="#Configuration">3.1. Configuration</a></li><li><a href="#Input">3.2. Input</a></li><li><a href="#Output">3.3. Output</a></li></ul><li><a href="#Pre-defined_printf_Module_Decoder">4. Pre-defined printf Module Decoder</a></li><ul><li><a href="#Configuration">4.1. Configuration</a></li><li><a href="#Input">4.2. Input</a></li><li><a href="#Output">4.3. Output</a></li></ul><li><a href="#Pre-defined_printf_Module_Decoder_with_Transformation">5. Pre-defined printf Module Decoder with Transformation</a></li><ul><li><a href="#Configuration">5.1. Configuration</a></li><li><a href="#Input">5.2. Input</a></li><li><a href="#Output">5.3. Output</a></li></ul><li><a href="#Lua_Grammar_Module_Decoder">6. Lua Grammar Module Decoder</a></li><ul><li><a href="#Configuration">6.1. Configuration</a></li><li><a href="#Input">6.2. Input</a></li><li><a href="#Output">6.3. Output</a></li></ul><li><a href="#Lua_Grammar_Module_Decoder_with_Transformation">7. Lua Grammar Module Decoder with Transformation</a></li><ul><li><a href="#Configuration">7.1. Configuration</a></li><li><a href="#Input">7.2. Input</a></li><li><a href="#Output">7.3. Output</a></li></ul><li><a href="#Lua_Grammar_Module_Decoder_with_Match_Arguments">8. Lua Grammar Module Decoder with Match Arguments</a></li><ul><li><a href="#Configuration">8.1. Configuration</a></li><li><a href="#Input">8.2. Input</a></li><li><a href="#Output">8.3. Output</a></li></ul><li><a href="#Lua_Grammar_Builder_Module_Decoder">9. Lua Grammar Builder Module Decoder</a></li><ul><li><a href="#Configuration">9.1. Configuration</a></li><li><a href="#Input">9.2. Input</a></li><li><a href="#Output">9.3. Output</a></li></ul><li><a href="#Lua_Decoder_Module">10. Lua Decoder Module</a></li><ul><li><a href="#Configuration">10.1. Configuration</a></li><li><a href="#Input">10.2. Input</a></li><li><a href="#Output">10.3. Output</a></li></ul></ul></div><a href="#Definition_of_Terms" id="goTop"><i class="fa fa-arrow-up"></i></a>
                                 
                                 </section>
                             
@@ -597,6 +754,10 @@ decoders_nginx_access = {
             
                 
                 
+                <a href="cookbooks.html" class="navigation navigation-next navigation-unique" aria-label="Next page: Common Configuration Cookbooks">
+                    <i class="fa fa-angle-right"></i>
+                </a>
+                
             
         
     </div>
@@ -604,7 +765,7 @@ decoders_nginx_access = {
     <script>
         var gitbook = gitbook || [];
         gitbook.push(function() {
-            gitbook.page.hasChanged({"page":{"title":"Using Decoders with Input Plugins","level":"2.1","depth":1,"previous":{"title":"Sandbox Extensions Documentation","level":"1.8","depth":1,"url":"http://mozilla-services.github.io/lua_sandbox_extensions/index.html","ref":"http://mozilla-services.github.io/lua_sandbox_extensions/index.html","articles":[]},"dir":"ltr"},"config":{"gitbook":"*","theme":"default","variables":{},"plugins":["collapsible-menu","navigator"],"pluginsConfig":{"collapsible-menu":{},"navigator":{},"highlight":{},"search":{},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"fontsettings":{"theme":"white","family":"sans","size":2},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"}},"file":{"path":"tutorials/using_decoders_with_input_plugins.md","mtime":"2018-02-15T16:45:18.700Z","type":"markdown"},"gitbook":{"version":"3.2.2","time":"2018-02-15T17:41:21.569Z"},"basePath":"..","book":{"language":""}});
+            gitbook.page.hasChanged({"page":{"title":"Using Decoders with Input Plugins","level":"2.1","depth":1,"next":{"title":"Common Configuration Cookbooks","level":"2.2","depth":1,"path":"tutorials/cookbooks.md","ref":"tutorials/cookbooks.md","articles":[]},"previous":{"title":"Sandbox Extensions Documentation","level":"1.8","depth":1,"url":"http://mozilla-services.github.io/lua_sandbox_extensions/index.html","ref":"http://mozilla-services.github.io/lua_sandbox_extensions/index.html","articles":[]},"dir":"ltr"},"config":{"gitbook":"*","theme":"default","variables":{},"plugins":["collapsible-menu","navigator"],"pluginsConfig":{"collapsible-menu":{},"navigator":{},"highlight":{},"search":{},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"fontsettings":{"theme":"white","family":"sans","size":2},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"}},"file":{"path":"tutorials/using_decoders_with_input_plugins.md","mtime":"2018-02-27T22:46:58.198Z","type":"markdown"},"gitbook":{"version":"3.2.2","time":"2018-02-27T22:51:08.706Z"},"basePath":"..","book":{"language":""}});
         });
     </script>
 </div>
