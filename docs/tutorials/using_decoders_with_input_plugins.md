@@ -37,7 +37,7 @@ configurations discussed here are independent from the input plugin being used.
 
 
 ----
-## Basic Syslog Decoder
+## Basic Syslog Decoder Module
 
 This is an example of a basic syslog decoder that extracts the header
 information (timestamp, hostname, pid, programname) and the message string. The
@@ -82,7 +82,7 @@ Feb 13 14:25:19 ubuntu sshd[7192]: Accepted publickey for foobar from 173.239.22
 ```
 
 ----
-## Ad-hoc printf Syslog Decoder
+## Ad-hoc printf Decoder
 
 This is an example of a syslog decoder using an ad-hoc printf parser.  The key
 in the sub_decoders hash is the programname from the syslog and its value is an
@@ -102,7 +102,7 @@ decoders_syslog = {
 
   sub_decoders = {
     foo = {
-      {{"%s:%lu: invalid line", "path", "linenum"}, nil},
+      { {"%s:%lu: invalid line", "path", "linenum"}, nil},
     },
   },
 }
@@ -131,7 +131,7 @@ Jan 23 08:50:03 ubuntu foo[1234]: /tmp/input.tsv:23: invalid line
 ```
 
 ----
-## Pre-defined printf Syslog Decoder
+## Pre-defined printf Module Decoder
 
 This is an example of a syslog decoder using a printf parser library. The value
 in the printf_messages array is the name of a module exporting another
@@ -139,7 +139,6 @@ in the printf_messages array is the name of a module exporting another
 array that is imported for use here. The key in the sub_decoders hash is the
 programname from the syslog and its value is an array containing a sample
 message that the user would like parsed.
-
 
 ### Configuration
 ```lua
@@ -190,7 +189,7 @@ Feb 13 14:25:19 ubuntu sshd[7192]: Accepted publickey for foobar from 173.239.22
 ```
 
 ----
-## Pre-defined printf Syslog Decoder with Transformation
+## Pre-defined printf Module Decoder with Transformation
 
 This is an example of a syslog decoder using a printf parser library. The value
 in the printf_messages array is the name of a module exporting another
@@ -202,7 +201,6 @@ transformation table is keyed by the field name to transform and the value is
 the transformation funtion to apply. The
 [maxminddb_heka](https://mozilla-services.github.io/lua_sandbox_extensions/maxminddb/io_modules/maxminddb/heka.html)
 table is the configuration to control the transformation.
-
 
 ### Configuration
 ```lua
@@ -264,12 +262,11 @@ Feb 13 14:25:19 ubuntu sshd[7192]: Accepted publickey for foobar from 173.239.22
 ```
 
 ----
-## Lua Grammar Module (LPeg) Syslog Decoder
+## Lua Grammar Module Decoder
 
 This is an example of a syslog decoder using a grammar module. The key in the
 sub_decoders hash is the programname from the syslog and its value is the module
 name and optional grammar name reference to apply to the matching messages.
-
 
 ### Configuration
 ```lua
@@ -289,12 +286,12 @@ decoders_syslog = {
 
 ### Input
 ```
-Feb 14 19:20:21 ubuntu someapp[3453]: foo=bar a=14 baz="hello kitty" cool%story=bro f %^asdf
+Feb 14 19:20:21 ubuntu someapp[3453]: foo=bar a=14 baz="hello kitty" cool%story=bro f %^asdf ip=173.239.228.74
 ```
 
 ### Output
 ```rst
-:Uuid: 37899ca9-e6b5-47fb-a3af-8f6e8362abb5
+Uuid: 3cafda9a-261f-48b5-a288-cc6c0783ba3e
 :Timestamp: 2018-02-14T19:20:21.000000000Z
 :Type: <nil>
 :Logger: input.grammar_module
@@ -306,21 +303,190 @@ Feb 14 19:20:21 ubuntu someapp[3453]: foo=bar a=14 baz="hello kitty" cool%story=
 :Fields:
     | name: a type: 0 representation: <nil> value: 14
     | name: foo type: 0 representation: <nil> value: bar
+    | name: cool%story type: 0 representation: <nil> value: bro
     | name: baz type: 0 representation: <nil> value: hello kitty
     | name: %^asdf type: 4 representation: <nil> value: true
     | name: programname type: 0 representation: <nil> value: someapp
-    | name: cool%story type: 0 representation: <nil> value: bro
     | name: f type: 4 representation: <nil> value: true
+    | name: ip type: 0 representation: <nil> value: 173.239.228.74
 ```
 
 ----
-## Lua Decoder Module Syslog Decoder
+## Lua Grammar Module Decoder with Transformation
+
+This is an example of a syslog decoder using a grammar module. The key in the
+sub_decoders hash is the programname from the syslog and its value an array with
+a grammar module entry and a transformation table.
+
+### Configuration
+```lua
+filename = "file.lua"
+input_filename = "grammar_module.log"
+send_decode_failures = true
+decoder_module = "decoders.syslog"
+
+decoders_syslog = {
+  template = "%TIMESTAMP% %HOSTNAME% %syslogtag%%msg:::sp-if-no-1st-sp%%msg:::drop-last-lf%",
+
+  sub_decoders = {
+    someapp = {
+    { {"lpeg.logfmt"}, {ip = "maxminddb.heka#add_geoip"}},
+    },
+  },
+}
+
+maxminddb_heka = {
+  databases = {
+    ["GeoIP2-City.mmdb"] = {
+        _city = {"city", "names", "en"},
+        _country = {"country", "iso_code"}
+    },
+  }
+}
+```
+
+### Input
+```
+Feb 14 19:20:21 ubuntu someapp[3453]: foo=bar a=14 baz="hello kitty" cool%story=bro f %^asdf ip=173.239.228.74
+```
+
+### Output
+```rst
+:Uuid: eade849f-e90f-4cc7-a817-265545d4e522
+:Timestamp: 2018-02-14T19:20:21.000000000Z
+:Type: <nil>
+:Logger: input.grammar_transform
+:Severity: 7
+:Payload: foo=bar a=14 baz="hello kitty" cool%story=bro f %^asdf ip=173.239.228.74
+:EnvVersion: <nil>
+:Pid: 3453
+:Hostname: ubuntu
+:Fields:
+    | name: a type: 0 representation: <nil> value: 14
+    | name: baz type: 0 representation: <nil> value: hello kitty
+    | name: ip type: 0 representation: <nil> value: 173.239.228.74
+    | name: f type: 4 representation: <nil> value: true
+    | name: ip_country type: 0 representation: <nil> value: US
+    | name: ip_city type: 0 representation: <nil> value: San Jose
+    | name: %^asdf type: 4 representation: <nil> value: true
+    | name: programname type: 0 representation: <nil> value: someapp
+    | name: cool%story type: 0 representation: <nil> value: bro
+    | name: foo type: 0 representation: <nil> value: bar
+```
+
+----
+## Lua Grammar Module Decoder with Match Arguments
+
+This is an example of a syslog decoder using a grammar module that takes
+additional match arguments. The key in the sub_decoders hash is the programname
+from the syslog and its value an array with a grammar module entry and nil
+transformation table.
+
+### Configuration
+```lua
+filename = "file.lua"
+input_filename = "grammar_module.log"
+send_decode_failures = true
+decoder_module = "decoders.syslog"
+
+decoders_syslog = {
+  template = "%TIMESTAMP% %HOSTNAME% %syslogtag%%msg:::sp-if-no-1st-sp%%msg:::drop-last-lf%",
+
+  sub_decoders = {
+    someapp = {
+        { {"syslog_docs#demo", "www.example.com"}, nil},
+    },
+  },
+}
+```
+
+### Input
+```
+Feb 14 19:20:21 ubuntu someapp[3453]: foo=bar a=14 baz="hello kitty" cool%story=bro f %^asdf ip=173.239.228.74
+```
+
+### Output
+```rst
+:Uuid: 0cde3ec6-b894-498e-aad6-abf3e4059342
+:Timestamp: 2018-02-14T19:20:21.000000000Z
+:Type: <nil>
+:Logger: input.grammar_args
+:Severity: 7
+:Payload: foo=bar a=14 baz="hello kitty" cool%story=bro f %^asdf ip=173.239.228.74
+:EnvVersion: <nil>
+:Pid: 3453
+:Hostname: ubuntu
+:Fields:
+    | name: programname type: 0 representation: <nil> value: someapp
+    | name: real_hostname type: 0 representation: <nil> value: www.example.com
+```
+
+----
+## Lua Grammar Builder Module Decoder
+
+This is an example of a syslog decoder using a grammar module that dynamically
+builds the needed grammar. The key in the sub_decoders hash is the programname
+from the syslog and its value is an array containing a
+[grammar building function](https://mozilla-services.github.io/lua_sandbox_extensions/lpeg/modules/lpeg/common_log_format.html#build_nginx_grammar)
+and its required argument, the log_format configuration string. The
+transformation table is not used in this example.
+
+### Configuration
+```lua
+filename = "file.lua"
+input_filename = "decoder_module.log"
+send_decode_failures = true
+decoder_module = "decoders.syslog"
+
+log_format = '$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent"'
+
+decoders_syslog = {
+  template = "%TIMESTAMP% %HOSTNAME% %syslogtag%%msg:::sp-if-no-1st-sp%%msg:::drop-last-lf%",
+
+  sub_decoders = {
+    nginx  = {
+        { {"lpeg.common_log_format#build_nginx_grammar", log_format}, nil},
+    },
+  },
+}
+```
+
+### Input
+```
+Jan 23 08:50:02 ubuntu nginx[1234]: 127.0.0.1 - - [10/Feb/2014:08:46:41 -0800] "GET / HTTP/1.1" 304 0 "-" "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:26.0) Gecko/20100101 Firefox/26.0"
+```
+
+### Output
+```rst
+:Uuid: 4d2347c9-26b6-4c7d-a703-edbf9335ecb8
+:Timestamp: 2018-01-23T08:50:02.000000000Z
+:Type: <nil>
+:Logger: input.function
+:Severity: 7
+:Payload: 127.0.0.1 - - [10/Feb/2014:08:46:41 -0800] "GET / HTTP/1.1" 304 0 "-" "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:26.0) Gecko/20100101 Firefox/26.0"
+:EnvVersion: <nil>
+:Pid: 1234
+:Hostname: ubuntu
+:Fields:
+    | name: remote_user type: 0 representation: <nil> value: -
+    | name: http_user_agent type: 0 representation: <nil> value: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:26.0) Gecko/20100101 Firefox/26.0
+    | name: body_bytes_sent type: 3 representation: B value: 0
+    | name: remote_addr type: 0 representation: ipv4 value: 127.0.0.1
+    | name: time type: 3 representation: <nil> value: 1.392050801e+18
+    | name: request type: 0 representation: <nil> value: GET / HTTP/1.1
+    | name: programname type: 0 representation: <nil> value: nginx
+    | name: http_referer type: 0 representation: <nil> value: -
+    | name: status type: 3 representation: <nil> value: 304
+```
+
+----
+## Lua Decoder Module
 
 This is an example of a syslog decoder using a decoder module. The key in the
 sub_decoders hash is the programname from the syslog and its value is the module
 name to apply to the matching messages. The
 [decoders_nginx_access](https://mozilla-services.github.io/lua_sandbox_extensions/lpeg/io_modules/decoders/nginx/access.html)
-table is the configuration information for the specified decoder. In this case
+table is the configuration information for the specified decoder.  In this case
 it is the log_format configuration value from the nginx.conf that produced this
 syslog entry.
 

@@ -22,6 +22,7 @@ local function output_menu(output_dir, version)
 ### Tutorials
 
 * [Using Decoders with Input Plugins](tutorials/using_decoders_with_input_plugins.md)
+* [Common Configuration Cookbooks](tutorials/cookbooks.md)
 ]])
     fh:close()
 end
