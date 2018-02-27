@@ -104,9 +104,9 @@ void hs_save_termination_err(const hs_config *cfg,
   if (!pos) return;
 
   char fn[HS_MAX_PATH];
-  int ret = snprintf(fn, sizeof(fn), "%s/%.*s/%s.err", cfg->run_path,
+  int ret = snprintf(fn, sizeof(fn), "%s/%.*s/%s%s", cfg->run_path,
                      (int)(pos - name), name,
-                     pos + 1);
+                     pos + 1, hs_err_ext);
   if (ret < 0 || ret > (int)sizeof(fn) - 1) return;
 
   FILE *fh = fopen(fn, "we");
