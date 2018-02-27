@@ -1,4 +1,5 @@
-require "os"
+require "io"
+require "string"
 i = 1
 alerts = {}
 function process_message()
@@ -8,15 +9,22 @@ function process_message()
     i = i + 1
     return 0
 end
+
 ticks = 0
 function timer_event(ns)
-    if ticks == 5 then
-        if (#alerts == 1 and alerts[1][2] == "10% of recent messages failed") then
-            print("success")
+    local cnt = #alerts
+    if ticks == 15 or cnt == 2 then
+        if cnt == 2 then
+            if not string.match(alerts[1][2], "10%% of recent messages failed") then
+                error("failed alert 1: " .. tostring(alerts[1][2]))
+            elseif not string.match(alerts[2][2], "terminate.lua:9: boom") then
+                error("failed alert 2: " .. tostring(alerts[2][2]))
+            end
         else
-            print("fail " .. #alerts)
+            error("fail " .. cnt)
         end
-        os.execute("kill -INT " .. read_config("Pid"))
+        local fh = assert(io.open(read_config("sandbox_load_path") .. "/input/plugin_tsv.off", "w+"))
+        fh:close()
     end
     ticks = ticks + 1
 end

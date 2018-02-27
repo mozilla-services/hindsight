@@ -5,6 +5,7 @@
 --[[
 # Generates test data for plugin_monitor
 --]]
+local socket = require "socket"
 
 local inputs = {
     {Timestamp = 0, Type = "plugin_monitor_test_percent", Payload = "0"},
@@ -15,6 +16,7 @@ local inputs = {
 
 
 function process_message()
+    socket.sleep(3)
     for x = 0, 89 do
         inputs[1].Payload = tostring(x)
         inject_message(inputs[1])
