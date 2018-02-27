@@ -18,6 +18,11 @@ local function output_menu(output_dir, version)
 * [Execution Profiling](hindsight_timer_report.md)
 * [Heka Sandbox Documentation](http://mozilla-services.github.io/lua_sandbox/heka/index.html)
 * [Sandbox Extensions Documentation](http://mozilla-services.github.io/lua_sandbox_extensions/index.html)
+
+### Tutorials
+
+* [Using Decoders with Input Plugins](tutorials/using_decoders_with_input_plugins.md)
+* [Common Configuration Cookbooks](tutorials/cookbooks.md)
 ]])
     fh:close()
 end
