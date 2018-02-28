@@ -110,13 +110,13 @@ output_defaults = {
 * **restricted_headers** - flag indicating that the following header fields are
   not user modifiable `Hostname` and `Logger` (bool, default true (analysis),
   false (input/output))
-* **ticker_interval** (default 0)
+* **ticker_interval** (seconds, default 0)
   * For input plugins it is the poll interval when `process_message` is called
     see: [polling input plugins](https://mozilla-services.github.io/lua_sandbox/heka/input.html#polling)
   * For analysis and output plugins it is the amount of time between
     `timer_event` function calls
 * **shutdown_on_terminate** - cleanly shuts down Hindsight if this plugin is
-  terminated (default false)
+  terminated (bool, default false)
 
 #### Default Analysis Sandbox Configuration Variables
 
@@ -131,7 +131,7 @@ output_defaults = {
 #### Default Output Sandbox Configuration Variables
 
 * **remove_checkpoints_on_terminate** - removes the checkpoint entries when the
-  plugin is terminated (default false).  This prevents the data from being
+  plugin is terminated (bool, default false).  This prevents the data from being
   pruned until the plugin can be fixed but it can also cause the system to back
   pressure as it will start filling the disk.
 * **read_queue** - specifies which queue the output plugin consumes
