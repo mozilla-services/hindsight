@@ -8,20 +8,14 @@
 
 set -e
 
-hindsight_dir="$PWD"
-lsb_dir="$(dirname "$hindsight_dir")/lua_sandbox"
+root_dir="$PWD"
+lsb_dir="$(dirname "$root_dir")/lua_sandbox"
+hs_dir="$(dirname "$root_dir")/hindsight"
 
 if [ ! -d "$lsb_dir" ]; then
     (   set -x;
         git clone https://github.com/mozilla-services/lua_sandbox "$lsb_dir"
         git rev-parse HEAD
-    )
-fi
-
-lse_dir="$(dirname "$hindsight_dir")/lua_sandbox_extensions"
-if [ ! -d "$lse_dir" ]; then
-    (   set -x;
-        git clone https://github.com/mozilla-services/lua_sandbox_extensions "$lse_dir"
     )
 fi
 
@@ -32,35 +26,17 @@ if [ "$1" != "build" -o $# -ge 2 ]; then
     exit 1
 fi
 
-lse_build() {
-    (   set -x
-
-        rm -rf ./release
-        mkdir release
-        cd release
-
-        cmake -DCMAKE_BUILD_TYPE=release -DEXT_heka=on -DEXT_lpeg=on \
-              -DEXT_socket=on -DEXT_cjson=on \
-              "-DCPACK_GENERATOR=${CPACK_GENERATOR}" ..
-        make
-        make packages
-    )
+build_hindsight() {
+    echo "+cd $hs_dir"
+    cd "$hs_dir"
+    build
+    if [ "$DISTRO" = "fedora:latest" ]; then
+        (   set -x;
+            $as_root yum install -y lua
+        )
+    fi
+    install_packages_from_dir ./release
 }
 
-setup_env
-install_packages c-compiler cmake make rpm-build
-old_dir="$PWD"
-echo "+cd $lsb_dir"
-cd "$lsb_dir"
-build
-install_packages_from_dir ./release
-echo "+cd $lse_dir"
-cd "$lse_dir"
-lse_build
-install_packages_from_dir ./release
-echo "+cd $old_dir"
-cd "$old_dir"
-build
-install_packages_from_dir ./release
-cd release
-ctest -C hindsight -VV
+build_function="build_hindsight"
+main
