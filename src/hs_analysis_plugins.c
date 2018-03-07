@@ -407,8 +407,8 @@ static void analyze_message(hs_analysis_thread *at, bool sample)
       p->ticker_expires = at->current_t + p->ticker_interval;
     }
 
-    if (ret > 0) terminate_sandbox(at, i);
     if (sample) p->stats = lsb_heka_get_stats(p->hsb);
+    if (ret > 0) terminate_sandbox(at, i);
   }
   pthread_mutex_unlock(&at->list_lock);
 }
