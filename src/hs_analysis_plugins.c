@@ -252,7 +252,7 @@ static void add_plugin(hs_analysis_thread *at, hs_analysis_plugin *p, int idx)
 {
   hs_log(NULL, p->name, 6, "adding to thread: %d", at->tid);
   at->list[idx] = p;
- if (UINT8_MAX - at->utilization > 5) {
+  if (UINT8_MAX - at->utilization > 5) {
     at->utilization += 5;
   } else {
     at->utilization = UINT8_MAX;
@@ -304,8 +304,6 @@ static void init_analysis_thread(hs_analysis_plugins *plugins, int tid)
 {
   hs_analysis_thread *at = &plugins->list[tid];
   at->plugins = plugins;
-  at->list = NULL;
-  at->msg = NULL;
   if (pthread_mutex_init(&at->list_lock, NULL)) {
     perror("list_lock pthread_mutex_init failed");
     exit(EXIT_FAILURE);
@@ -314,20 +312,6 @@ static void init_analysis_thread(hs_analysis_plugins *plugins, int tid)
     perror("cp_lock pthread_mutex_init failed");
     exit(EXIT_FAILURE);
   }
-  at->cp.id = 0;
-  at->cp.offset = 0;
-  at->current_t = 0;
-  at->list_cap = 0;
-  at->list_cnt = 0;
-  at->tid = tid;
-  at->stop = false;
-  at->sample = false;
-  at->mm_delta_cnt = 0;
-  at->max_mps = 0;
-
-#ifdef HINDSIGHT_CLI
-  at->terminated = false;
-#endif
 
   char name[255];
   int n = snprintf(name, sizeof name, "%s%d", hs_analysis_dir, tid);
@@ -568,7 +552,7 @@ void hs_init_analysis_plugins(hs_analysis_plugins *plugins,
   plugins->terminated = false;
 #endif
 
-  plugins->list = malloc(sizeof(hs_analysis_thread) * cfg->analysis_threads);
+  plugins->list = calloc(cfg->analysis_threads, sizeof(hs_analysis_thread));
   if (!plugins->list) {
     hs_log(NULL, g_module, 0, "plugins->list malloc failed");
     exit(EXIT_FAILURE);
@@ -576,7 +560,7 @@ void hs_init_analysis_plugins(hs_analysis_plugins *plugins,
   for (unsigned i = 0; i < cfg->analysis_threads; ++i) {
     init_analysis_thread(plugins, i);
   }
-  plugins->threads = malloc(sizeof(pthread_t *) * (cfg->analysis_threads));
+  plugins->threads = calloc(cfg->analysis_threads, sizeof(pthread_t *));
   if (!plugins->threads) {
     hs_log(NULL, g_module, 0, "plugins->threads malloc failed");
     exit(EXIT_FAILURE);
@@ -844,7 +828,7 @@ static unsigned least_used_thread_id(hs_analysis_plugins *plugins)
   }
   if (plugins->cfg->analysis_utilization_limit &&
       min_util >= plugins->cfg->analysis_utilization_limit) {
-      tid = UINT_MAX;
+    tid = UINT_MAX;
   }
   return tid;
 }
