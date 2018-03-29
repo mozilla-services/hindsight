@@ -5,7 +5,8 @@ of ingesting syslogs. Each section starts with a description followed by a
 configuration, input file and the resulting output. The configurations are
 evolved to demonstrate the available functionality.
 
-For all of the examples in this guide the
+For all of the [examples](https://github.com/mozilla-services/lua_sandbox_extensions/syslog/tests/integration/tutorial)
+in this guide the
 [file](https://mozilla-services.github.io/lua_sandbox_extensions/heka/sandboxes/heka/input/file.html)
 input is used. In a real world environment one would most likely use the
 [tail](https://mozilla-services.github.io/lua_sandbox_extensions/lfs/sandboxes/heka/input/tail.html),
@@ -63,7 +64,7 @@ decoders_syslog = {
 
 ### Input
 ```
-Feb 13 14:25:19 ubuntu sshd[7192]: Accepted publickey for foobar from 173.239.228.74 port 4242 ssh2
+Feb 13 14:25:19 ubuntu sshd[7192]: Accepted publickey for foobar from 216.160.83.56 port 4242 ssh2
 ```
 
 ### Output
@@ -73,7 +74,7 @@ Feb 13 14:25:19 ubuntu sshd[7192]: Accepted publickey for foobar from 173.239.22
 :Type: <nil>
 :Logger: input.syslog
 :Severity: 7
-:Payload: Accepted publickey for foobar from 173.239.228.74 port 4242 ssh2
+:Payload: Accepted publickey for foobar from 216.160.83.56 port 4242 ssh2
 :EnvVersion: <nil>
 :Pid: 7192
 :Hostname: ubuntu
@@ -164,7 +165,7 @@ decoders_syslog = {
 
 ### Input
 ```
-Feb 13 14:25:19 ubuntu sshd[7192]: Accepted publickey for foobar from 173.239.228.74 port 4242 ssh2
+Feb 13 14:25:19 ubuntu sshd[7192]: Accepted publickey for foobar from 216.160.83.56 port 4242 ssh2
 ```
 
 ### Output
@@ -174,7 +175,7 @@ Feb 13 14:25:19 ubuntu sshd[7192]: Accepted publickey for foobar from 173.239.22
 :Type: <nil>
 :Logger: input.printf
 :Severity: 7
-:Payload: Accepted publickey for foobar from 173.239.228.74 port 4242 ssh2
+:Payload: Accepted publickey for foobar from 216.160.83.56 port 4242 ssh2
 :EnvVersion: <nil>
 :Pid: 7192
 :Hostname: ubuntu
@@ -182,7 +183,7 @@ Feb 13 14:25:19 ubuntu sshd[7192]: Accepted publickey for foobar from 173.239.22
     | name: ssh_remote_port type: 3 representation: <nil> value: 4242
     | name: method type: 0 representation: <nil> value: publickey
     | name: user type: 0 representation: <nil> value: foobar
-    | name: ssh_remote_ipaddr type: 0 representation: ipv4 value: 173.239.228.74
+    | name: ssh_remote_ipaddr type: 0 representation: ipv4 value: 216.160.83.56
     | name: programname type: 0 representation: <nil> value: sshd
     | name: extra type: 0 representation: <nil> value:
     | name: authmsg type: 0 representation: <nil> value: Accepted
@@ -235,7 +236,7 @@ maxminddb_heka = {
 
 ### Input
 ```
-Feb 13 14:25:19 ubuntu sshd[7192]: Accepted publickey for foobar from 173.239.228.74 port 4242 ssh2
+Feb 13 14:25:19 ubuntu sshd[7192]: Accepted publickey for foobar from 216.160.83.56 port 4242 ssh2
 ```
 
 ### Output
@@ -245,7 +246,7 @@ Feb 13 14:25:19 ubuntu sshd[7192]: Accepted publickey for foobar from 173.239.22
 :Type: <nil>
 :Logger: input.printf_transform
 :Severity: 7
-:Payload: Accepted publickey for foobar from 173.239.228.74 port 4242 ssh2
+:Payload: Accepted publickey for foobar from 216.160.83.56 port 4242 ssh2
 :EnvVersion: <nil>
 :Pid: 7192
 :Hostname: ubuntu
@@ -255,10 +256,10 @@ Feb 13 14:25:19 ubuntu sshd[7192]: Accepted publickey for foobar from 173.239.22
     | name: user type: 0 representation: <nil> value: foobar
     | name: extra type: 0 representation: <nil> value:
     | name: authmsg type: 0 representation: <nil> value: Accepted
-    | name: ssh_remote_ipaddr_city type: 0 representation: <nil> value: San Jose
+    | name: ssh_remote_ipaddr_city type: 0 representation: <nil> value: Milton
     | name: ssh_remote_ipaddr_country type: 0 representation: <nil> value: US
     | name: programname type: 0 representation: <nil> value: sshd
-    | name: ssh_remote_ipaddr type: 0 representation: ipv4 value: 173.239.228.74
+    | name: ssh_remote_ipaddr type: 0 representation: ipv4 value: 216.160.83.56
 ```
 
 ----
@@ -286,7 +287,7 @@ decoders_syslog = {
 
 ### Input
 ```
-Feb 14 19:20:21 ubuntu someapp[3453]: foo=bar a=14 baz="hello kitty" cool%story=bro f %^asdf ip=173.239.228.74
+Feb 14 19:20:21 ubuntu someapp[3453]: foo=bar a=14 baz="hello kitty" cool%story=bro f %^asdf ip=216.160.83.56
 ```
 
 ### Output
@@ -308,7 +309,7 @@ Uuid: 3cafda9a-261f-48b5-a288-cc6c0783ba3e
     | name: %^asdf type: 4 representation: <nil> value: true
     | name: programname type: 0 representation: <nil> value: someapp
     | name: f type: 4 representation: <nil> value: true
-    | name: ip type: 0 representation: <nil> value: 173.239.228.74
+    | name: ip type: 0 representation: <nil> value: 216.160.83.56
 ```
 
 ----
@@ -347,7 +348,7 @@ maxminddb_heka = {
 
 ### Input
 ```
-Feb 14 19:20:21 ubuntu someapp[3453]: foo=bar a=14 baz="hello kitty" cool%story=bro f %^asdf ip=173.239.228.74
+Feb 14 19:20:21 ubuntu someapp[3453]: foo=bar a=14 baz="hello kitty" cool%story=bro f %^asdf ip=216.160.83.56
 ```
 
 ### Output
@@ -357,17 +358,17 @@ Feb 14 19:20:21 ubuntu someapp[3453]: foo=bar a=14 baz="hello kitty" cool%story=
 :Type: <nil>
 :Logger: input.grammar_transform
 :Severity: 7
-:Payload: foo=bar a=14 baz="hello kitty" cool%story=bro f %^asdf ip=173.239.228.74
+:Payload: foo=bar a=14 baz="hello kitty" cool%story=bro f %^asdf ip=216.160.83.56
 :EnvVersion: <nil>
 :Pid: 3453
 :Hostname: ubuntu
 :Fields:
     | name: a type: 0 representation: <nil> value: 14
     | name: baz type: 0 representation: <nil> value: hello kitty
-    | name: ip type: 0 representation: <nil> value: 173.239.228.74
+    | name: ip type: 0 representation: <nil> value: 216.160.83.56
     | name: f type: 4 representation: <nil> value: true
     | name: ip_country type: 0 representation: <nil> value: US
-    | name: ip_city type: 0 representation: <nil> value: San Jose
+    | name: ip_city type: 0 representation: <nil> value: Milton
     | name: %^asdf type: 4 representation: <nil> value: true
     | name: programname type: 0 representation: <nil> value: someapp
     | name: cool%story type: 0 representation: <nil> value: bro
@@ -402,7 +403,7 @@ decoders_syslog = {
 
 ### Input
 ```
-Feb 14 19:20:21 ubuntu someapp[3453]: foo=bar a=14 baz="hello kitty" cool%story=bro f %^asdf ip=173.239.228.74
+Feb 14 19:20:21 ubuntu someapp[3453]: foo=bar a=14 baz="hello kitty" cool%story=bro f %^asdf ip=216.160.83.56
 ```
 
 ### Output
@@ -412,7 +413,7 @@ Feb 14 19:20:21 ubuntu someapp[3453]: foo=bar a=14 baz="hello kitty" cool%story=
 :Type: <nil>
 :Logger: input.grammar_args
 :Severity: 7
-:Payload: foo=bar a=14 baz="hello kitty" cool%story=bro f %^asdf ip=173.239.228.74
+:Payload: foo=bar a=14 baz="hello kitty" cool%story=bro f %^asdf ip=216.160.83.56
 :EnvVersion: <nil>
 :Pid: 3453
 :Hostname: ubuntu
