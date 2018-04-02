@@ -20,8 +20,8 @@ print("END_TIMER:foo")
 
 ## Log
 ```
-1515017287796327572 [debug] START_TIMER:foo
-1515017287796347586 [debug] END_TIMER:foo
+1515017287796327572 [debug] input.test START_TIMER:foo
+1515017287796347586 [debug] input.test END_TIMER:foo
 ````
 
 ## Output

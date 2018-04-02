@@ -1,17 +1,17 @@
-0	[debug]	START_TIMER:foo
-123	[debug]	END_TIMER:foo
-0	[debug]	START_TIMER:foo
-100	[debug]	END_TIMER:foo
-0	[debug]	START_TIMER:foo
-110	[debug]	END_TIMER:foo
-0	[debug]	START_TIMER:foo
-105	[debug]	END_TIMER:foo
-0	[debug]	START_TIMER:bar
-24	[debug]	END_TIMER:bar
-0	[debug]	START_TIMER:widget
-50	[debug]	END_TIMER:widget
-0	[debug]	START_TIMER:widget
-60	[debug]	END_TIMER:widget
-60	[debug]	END_TIMER:widget
-0	[debug]	START_TIMER:widget
-0	[debug]	START_TIMER:widget
+0 [debug] input.test START_TIMER:foo
+123 [debug] input.test END_TIMER:foo
+0 [debug] input.test START_TIMER:foo
+100 [debug] input.test END_TIMER:foo
+0 [debug] input.test START_TIMER:foo
+110 [debug] input.test END_TIMER:foo
+0 [debug] input.test START_TIMER:foo
+105 [debug] input.test END_TIMER:foo
+0 [debug] input.test START_TIMER:bar
+24 [debug] input.test END_TIMER:bar
+0 [debug] input.test START_TIMER:widget
+50 [debug] input.test END_TIMER:widget
+0 [debug] input.test START_TIMER:widget
+60 [debug] input.test END_TIMER:widget
+60 [debug] input.test END_TIMER:widget
+0 [debug] input.test START_TIMER:widget
+0 [debug] input.test START_TIMER:widget

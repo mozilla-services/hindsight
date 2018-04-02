@@ -84,7 +84,7 @@ decoders_syslog = {
   sub_decoders = {
     filterlog = "lpeg.bsd.filterlog",
     ["hostname.example.com"] = {
-      { {"common_log_format#build_nginx_grammar", log_format}, nil}
+      { {"lpeg.common_log_format#build_nginx_grammar", log_format}, nil}
     }
   }
 }
