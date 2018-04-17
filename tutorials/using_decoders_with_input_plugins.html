@@ -96,7 +96,7 @@
                 <a href="../">
             
                     
-                    Hindsight (0.14.10)
+                    Hindsight (0.14.12)
             
                 </a>
             
@@ -278,7 +278,8 @@
 of ingesting syslogs. Each section starts with a description followed by a
 configuration, input file and the resulting output. The configurations are
 evolved to demonstrate the available functionality.</p>
-<p>For all of the examples in this guide the
+<p>For all of the <a href="https://github.com/mozilla-services/lua_sandbox_extensions/syslog/tests/integration/tutorial" target="_blank">examples</a>
+in this guide the
 <a href="https://mozilla-services.github.io/lua_sandbox_extensions/heka/sandboxes/heka/input/file.html" target="_blank">file</a>
 input is used. In a real world environment one would most likely use the
 <a href="https://mozilla-services.github.io/lua_sandbox_extensions/lfs/sandboxes/heka/input/tail.html" target="_blank">tail</a>,
@@ -328,14 +329,14 @@ decoders_syslog = {
 }
 </code></pre>
 <h3 id="Input">2.2. Input</h3>
-<pre><code>Feb 13 14:25:19 ubuntu sshd[7192]: Accepted publickey for foobar from 173.239.228.74 port 4242 ssh2
+<pre><code>Feb 13 14:25:19 ubuntu sshd[7192]: Accepted publickey for foobar from 216.160.83.56 port 4242 ssh2
 </code></pre><h3 id="Output">2.3. Output</h3>
 <pre><code class="lang-rst">:Uuid: 0c1e9271-6b7c-451e-aa05-63cdaf14cf10
 :Timestamp: 2018-02-13T14:25:19.000000000Z
 :Type: &lt;nil&gt;
 :Logger: input.syslog
 :Severity: 7
-:Payload: Accepted publickey for foobar from 173.239.228.74 port 4242 ssh2
+:Payload: Accepted publickey for foobar from 216.160.83.56 port 4242 ssh2
 :EnvVersion: &lt;nil&gt;
 :Pid: 7192
 :Hostname: ubuntu
@@ -411,14 +412,14 @@ decoders_syslog = {
 }
 </code></pre>
 <h3 id="Input">4.2. Input</h3>
-<pre><code>Feb 13 14:25:19 ubuntu sshd[7192]: Accepted publickey for foobar from 173.239.228.74 port 4242 ssh2
+<pre><code>Feb 13 14:25:19 ubuntu sshd[7192]: Accepted publickey for foobar from 216.160.83.56 port 4242 ssh2
 </code></pre><h3 id="Output">4.3. Output</h3>
 <pre><code class="lang-rst">:Uuid: 3bde3689-26a7-484f-a893-a7d6718be4c6
 :Timestamp: 2018-02-13T14:25:19.000000000Z
 :Type: &lt;nil&gt;
 :Logger: input.printf
 :Severity: 7
-:Payload: Accepted publickey for foobar from 173.239.228.74 port 4242 ssh2
+:Payload: Accepted publickey for foobar from 216.160.83.56 port 4242 ssh2
 :EnvVersion: &lt;nil&gt;
 :Pid: 7192
 :Hostname: ubuntu
@@ -426,7 +427,7 @@ decoders_syslog = {
     | name: ssh_remote_port type: 3 representation: &lt;nil&gt; value: 4242
     | name: method type: 0 representation: &lt;nil&gt; value: publickey
     | name: user type: 0 representation: &lt;nil&gt; value: foobar
-    | name: ssh_remote_ipaddr type: 0 representation: ipv4 value: 173.239.228.74
+    | name: ssh_remote_ipaddr type: 0 representation: ipv4 value: 216.160.83.56
     | name: programname type: 0 representation: &lt;nil&gt; value: sshd
     | name: extra type: 0 representation: &lt;nil&gt; value:
     | name: authmsg type: 0 representation: &lt;nil&gt; value: Accepted
@@ -473,14 +474,14 @@ maxminddb_heka = {
 }
 </code></pre>
 <h3 id="Input">5.2. Input</h3>
-<pre><code>Feb 13 14:25:19 ubuntu sshd[7192]: Accepted publickey for foobar from 173.239.228.74 port 4242 ssh2
+<pre><code>Feb 13 14:25:19 ubuntu sshd[7192]: Accepted publickey for foobar from 216.160.83.56 port 4242 ssh2
 </code></pre><h3 id="Output">5.3. Output</h3>
 <pre><code class="lang-rst">:Uuid: 5018c7e5-e51d-447f-aa84-a2f3a2d9ad11
 :Timestamp: 2018-02-13T14:25:19.000000000Z
 :Type: &lt;nil&gt;
 :Logger: input.printf_transform
 :Severity: 7
-:Payload: Accepted publickey for foobar from 173.239.228.74 port 4242 ssh2
+:Payload: Accepted publickey for foobar from 216.160.83.56 port 4242 ssh2
 :EnvVersion: &lt;nil&gt;
 :Pid: 7192
 :Hostname: ubuntu
@@ -490,10 +491,10 @@ maxminddb_heka = {
     | name: user type: 0 representation: &lt;nil&gt; value: foobar
     | name: extra type: 0 representation: &lt;nil&gt; value:
     | name: authmsg type: 0 representation: &lt;nil&gt; value: Accepted
-    | name: ssh_remote_ipaddr_city type: 0 representation: &lt;nil&gt; value: San Jose
+    | name: ssh_remote_ipaddr_city type: 0 representation: &lt;nil&gt; value: Milton
     | name: ssh_remote_ipaddr_country type: 0 representation: &lt;nil&gt; value: US
     | name: programname type: 0 representation: &lt;nil&gt; value: sshd
-    | name: ssh_remote_ipaddr type: 0 representation: ipv4 value: 173.239.228.74
+    | name: ssh_remote_ipaddr type: 0 representation: ipv4 value: 216.160.83.56
 </code></pre>
 <hr>
 <h2 id="Lua_Grammar_Module_Decoder">6. Lua Grammar Module Decoder</h2>
@@ -515,7 +516,7 @@ decoders_syslog = {
 }
 </code></pre>
 <h3 id="Input">6.2. Input</h3>
-<pre><code>Feb 14 19:20:21 ubuntu someapp[3453]: foo=bar a=14 baz=&quot;hello kitty&quot; cool%story=bro f %^asdf ip=173.239.228.74
+<pre><code>Feb 14 19:20:21 ubuntu someapp[3453]: foo=bar a=14 baz=&quot;hello kitty&quot; cool%story=bro f %^asdf ip=216.160.83.56
 </code></pre><h3 id="Output">6.3. Output</h3>
 <pre><code class="lang-rst">Uuid: 3cafda9a-261f-48b5-a288-cc6c0783ba3e
 :Timestamp: 2018-02-14T19:20:21.000000000Z
@@ -534,7 +535,7 @@ decoders_syslog = {
     | name: %^asdf type: 4 representation: &lt;nil&gt; value: true
     | name: programname type: 0 representation: &lt;nil&gt; value: someapp
     | name: f type: 4 representation: &lt;nil&gt; value: true
-    | name: ip type: 0 representation: &lt;nil&gt; value: 173.239.228.74
+    | name: ip type: 0 representation: &lt;nil&gt; value: 216.160.83.56
 </code></pre>
 <hr>
 <h2 id="Lua_Grammar_Module_Decoder_with_Transformation">7. Lua Grammar Module Decoder with Transformation</h2>
@@ -567,24 +568,24 @@ maxminddb_heka = {
 }
 </code></pre>
 <h3 id="Input">7.2. Input</h3>
-<pre><code>Feb 14 19:20:21 ubuntu someapp[3453]: foo=bar a=14 baz=&quot;hello kitty&quot; cool%story=bro f %^asdf ip=173.239.228.74
+<pre><code>Feb 14 19:20:21 ubuntu someapp[3453]: foo=bar a=14 baz=&quot;hello kitty&quot; cool%story=bro f %^asdf ip=216.160.83.56
 </code></pre><h3 id="Output">7.3. Output</h3>
 <pre><code class="lang-rst">:Uuid: eade849f-e90f-4cc7-a817-265545d4e522
 :Timestamp: 2018-02-14T19:20:21.000000000Z
 :Type: &lt;nil&gt;
 :Logger: input.grammar_transform
 :Severity: 7
-:Payload: foo=bar a=14 baz=&quot;hello kitty&quot; cool%story=bro f %^asdf ip=173.239.228.74
+:Payload: foo=bar a=14 baz=&quot;hello kitty&quot; cool%story=bro f %^asdf ip=216.160.83.56
 :EnvVersion: &lt;nil&gt;
 :Pid: 3453
 :Hostname: ubuntu
 :Fields:
     | name: a type: 0 representation: &lt;nil&gt; value: 14
     | name: baz type: 0 representation: &lt;nil&gt; value: hello kitty
-    | name: ip type: 0 representation: &lt;nil&gt; value: 173.239.228.74
+    | name: ip type: 0 representation: &lt;nil&gt; value: 216.160.83.56
     | name: f type: 4 representation: &lt;nil&gt; value: true
     | name: ip_country type: 0 representation: &lt;nil&gt; value: US
-    | name: ip_city type: 0 representation: &lt;nil&gt; value: San Jose
+    | name: ip_city type: 0 representation: &lt;nil&gt; value: Milton
     | name: %^asdf type: 4 representation: &lt;nil&gt; value: true
     | name: programname type: 0 representation: &lt;nil&gt; value: someapp
     | name: cool%story type: 0 representation: &lt;nil&gt; value: bro
@@ -613,14 +614,14 @@ decoders_syslog = {
 }
 </code></pre>
 <h3 id="Input">8.2. Input</h3>
-<pre><code>Feb 14 19:20:21 ubuntu someapp[3453]: foo=bar a=14 baz=&quot;hello kitty&quot; cool%story=bro f %^asdf ip=173.239.228.74
+<pre><code>Feb 14 19:20:21 ubuntu someapp[3453]: foo=bar a=14 baz=&quot;hello kitty&quot; cool%story=bro f %^asdf ip=216.160.83.56
 </code></pre><h3 id="Output">8.3. Output</h3>
 <pre><code class="lang-rst">:Uuid: 0cde3ec6-b894-498e-aad6-abf3e4059342
 :Timestamp: 2018-02-14T19:20:21.000000000Z
 :Type: &lt;nil&gt;
 :Logger: input.grammar_args
 :Severity: 7
-:Payload: foo=bar a=14 baz=&quot;hello kitty&quot; cool%story=bro f %^asdf ip=173.239.228.74
+:Payload: foo=bar a=14 baz=&quot;hello kitty&quot; cool%story=bro f %^asdf ip=216.160.83.56
 :EnvVersion: &lt;nil&gt;
 :Pid: 3453
 :Hostname: ubuntu
@@ -765,7 +766,7 @@ decoders_nginx_access = {
     <script>
         var gitbook = gitbook || [];
         gitbook.push(function() {
-            gitbook.page.hasChanged({"page":{"title":"Using Decoders with Input Plugins","level":"2.1","depth":1,"next":{"title":"Common Configuration Cookbooks","level":"2.2","depth":1,"path":"tutorials/cookbooks.md","ref":"tutorials/cookbooks.md","articles":[]},"previous":{"title":"Sandbox Extensions Documentation","level":"1.8","depth":1,"url":"http://mozilla-services.github.io/lua_sandbox_extensions/index.html","ref":"http://mozilla-services.github.io/lua_sandbox_extensions/index.html","articles":[]},"dir":"ltr"},"config":{"gitbook":"*","theme":"default","variables":{},"plugins":["collapsible-menu","navigator"],"pluginsConfig":{"collapsible-menu":{},"navigator":{},"highlight":{},"search":{},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"fontsettings":{"theme":"white","family":"sans","size":2},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"}},"file":{"path":"tutorials/using_decoders_with_input_plugins.md","mtime":"2018-02-27T22:46:58.198Z","type":"markdown"},"gitbook":{"version":"3.2.2","time":"2018-02-27T22:51:08.706Z"},"basePath":"..","book":{"language":""}});
+            gitbook.page.hasChanged({"page":{"title":"Using Decoders with Input Plugins","level":"2.1","depth":1,"next":{"title":"Common Configuration Cookbooks","level":"2.2","depth":1,"path":"tutorials/cookbooks.md","ref":"tutorials/cookbooks.md","articles":[]},"previous":{"title":"Sandbox Extensions Documentation","level":"1.8","depth":1,"url":"http://mozilla-services.github.io/lua_sandbox_extensions/index.html","ref":"http://mozilla-services.github.io/lua_sandbox_extensions/index.html","articles":[]},"dir":"ltr"},"config":{"gitbook":"*","theme":"default","variables":{},"plugins":["collapsible-menu","navigator"],"pluginsConfig":{"collapsible-menu":{},"navigator":{},"highlight":{},"search":{},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"fontsettings":{"theme":"white","family":"sans","size":2},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"}},"file":{"path":"tutorials/using_decoders_with_input_plugins.md","mtime":"2018-04-17T14:59:24.114Z","type":"markdown"},"gitbook":{"version":"3.2.2","time":"2018-04-17T15:52:20.858Z"},"basePath":"..","book":{"language":""}});
         });
     </script>
 </div>
