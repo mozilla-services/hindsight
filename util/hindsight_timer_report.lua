@@ -77,7 +77,7 @@ end
 
 local fh = assert(io.open(arg[1]))
 for line in fh:lines() do
-    local ns, prefix, name = line:match("(%d+)\t%[debug%]\t(%u+_TIMER):(.+)")
+    local ns, prefix, name = line:match("(%d+) %[debug%] [%w_.]+ (%u+_TIMER):(.+)")
     if ns then update_timer(ns, prefix, name) end
 end
 
