@@ -40,9 +40,11 @@ static bool extract_id(const char *fn, unsigned long long *id)
 static size_t find_first_id(const char *path)
 {
   struct dirent *entry;
+  errno = 0;
   DIR *dp = opendir(path);
-  if (dp == NULL) {
-    hs_log(NULL, g_module, 0, "path does not exist: %s", path);
+  if (!dp) {
+    hs_log(NULL, g_module, 0, "errno: %d path does not exist: %s", errno,
+           path);
     exit(EXIT_FAILURE);
   }
 
@@ -65,6 +67,36 @@ static void remove_checkpoint(hs_checkpoint_reader *cpr,
   lua_pushnil(cpr->values);
   lua_setfield(cpr->values, LUA_GLOBALSINDEX, key);
   hs_log(NULL, g_module, 6, "checkpoint removed: %s", key);
+}
+
+
+size_t hs_find_next_id(const char *path, const char *subdir, size_t start_id)
+{
+  char fqfn[HS_MAX_PATH];
+  if (hs_get_fqfn(path, subdir, fqfn, sizeof(fqfn))) {
+    hs_log(NULL, g_module, 0, "checkpoint name exceeds the max length: %d",
+           sizeof(fqfn));
+    exit(EXIT_FAILURE);
+  }
+
+  struct dirent *entry;
+  errno = 0;
+  DIR *dp = opendir(fqfn);
+  if (!dp) {
+    hs_log(NULL, g_module, 0, "errno: %d path does not exist: %s", errno, fqfn);
+    exit(EXIT_FAILURE);
+  }
+
+  unsigned long long file_id = ULLONG_MAX, current_id = 0;
+  while ((entry = readdir(dp))) {
+    if (extract_id(entry->d_name, &current_id)) {
+      if (current_id > start_id && current_id < file_id) {
+        file_id = current_id;
+      }
+    }
+  }
+  closedir(dp);
+  return file_id == ULLONG_MAX ? 0 : file_id;
 }
 
 

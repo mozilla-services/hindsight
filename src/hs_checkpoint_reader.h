@@ -50,6 +50,9 @@ typedef struct hs_checkpoint_reader {
   pthread_mutex_t lock;
 } hs_checkpoint_reader;
 
+
+size_t hs_find_next_id(const char *path, const char *subdir, size_t start_id);
+
 void hs_init_checkpoint_reader(hs_checkpoint_reader *cpr, const char *path);
 
 void hs_free_checkpoint_reader(hs_checkpoint_reader *cpr);
@@ -65,9 +68,9 @@ void hs_update_checkpoint(hs_checkpoint_reader *cpr,
                           hs_ip_checkpoint *cp);
 
 void hs_lookup_input_checkpoint(hs_checkpoint_reader *cpr,
+                                const char *subdir,
                                 const char *key,
                                 const char *path,
-                                const char *subdir,
                                 hs_checkpoint *cp);
 
 void hs_update_input_checkpoint(hs_checkpoint_reader *cpr,
