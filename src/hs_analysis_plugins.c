@@ -133,6 +133,7 @@ create_analysis_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
   p->te_im_limit = sbc->te_im_limit;
   p->shutdown_terminate = sbc->shutdown_terminate;
   p->ticker_interval = sbc->ticker_interval;
+  p->pm_sample = true;
   int stagger = p->ticker_interval > 60 ? 60 : p->ticker_interval;
   // distribute when the timer_events will fire
   if (stagger) {
@@ -399,6 +400,8 @@ static void analyze_message(hs_analysis_thread *at, bool sample)
           }
         }
       }
+    } else {
+      if (sample) p->pm_sample = true;
     }
 
     if (ret <= 0 && p->ticker_interval && at->current_t >= p->ticker_expires) {

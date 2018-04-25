@@ -136,6 +136,7 @@ create_output_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
   p->rm_cp_terminate = sbc->rm_cp_terminate;
   p->read_queue = sbc->read_queue;
   p->shutdown_terminate = sbc->shutdown_terminate;
+  p->pm_sample = true;
   int stagger = p->ticker_interval > 60 ? 60 : p->ticker_interval;
   // distribute when the timer_events will fire
   if (stagger) {
@@ -249,6 +250,7 @@ static int output_message(hs_output_plugin *p, lsb_heka_message *msg,
     bool matched = lsb_eval_message_matcher(p->mm, msg);
     if (sample) {
       mmdelta = lsb_get_time() - start;
+      p->pm_sample = true;
     }
     if (matched) {
       if (p->async_len) {
@@ -259,7 +261,8 @@ static int output_message(hs_output_plugin *p, lsb_heka_message *msg,
         p->async_cp[i].analysis.offset = p->cur.analysis.offset;
       }
       ret = lsb_heka_pm_output(p->hsb, msg, (void *)p->sequence_id,
-                               sample);
+                               p->pm_sample);
+      p->pm_sample = false;
       if (ret <= 0) {
         if (ret == LSB_HEKA_PM_SENT) {
           p->batching = false;
@@ -286,12 +289,20 @@ static int output_message(hs_output_plugin *p, lsb_heka_message *msg,
           ++p->sequence_id;
         }
       }
+    } else {
+      if (sample) p->pm_sample = true;
     }
 
     // advance the checkpoint if not batching/asyc/retrying
     if (ret <= 0 && !p->batching && ret != LSB_HEKA_PM_RETRY) {
       update_checkpoint(p);
     }
+  }
+
+  if (ret <= 0 && p->ticker_interval
+      && current_t >= p->ticker_expires) {
+    te_ret = lsb_heka_timer_event(p->hsb, current_t, false);
+    p->ticker_expires = current_t + p->ticker_interval;
   }
 
   if (sample) {
@@ -302,12 +313,6 @@ static int output_message(hs_output_plugin *p, lsb_heka_message *msg,
     p->stats = lsb_heka_get_stats(p->hsb);
     p->sample = false;
     pthread_mutex_unlock(&p->cp_lock);
-  }
-
-  if (ret <= 0 && p->ticker_interval
-      && current_t >= p->ticker_expires) {
-    te_ret = lsb_heka_timer_event(p->hsb, current_t, false);
-    p->ticker_expires = current_t + p->ticker_interval;
   }
 
   if (ret > 0 || te_ret > 0) {
@@ -563,6 +568,9 @@ static void* input_thread(void *arg)
           hs_log(NULL, p->name, 7, "retry message %llu err: %s", p->sequence_id,
                  err);
           sleep(1);
+#ifndef HINDSIGHT_CLI
+          current_t = time(NULL);
+#endif
           ret = output_message(p, msg, false, current_t);
           if (ret == LSB_HEKA_PM_RETRY) {
             pthread_mutex_lock(&p->cp_lock);
@@ -582,11 +590,6 @@ static void* input_thread(void *arg)
       lsb_clear_heka_message(&im); // create an idle/empty message
       msg = &im;
       output_message(p, msg, sample, current_t);
-      if (sample) {
-        pthread_mutex_lock(&p->cp_lock);
-        p->sample = false;
-        pthread_mutex_unlock(&p->cp_lock);
-      }
       msg = NULL;
       sleep(1);
     }
