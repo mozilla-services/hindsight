@@ -442,12 +442,13 @@ static void* input_thread(void *arg)
   lsb_logger logger = { .context = NULL, .cb = hs_log };
   bool stop = false;
   bool sample = false;
+  bool next = false;
 #ifdef HINDSIGHT_CLI
   long long cli_ns = 0;
   bool input_stop = false;
-  bool next = false;
   while (!(stop && input_stop)) {
 #else
+  int iwait_cnt = 0;
   while (!stop) {
 #endif
     pthread_mutex_lock(&at->cp_lock);
@@ -479,9 +480,6 @@ static void* input_thread(void *arg)
         pthread_mutex_unlock(&at->cp_lock);
       } else {
         bytes_read = hs_read_file(&at->input);
-        // When the read gets to the end it will always check once for the next
-        // available file just incase the output_size was increased on the last
-        // restart.
 #ifdef HINDSIGHT_CLI
         next = false;
         if (!bytes_read
@@ -492,9 +490,31 @@ static void* input_thread(void *arg)
           input_stop = true;
         }
 #else
-        if (!bytes_read
-            && (at->input.cp.offset >= at->plugins->cfg->output_size)) {
-          hs_open_file(&at->input, hs_input_dir, at->input.cp.id + 1);
+        // When the read gets to the end it will always check once for the next
+        // available file just incase the output_size was increased on the last
+        // restart.
+        if (!bytes_read && (at->input.cp.offset >= at->plugins->cfg->output_size
+                            || next)) {
+          next = hs_open_file(&at->input, hs_input_dir, at->input.cp.id + 1);
+          if (!next) {
+            if (++iwait_cnt > 60
+                || at->input.cp.offset < at->plugins->cfg->output_size) {
+              size_t next_id = hs_find_next_id(at->plugins->cfg->output_path,
+                                               hs_input_dir,
+                                               at->input.cp.id);
+              if (next_id > at->input.cp.id + 1) {
+                hs_log(NULL, g_module, 3,
+                       "tid: %d the input checkpoint skipped %zu missing files",
+                       at->tid, next_id - at->input.cp.id - 1);
+                next = hs_open_file(&at->input, hs_input_dir, next_id);
+                if (!next) {
+                  hs_log(NULL, g_module, 2,
+                         "unable to open input queue file: %zu", next_id);
+                }
+              }
+              iwait_cnt = 0;
+            }
+          }
         }
 #endif
       }
@@ -505,7 +525,22 @@ static void* input_thread(void *arg)
         input_stop = true;
       }
 #else
-      hs_open_file(&at->input, hs_input_dir, at->input.cp.id);
+      if (++iwait_cnt > 60) { // the internal state is bad (manual prune?)
+        hs_lookup_input_checkpoint(at->plugins->cpr,
+                                   hs_input_dir,
+                                   NULL, // restart from the end
+                                   at->plugins->cfg->output_path,
+                                   &at->input.cp);
+        pthread_mutex_lock(&at->cp_lock);
+        at->cp.id = at->input.cp.id = at->input.cp.id;
+        at->cp.offset = at->input.cp.offset = at->input.cp.offset;
+        pthread_mutex_unlock(&at->cp_lock);
+        hs_log(NULL, g_module, 3, "tid: %d the input checkpoint was reset",
+               at->tid);
+        iwait_cnt = 0;
+      }
+      next = hs_open_file(&at->input, hs_input_dir, at->input.cp.id);
+      if (next) iwait_cnt = 0;
 #endif
     }
 

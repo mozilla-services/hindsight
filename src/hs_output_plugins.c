@@ -64,8 +64,8 @@ static void update_checkpoint(hs_output_plugin *p)
 
 
 static void remove_checkpoint_q(hs_output_plugins *plugins,
-                               const char *plugin_name,
-                               char q)
+                                const char *plugin_name,
+                                char q)
 {
   char key[HS_MAX_PATH];
   if (q >= 'b') {
@@ -336,21 +336,29 @@ static void* input_thread(void *arg)
   int ret = 0;
   bool stop = false;
   bool sample = false;
-  time_t current_t = 0;
+  time_t current_t = time(NULL);
   lsb_logger logger = { .context = NULL, .cb = hs_log };
 #ifdef HINDSIGHT_CLI
   long long cli_ns = 0;
   bool input_stop = p->read_queue == 'a';
   bool analysis_stop = p->read_queue == 'i';
-  bool next = false;
   while (!(stop && input_stop && analysis_stop)) {
 #else
+  time_t itimer = 0;
+  time_t atimer = 0;
+  bool inext = false;
+  bool anext = false;
+  int iwait_cnt = 0;
+  int await_cnt = 0;
   while (!stop) {
 #endif
     pthread_mutex_lock(&p->cp_lock);
     stop = p->stop;
     sample = p->sample;
     pthread_mutex_unlock(&p->cp_lock);
+#ifndef HINDSIGHT_CLI
+    current_t = time(NULL);
+#endif
 
     if (p->read_queue >= 'b') {
       if (p->input.fh && !pim) {
@@ -359,7 +367,7 @@ static void* input_thread(void *arg)
         } else {
           bytes_read[0] = hs_read_file(&p->input);
 #ifdef HINDSIGHT_CLI
-          next = false;
+          bool next = false;
           if (!bytes_read[0]
               && (p->input.cp.offset >= p->plugins->cfg->output_size)) {
             next = hs_open_file(&p->input, hs_input_dir, p->input.cp.id + 1);
@@ -368,18 +376,63 @@ static void* input_thread(void *arg)
             input_stop = true;
           }
 #else
-          if (!bytes_read[0]
-              && (p->input.cp.offset >= p->plugins->cfg->output_size)) {
-            hs_open_file(&p->input, hs_input_dir, p->input.cp.id + 1);
+          // When the read gets to the end it will always check once for the
+          // next available file just incase the output_size was increased on
+          // the last restart.
+          if (!bytes_read[0] &&
+              (p->input.cp.offset >= p->plugins->cfg->output_size || inext)) {
+            if (current_t != itimer) {
+              itimer = current_t;
+              inext = hs_open_file(&p->input, hs_input_dir, p->input.cp.id + 1);
+              if (inext) {
+                iwait_cnt = 0;
+              } else {
+                if (++iwait_cnt > 60
+                    || p->input.cp.offset < p->plugins->cfg->output_size) {
+                  size_t next_id = hs_find_next_id(p->plugins->cfg->output_path,
+                                                   hs_input_dir,
+                                                   p->input.cp.id);
+                  if (next_id > p->input.cp.id + 1) {
+                    hs_log(NULL, p->name, 3,
+                           "the input checkpoint skipped %zu missing files",
+                           next_id - p->input.cp.id - 1);
+                    inext = hs_open_file(&p->input, hs_input_dir, next_id);
+                    if (!inext) {
+                      hs_log(NULL, p->name, 2,
+                             "unable to open input queue file: %zu", next_id);
+                    }
+                  }
+                  iwait_cnt = 0;
+                }
+              }
+            }
           }
 #endif
         }
       } else if (!p->input.fh) { // still waiting on the first file
 #ifdef HINDSIGHT_CLI
-        next = hs_open_file(&p->input, hs_input_dir, p->input.cp.id);
+        bool next = hs_open_file(&p->input, hs_input_dir, p->input.cp.id);
         if (!next && stop) input_stop = true;
 #else
-        hs_open_file(&p->input, hs_input_dir, p->input.cp.id);
+        if (current_t != itimer) {
+          itimer = current_t;
+          if (++iwait_cnt > 60) {
+            // the internal state is bad (manual prune?)
+            hs_lookup_input_checkpoint(p->plugins->cpr,
+                                       hs_input_dir,
+                                       NULL, // restart from the end
+                                       p->plugins->cfg->output_path,
+                                       &p->input.cp);
+            pthread_mutex_lock(&p->cp_lock);
+            p->cur.input.id = p->cp.input.id = p->input.cp.id;
+            p->cur.input.offset = p->cp.input.offset = p->input.cp.offset;
+            pthread_mutex_unlock(&p->cp_lock);
+            hs_log(NULL, p->name, 3, "the input checkpoint was reset");
+            iwait_cnt = 0;
+          }
+          inext = hs_open_file(&p->input, hs_input_dir, p->input.cp.id);
+          if (inext) iwait_cnt = 0;
+        }
 #endif
       }
     }
@@ -391,7 +444,7 @@ static void* input_thread(void *arg)
         } else {
           bytes_read[1] = hs_read_file(&p->analysis);
 #ifdef HINDSIGHT_CLI
-          next = false;
+          bool next = false;
           if (!bytes_read[1]
               && (p->analysis.cp.offset >= p->plugins->cfg->output_size)) {
             next = hs_open_file(&p->analysis, hs_analysis_dir,
@@ -401,18 +454,68 @@ static void* input_thread(void *arg)
             analysis_stop = true;
           }
 #else
+          // When the read gets to the end it will always check once for the
+          // next available file just incase the output_size was increased on
+          // the last restart.
           if (!bytes_read[1]
-              && (p->analysis.cp.offset >=  p->plugins->cfg->output_size)) {
-            hs_open_file(&p->analysis, hs_analysis_dir, p->analysis.cp.id + 1);
+              && (p->analysis.cp.offset >= p->plugins->cfg->output_size
+                  || anext)) {
+            if (current_t != atimer) {
+              atimer = current_t;
+              anext = hs_open_file(&p->analysis, hs_analysis_dir,
+                                   p->analysis.cp.id + 1);
+              if (anext) {
+                await_cnt = 0;
+              } else {
+                if (++await_cnt > 60
+                    || p->analysis.cp.offset < p->plugins->cfg->output_size) {
+                  size_t next_id = hs_find_next_id(p->plugins->cfg->output_path,
+                                                   hs_analysis_dir,
+                                                   p->analysis.cp.id);
+                  if (next_id > p->analysis.cp.id + 1) {
+                    hs_log(NULL, p->name, 3,
+                           "the analysis checkpoint skipped %zu missing files",
+                           next_id - p->analysis.cp.id - 1);
+                    anext = hs_open_file(&p->analysis, hs_analysis_dir,
+                                         next_id);
+                    if (!anext) {
+                      hs_log(NULL, p->name, 2,
+                             "unable to open analysis queue file: %zu",
+                             next_id);
+                    }
+                  }
+                  await_cnt = 0;
+                }
+              }
+            }
           }
 #endif
         }
       } else if (!p->analysis.fh) { // still waiting on the first file
 #ifdef HINDSIGHT_CLI
-        next = hs_open_file(&p->analysis, hs_analysis_dir, p->analysis.cp.id);
+        bool next = hs_open_file(&p->analysis, hs_analysis_dir, p->analysis.cp.id);
         if (!next && input_stop && stop) analysis_stop = true;
 #else
-        hs_open_file(&p->analysis, hs_analysis_dir, p->analysis.cp.id);
+        if (current_t != atimer) {
+          atimer = current_t;
+          if (++await_cnt > 60) {
+            // the internal state is bad (manual prune?)
+            hs_lookup_input_checkpoint(p->plugins->cpr,
+                                       hs_analysis_dir,
+                                       NULL, // restart from the end
+                                       p->plugins->cfg->output_path,
+                                       &p->analysis.cp);
+            pthread_mutex_lock(&p->cp_lock);
+            p->cur.analysis.id = p->cp.analysis.id = p->analysis.cp.id;
+            p->cur.analysis.offset = p->cp.analysis.offset = p->analysis.cp.offset;
+            pthread_mutex_unlock(&p->cp_lock);
+            hs_log(NULL, p->name, 3, "the analysis checkpoint was reset");
+            await_cnt = 0;
+          }
+          anext = hs_open_file(&p->analysis, hs_analysis_dir,
+                               p->analysis.cp.id);
+          if (anext) await_cnt = 0;
+        }
 #endif
       }
     }
@@ -452,8 +555,6 @@ static void* input_thread(void *arg)
         cli_ns = msg->timestamp;
         current_t = cli_ns / 1000000000LL;
       }
-#else
-      current_t = time(NULL);
 #endif
       ret = output_message(p, msg, sample, current_t);
       if (ret == LSB_HEKA_PM_RETRY) {
@@ -480,9 +581,6 @@ static void* input_thread(void *arg)
       // trigger any pending timer events
       lsb_clear_heka_message(&im); // create an idle/empty message
       msg = &im;
-#ifndef HINDSIGHT_CLI
-      current_t = time(NULL);
-#endif
       output_message(p, msg, sample, current_t);
       if (sample) {
         pthread_mutex_lock(&p->cp_lock);
@@ -494,9 +592,6 @@ static void* input_thread(void *arg)
     }
   }
 
-#ifndef HINDSIGHT_CLI
-  current_t = time(NULL);
-#endif
   shutdown_timer_event(p, current_t);
   lsb_free_heka_message(&am);
   lsb_free_heka_message(&im);
