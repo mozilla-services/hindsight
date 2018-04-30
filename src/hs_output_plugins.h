@@ -46,6 +46,7 @@ struct hs_output_plugin {
   bool      batching;
   bool      stop;
   bool      sample;
+  bool      pm_sample;
   bool      rm_cp_terminate;
   bool      shutdown_terminate;
   char      read_queue;
