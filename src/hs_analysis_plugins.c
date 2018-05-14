@@ -304,6 +304,7 @@ static void add_to_analysis_plugins(const hs_sandbox_config *cfg,
 static void init_analysis_thread(hs_analysis_plugins *plugins, int tid)
 {
   hs_analysis_thread *at = &plugins->list[tid];
+  at->tid = tid;
   at->plugins = plugins;
   if (pthread_mutex_init(&at->list_lock, NULL)) {
     perror("list_lock pthread_mutex_init failed");
