@@ -1,115 +1,48 @@
 FROM centos:7
 
-ADD . /app/src/hindsight/
+# This is a simple Dockerfile that will install lua_sandbox and hindsight. Often times you will also
+# want the extensions, which are all the lua_sandbox plugins for use with hindsight. To get an image
+# with those included, see the lua_sandbox_extensions repo:
+#
+# https://github.com/mozilla-services/lua_sandbox_extensions
 
-RUN yum -y update && \
-    yum -y install sudo && \
+WORKDIR /root
 
-    # create the 'app' user
-    groupadd -g 10001 app && \
-    useradd -g app -G wheel -u 10001 -d /app app -s /bin/bash && \
+# Install most of our package dependencies here
+RUN yum makecache && \
+    yum install -y git rpm-build c-compiler make curl gcc gcc-c++ \
+    autoconf automake centos-release-scl epel-release zlib-devel openssl-devel \
+    libcurl-devel lua-devel && \
+    yum install -y devtoolset-6 && \
+    curl -OL https://cmake.org/files/v3.10/cmake-3.10.2-Linux-x86_64.tar.gz && \
+    if [[ `sha256sum cmake-3.10.2-Linux-x86_64.tar.gz | awk '{print $1}'` != \
+        "7a82b46c35f4e68a0807e8dc04e779dee3f36cd42c6387fd13b5c29fe62a69ea" ]]; then exit 1; fi && \
+    (cd /usr && tar --strip-components=1 -zxf /root/cmake-3.10.2-Linux-x86_64.tar.gz) && \
+    cat /etc/yum.conf | grep -v override_install_langs > /etc/yum.conf.lang && \
+    cp /etc/yum.conf.lang /etc/yum.conf && \
+    yum reinstall -y glibc-common
 
-    # allow app user to sudo without a password
-    sed -i 's/^%wheel\tALL=(ALL)\tALL$/# %wheel\tALL=(ALL)\tALL/g' /etc/sudoers && \
-    sed -i 's/^# %wheel\tALL=(ALL)\tNOPASSWD: ALL$/%wheel\tALL=(ALL)\tNOPASSWD: ALL/g' /etc/sudoers && \
-    chown app:app /app -R
+# Use devtoolset-6
+ENV PERL5LIB='PERL5LIB=/opt/rh/devtoolset-6/root//usr/lib64/perl5/vendor_perl:/opt/rh/devtoolset-6/root/usr/lib/perl5:/opt/rh/devtoolset-6/root//usr/share/perl5/vendor_perl' \
+    X_SCLS=devtoolset-6 \
+    PCP_DIR=/opt/rh/devtoolset-6/root \
+    LD_LIBRARY_PATH=/opt/rh/devtoolset-6/root/usr/lib64:/opt/rh/devtoolset-6/root/usr/lib \
+    PATH=/opt/rh/devtoolset-6/root/usr/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+    PYTHONPATH=/opt/rh/devtoolset-6/root/usr/lib64/python2.7/site-packages:/opt/rh/devtoolset-6/root/usr/lib/python2.7/site-packages \
+    PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
 
-USER app
-WORKDIR /app
+# Compile and install lua_sandbox using master branch
+RUN git clone https://github.com/mozilla-services/lua_sandbox && \
+    mkdir -p lua_sandbox/release && cd lua_sandbox/release && \
+    cmake -DCMAKE_BUILD_TYPE=release .. && \
+    make && ctest && cpack -G RPM && rpm -i *.rpm
 
-RUN sudo yum -y install epel-release.noarch && \
-    sudo yum -y install lua-devel luarocks cmake3 make clang gcc git rpm-build sudo && \
-    sudo ln -s /usr/bin/cmake3 /usr/local/bin/cmake && \
+# Compile and install hindsight
+ADD . /root/hindsight
+RUN mkdir -p /root/hindsight/release && cd /root/hindsight/release &&  \
+	cmake -DCMAKE_BUILD_TYPE=release .. && \
+	make && ctest && cpack -G RPM && rpm -i *.rpm
 
-    # Install confluent 3.1 for centos 7 for librdkafka-devel
-    echo -e "[confluent]\n\
-name=confluent\n\
-baseurl=http://packages.confluent.io/rpm/3.1/7\n\
-gpgcheck=1\n\
-gpgkey=http://packages.confluent.io/rpm/3.1/archive.key\n" | sudo tee /etc/yum.repos.d/confluent.repo && \
-
-    # Build the lua sandbox & extensions
-    cd /app/src && \
-    git clone https://github.com/mozilla-services/lua_sandbox.git && \
-    git clone https://github.com/mozilla-services/lua_sandbox_extensions.git && \
-    cd lua_sandbox_extensions/ && \
-    . /app/src/lua_sandbox/build/functions.sh && \
-    build_lsbe() { \
-        install_packages c++-compiler librdkafka-devel openssl-devel postgresql-devel systemd-devel zlib-devel && \
-        rm -rf ./release && \
-        mkdir release && \
-        cd release && \
-        cmake -DCMAKE_BUILD_TYPE=release \
-        -DEXT_aws=off \
-        -DEXT_bloom_filter=on \
-        -DEXT_circular_buffer=on \
-        -DEXT_cjson=on \
-        -DEXT_compat=on \
-        -DEXT_cuckoo_filter=on \
-        -DEXT_elasticsearch=on \
-        -DEXT_geoip=off \
-        -DEXT_heka=on \
-        -DEXT_hyperloglog=on \
-        -DEXT_jose=off \
-        -DEXT_kafka=on \
-        -DEXT_lfs=on \
-        -DEXT_lpeg=on \
-        -DEXT_lsb=on \
-        -DEXT_moz_ingest=on \
-        -DEXT_moz_logging=on \
-        -DEXT_moz_pioneer=off \
-        -DEXT_moz_security=off \
-        -DEXT_moz_telemetry=on \
-        -DEXT_openssl=on \
-        -DEXT_parquet=off \
-        -DEXT_postgres=on \
-        -DEXT_rjson=on \
-        -DEXT_sax=on \
-        -DEXT_snappy=off \
-        -DEXT_socket=on \
-        -DEXT_ssl=on \
-        -DEXT_struct=on \
-        -DEXT_syslog=on \
-        -DEXT_systemd=on \
-        -DEXT_zlib=on \
-	"-DCPACK_GENERATOR=${CPACK_GENERATOR}" .. && \
-        make && \
-        ctest -V && \
-        make packages; \
-    } && \
-    build_function="build_lsbe" main && \
-    sudo yum install -y /app/src/lua_sandbox_extensions/release/luasandbox*.rpm && \
-
-    # Build hindsight
-    cd /app/src/hindsight && \
-    mkdir release && \
-    cd release && \
-    cmake3 -DCMAKE_BUILD_TYPE=release .. && \
-    make && \
-    ctest3 && \
-    cpack3 -G RPM && \
-    sudo yum install -y /app/src/hindsight/release/hindsight*.rpm && \
-
-    # Setup run directory
-    cd /app && \
-    mkdir -p /app/cfg \
-             /app/input \
-             /app/output/input \
-             /app/load \
-             /app/run/input \
-             /app/run/analysis \
-             /app/run/output && \
-    cp /app/src/hindsight/hindsight.cfg /app/cfg/hindsight.cfg && \
-
-    # some extra lua libraries
-    sudo luarocks install lrexlib-pcre && \
-
-    # cleanup
-    rm -rf /app/src && \
-    sudo yum -y remove cmake3 make clang git rpm-build c++-compiler librdkafka-devel openssl-devel postgresql-devel systemd-devel zlib-devel  && \
-    sudo yum -y autoremove && \
-    sudo yum -y clean all
-
-VOLUME /app/output /app/load /app/run /app/input
-
-CMD /usr/bin/hindsight /app/cfg/hindsight.cfg
+# Add a hindsight user and default RUN command
+RUN groupadd hindsight && useradd -g hindsight -s /bin/bash -m hindsight
+CMD /usr/bin/su - hindsight -c 'cd /home/hindsight && hindsight hindsight.cfg 7'

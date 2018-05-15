@@ -3,32 +3,12 @@ sudo: required
 services:
   - docker
 
-env:
-    matrix:
-        - DOCKER_IMAGE=centos:6 CMAKE_URL=auto
-        - DOCKER_IMAGE=centos:7 CMAKE_URL=auto
-        - DOCKER_IMAGE=debian:7 CMAKE_URL=auto
-        - DOCKER_IMAGE=debian:8 CMAKE_URL=auto
-        - DOCKER_IMAGE=debian:8 CC=clang CMAKE_URL=auto
-        - DOCKER_IMAGE=debian:stretch
-        - DOCKER_IMAGE=fedora:latest
-        - DOCKER_IMAGE=ubuntu:12.04 CMAKE_URL=auto
-        - DOCKER_IMAGE=ubuntu:latest CMAKE_URL=auto # LTS
-        - DOCKER_IMAGE=ubuntu:devel
-        # used to build a container for mozilla/hindsight
-        - BUILD_CONTAINER=1
-
 script:
-    - if [ ! -z "$DOCKER_IMAGE" ]; then ./build/run.sh build; fi
-    - |
-        if [ "$BUILD_CONTAINER" -eq 1 ]; then
-            docker build -t "app:build" .
-            # If a TRAVIS_TAG is set, push a new release on dockerhub
-            if [ ! -z "$TRAVIS_TAG" ]; then
-                docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
-                docker tag app:build mozilla/hindsight:${TRAVIS_TAG}
-                docker tag app:build mozilla/hindsight:latest
-                docker push mozilla/hindsight:latest
-                docker logout
-            fi
-        fi
+  - docker build -t mozilla/hindsight:latest .
+
+deploy:
+  - provider: script
+    script: bash docker_push.sh $TRAVIS_BRANCH
+    on:
+      all_branches: true
+      condition: $TRAVIS_BRANCH =~ ^dev|master$

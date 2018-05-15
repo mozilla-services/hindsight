@@ -11,7 +11,7 @@ Hindsight is that light weight skeleton around the same lua sandbox offering
 [extension packages](https://mozilla-services.github.io/lua_sandbox_extensions)
 including hundreds of data structures, algorithms, plugins, parsers and
 grammars. The extensions repository is where most of the active development is
-happening now as the core infrastruture (Hindsight and the [Lua Sandbox](https://github.com/mozilla-services/lua_sandbox))
+happening now as the core infrastructure (Hindsight and the [Lua Sandbox](https://github.com/mozilla-services/lua_sandbox))
 is stable and changes infrequently.  There is also a [Hindsight Administration UI](https://github.com/mozilla-services/hindsight_admin)
 available for monitoring, debugging and plugin management (you can check out a
 running instance here: [hsadmin](https://hsadmin.trink.com/))
@@ -26,8 +26,8 @@ running instance here: [hsadmin](https://hsadmin.trink.com/))
 ### Prerequisites
 
 * Clang 3.1 or GCC 4.7+
-* CMake (3.0+) - http://cmake.org/cmake/resources/software.html
-* lua_sandbox (1.1+) - https://github.com/mozilla-services/lua_sandbox
+* CMake (3.6+) - http://cmake.org/cmake/resources/software.html
+* lua_sandbox (1.2.3+) - https://github.com/mozilla-services/lua_sandbox
 
 ### CMake Build Instructions
 
@@ -56,6 +56,16 @@ running instance here: [hsadmin](https://hsadmin.trink.com/))
   * The version in the dev branch is updated
   * The changes are merged into master
   * A new tag is created
+
+## Docker Images
+
+[Docker images](https://hub.docker.com/r/mozilla/hindsight/tags) are constructed from the
+master and dev branches and can be pulled, or built using the Dockerfile.
+
+Note that the Docker image built here is only a bare bones image containing just lua_sandbox
+and hindsight. For a more full featured image that also contains all of the extensions, see
+the Docker image for the [extensions](https://github.com/mozilla-services/lua_sandbox_extensions)
+repo.
 
 ## Contributions
 
