@@ -16,13 +16,19 @@ RUN yum -y update && \
 
 USER app
 WORKDIR /app
-
+RUN sudo yum -y install centos-release-scl-rh
+RUN sudo yum -y install devtoolset-3-gcc devtoolset-3-gcc-c++
+RUN sudo update-alternatives --install /usr/bin/gcc-4.9 gcc-4.9 /opt/rh/devtoolset-3/root/usr/bin/gcc 10
+RUN sudo update-alternatives --install /usr/bin/g++-4.9 g++-4.9 /opt/rh/devtoolset-3/root/usr/bin/g++ 10
+RUN sudo rm -f /usr/bin/g++ && sudo rm -f /usb/bin/gcc
+RUN sudo ln -s /usr/bin/g++-4.9 /usr/bin/g++
+RUN sudo ln -s /usr/bin/gcc-4.9 /usr/bin/gcc
 RUN sudo yum -y install epel-release.noarch && \
-    sudo yum -y install lua-devel luarocks cmake3 make clang gcc git rpm-build sudo && \
-    sudo ln -s /usr/bin/cmake3 /usr/local/bin/cmake && \
+    sudo yum -y install lua-devel luarocks cmake3 make git rpm-build sudo && \
+    sudo ln -s /usr/bin/cmake3 /usr/local/bin/cmake
 
     # Install confluent 3.1 for centos 7 for librdkafka-devel
-    echo -e "[confluent]\n\
+RUN     echo -e "[confluent]\n\
 name=confluent\n\
 baseurl=http://packages.confluent.io/rpm/3.1/7\n\
 gpgcheck=1\n\
@@ -35,7 +41,7 @@ gpgkey=http://packages.confluent.io/rpm/3.1/archive.key\n" | sudo tee /etc/yum.r
     cd lua_sandbox_extensions/ && \
     . /app/src/lua_sandbox/build/functions.sh && \
     build_lsbe() { \
-        install_packages c++-compiler librdkafka-devel openssl-devel postgresql-devel systemd-devel zlib-devel && \
+        install_packages  librdkafka-devel openssl-devel postgresql-devel systemd-devel zlib-devel && \
         rm -rf ./release && \
         mkdir release && \
         cd release && \
