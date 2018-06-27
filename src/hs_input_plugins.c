@@ -427,7 +427,8 @@ static bool join_thread(hs_input_plugins *plugins, hs_input_plugin *p)
     }
   }
 #ifdef HINDSIGHT_CLI
-  if (!lsb_heka_is_running(p->hsb)) { // todo or !stopped (needs a new sandbox api)
+  int state = lsb_heka_get_state(p->hsb);
+  if (state == LSB_TERMINATED || state == LSB_UNKNOWN) {
     plugins->terminated = true;
   }
 #endif
