@@ -3,7 +3,7 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 cmake_minimum_required(VERSION 3.6 FATAL_ERROR)
-project(hindsight VERSION 0.14.14 LANGUAGES C)
+project(hindsight VERSION 0.15.0 LANGUAGES C)
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Hindsight")
 set(CPACK_PACKAGE_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
 set(CPACK_PACKAGE_VERSION_MINOR ${PROJECT_VERSION_MINOR})
@@ -13,7 +13,7 @@ set(CPACK_PACKAGE_CONTACT       "Mike Trinkala <trink@mozilla.com>")
 set(CPACK_STRIP_FILES           TRUE)
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/LICENSE")
 set(CPACK_RPM_PACKAGE_LICENSE   "MPLv2.0")
-set(CPACK_DEBIAN_PACKAGE_DEPENDS "luasandbox (>= 1.2.3)")
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "luasandbox (>= 1.3)")
 set(CPACK_DEBIAN_PACKAGE_RECOMMENDS "luasandbox-hindsight (>= 0.0.1)")
 # only suppoorted in rpm 4.12+ string(REGEX REPLACE "[()]" "" CPACK_RPM_PACKAGE_SUGGESTS ${CPACK_DEBIAN_PACKAGE_RECOMMENDS})
 set(CPACK_DEBIAN_FILE_NAME      "DEB-DEFAULT")
@@ -23,7 +23,7 @@ set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 include(mozsvc)
 
-find_package(luasandbox 1.2.3 REQUIRED CONFIG)
+find_package(luasandbox 1.3 REQUIRED CONFIG)
 include(GNUInstallDirs)
 
 if(CMAKE_HOST_UNIX)
