@@ -33,7 +33,6 @@ struct hs_input_plugin {
   sem_t             shutdown;
   int               im_delta_cnt;
   bool              sample;
-  bool              orphaned;
   bool              shutdown_terminate;
 };
 

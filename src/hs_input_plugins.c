@@ -123,8 +123,8 @@ static int inject_message(void *parent,
 
   if (!pb) { // a NULL message is used as a synchronization point
     if (!sem_trywait(&p->shutdown)) {
-      sem_post(&p->shutdown);
       lsb_heka_stop_sandbox_clean(p->hsb);
+      sem_post(&p->shutdown);
     }
     return rv;
   }
@@ -300,6 +300,18 @@ create_input_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
 }
 
 
+static struct timespec get_current_timespec(const char *name)
+{
+  struct timespec ts;
+  if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
+    hs_log(NULL, name, 3, "clock_gettime failed");
+    ts.tv_sec = time(NULL);
+    ts.tv_nsec = 0;
+  }
+  return ts;
+}
+
+
 static void* input_thread(void *arg)
 {
   hs_input_plugin *p = (hs_input_plugin *)arg;
@@ -337,12 +349,7 @@ static void* input_thread(void *arg)
         pthread_mutex_lock(&p->cp.lock);
         p->stats = lsb_heka_get_stats(p->hsb);
         pthread_mutex_unlock(&p->cp.lock);
-
-        if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
-          hs_log(NULL, p->name, 3, "clock_gettime failed");
-          ts.tv_sec = time(NULL);
-          ts.tv_nsec = 0;
-        }
+        ts = get_current_timespec(p->name);
         ts.tv_sec += p->ticker_interval;
         if (!sem_timedwait(&p->shutdown, &ts)) {
           shutdown = true;
@@ -357,9 +364,9 @@ static void* input_thread(void *arg)
     }
   }
 
-  if (p->orphaned) {
-    pthread_exit(NULL);
-  }
+  pthread_testcancel();
+  int oldstate = 0;
+  pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
 
   hs_input_plugins *plugins = p->plugins;
   // hold the current checkpoint in memory until we shutdown to facilitate
@@ -368,7 +375,6 @@ static void* input_thread(void *arg)
 
   if (shutdown) {
     hs_log(NULL, p->name, 6, "shutting down");
-    sem_post(&p->shutdown);
   } else {
     const char *err = lsb_heka_get_error(p->hsb);
     hs_log(NULL, p->name, 6, "detaching received: %d msg: %s", ret, err);
@@ -395,34 +401,24 @@ static void* input_thread(void *arg)
 }
 
 
-static bool join_thread(hs_input_plugins *plugins, hs_input_plugin *p)
+static bool join_thread(hs_input_plugins *plugins, hs_input_plugin *p,
+                        struct timespec ts)
 {
-  struct timespec ts;
-  if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
-    hs_log(NULL, p->name, 3, "clock_gettime failed");
-    ts.tv_sec = time(NULL);
-    ts.tv_nsec = 0;
-  }
-
-  ts.tv_sec += 2;
+  ts.tv_sec += 10;
   if (pthread_timedjoin_np(p->thread, NULL, &ts)) {
-    lsb_heka_stop_sandbox(p->hsb);
     hs_log(NULL, p->name, 4, "sandbox did not respond to a clean stop");
+    lsb_heka_stop_sandbox(p->hsb);
+    ts = get_current_timespec(p->name);
     ts.tv_sec += 2;
     if (pthread_timedjoin_np(p->thread, NULL, &ts)) {
-      if (!sem_trywait(&p->shutdown)) {
-        p->orphaned = true;
-        hs_log(NULL, p->name, 3, "sandbox did not respond to a forced stop "
-               "(orphaning)");
-        sem_post(&p->shutdown);
+      hs_log(NULL, p->name, 4, "sandbox did not respond to a forced stop");
+      pthread_cancel(p->thread);
+      ts = get_current_timespec(p->name);
+      ts.tv_sec += 2;
+      if (pthread_timedjoin_np(p->thread, NULL, &ts)) {
+        hs_log(NULL, p->name, 3, "sandbox did not respond to a thread cancel "
+               "(memory leaked)");
         return false;
-      } else {
-        ts.tv_sec += 1;
-        if (pthread_timedjoin_np(p->thread, NULL, &ts)) {
-          hs_log(NULL, p->name, 2, "sandbox acknowledged the stop but failed "
-                 "to stop (undefined behavior)");
-          return false;
-        }
       }
     }
   }
@@ -432,6 +428,7 @@ static bool join_thread(hs_input_plugins *plugins, hs_input_plugin *p)
     plugins->terminated = true;
   }
 #endif
+  hs_log(NULL, p->name, 7, "destroyed");
   destroy_input_plugin(p);
   --plugins->list_cnt;
   return true;
@@ -442,8 +439,8 @@ static bool remove_plugin(hs_input_plugins *plugins, int idx)
 {
   hs_input_plugin *p = plugins->list[idx];
   sem_post(&p->shutdown);
-  lsb_heka_stop_sandbox_clean(p->hsb);
-  if (join_thread(plugins, p)) {
+  hs_log(NULL, g_module, 7, "shutdown signaled %s", p->name);
+  if (join_thread(plugins, p, get_current_timespec(p->name))) {
     plugins->list[idx] = NULL;
     return true;
   }
@@ -545,13 +542,14 @@ void hs_init_input_plugins(hs_input_plugins *plugins,
 
 void hs_wait_input_plugins(hs_input_plugins *plugins)
 {
+  struct timespec ts = get_current_timespec(g_module);
   pthread_mutex_lock(&plugins->list_lock);
   for (int i = 0; i < plugins->list_cap; ++i) {
     if (!plugins->list[i]) continue;
 
     hs_input_plugin *p = plugins->list[i];
     plugins->list[i] = NULL;
-    join_thread(plugins, p);
+    join_thread(plugins, p, ts);
   }
   pthread_mutex_unlock(&plugins->list_lock);
 }
@@ -718,6 +716,7 @@ void hs_stop_input_plugins(hs_input_plugins *plugins)
   for (int i = 0; i < plugins->list_cap; ++i) {
     if (!plugins->list[i]) continue;
     sem_post(&plugins->list[i]->shutdown);
+    hs_log(NULL, g_module, 7, "shutdown signaled %s", plugins->list[i]->name);
   }
   pthread_mutex_unlock(&plugins->list_lock);
 }
