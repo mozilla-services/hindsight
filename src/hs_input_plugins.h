@@ -16,6 +16,7 @@
 
 #include "hs_config.h"
 #include "hs_checkpoint_reader.h"
+#include "hs_logger.h"
 #include "hs_output.h"
 
 typedef struct hs_input_plugin hs_input_plugin;
@@ -34,6 +35,7 @@ struct hs_input_plugin {
   int               im_delta_cnt;
   bool              sample;
   bool              shutdown_terminate;
+  hs_log_context    ctx;
 };
 
 struct hs_input_plugins {

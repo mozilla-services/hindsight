@@ -22,6 +22,7 @@
 
 #include "hs_config.h"
 #include "hs_input.h"
+#include "hs_logger.h"
 #include "hs_output.h"
 
 typedef struct hs_output_plugin hs_output_plugin;
@@ -58,6 +59,7 @@ struct hs_output_plugin {
   hs_checkpoint_pair  cur;
   hs_checkpoint_pair  *async_cp;
   int                 async_len;
+  hs_log_context    ctx;
 };
 
 struct hs_output_plugins {

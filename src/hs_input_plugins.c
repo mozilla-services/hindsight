@@ -28,7 +28,6 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "hs_logger.h"
 #include "hs_util.h"
 
 static const char g_module[] = "input_plugins";
@@ -245,6 +244,8 @@ create_input_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
     destroy_input_plugin(p);
   }
   memcpy(p->name, sbc->cfg_name, len);
+  p->ctx.plugin_name = p->name;
+  p->ctx.output_path = cfg->run_path;
 
   char *state_file = NULL;
   if (sbc->preserve_data) {
@@ -282,7 +283,7 @@ create_input_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
     destroy_input_plugin(p);
     return NULL;
   }
-  lsb_logger logger = { .context = NULL, .cb = hs_log };
+  lsb_logger logger = { .context = &p->ctx, .cb = hs_log };
   p->hsb = lsb_heka_create_input(p, lua_file, state_file, ob.buf, &logger,
                                  inject_message);
   lsb_free_output_buffer(&ob);
@@ -294,7 +295,8 @@ create_input_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
     hs_log(NULL, g_module, 3, "%s lsb_heka_create_input failed", sbc->cfg_name);
     return NULL;
   }
-
+  p->ctx.plugin_name = NULL;
+  p->ctx.output_path = NULL;
   init_ip_checkpoint(&p->cp);
   return p;
 }
@@ -379,7 +381,7 @@ static void* input_thread(void *arg)
     const char *err = lsb_heka_get_error(p->hsb);
     hs_log(NULL, p->name, 6, "detaching received: %d msg: %s", ret, err);
     if (ret > 0) {
-      hs_save_termination_err(plugins->cfg, p->name, err);
+      hs_save_termination_err(plugins->cfg->run_path, p->name, err);
     }
     pthread_mutex_lock(&plugins->list_lock);
 #ifdef HINDSIGHT_CLI
@@ -633,6 +635,8 @@ void hs_load_input_startup(hs_input_plugins *plugins)
 {
   hs_config *cfg = plugins->cfg;
   const char *dir = cfg->run_path_input;
+  hs_prune_err(dir);
+
   DIR *dp = opendir(dir);
   if (dp == NULL) {
     hs_log(NULL, g_module, 0, "%s: %s", dir, strerror(errno));

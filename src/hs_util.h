@@ -9,6 +9,7 @@
 #ifndef hs_util_h_
 #define hs_util_h_
 
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <time.h>
@@ -48,10 +49,10 @@ bool hs_has_ext(const char *fn, const char *ext);
  * @return bool
  */
 bool hs_find_lua(const hs_config *cfg,
-                const hs_sandbox_config *sbc,
-                const char *ptype,
-                char *fqfn,
-                size_t fqfn_len);
+                 const hs_sandbox_config *sbc,
+                 const char *ptype,
+                 char *fqfn,
+                 size_t fqfn_len);
 
 /**
  * Constructs a fully qualified filename from the provided components
@@ -91,15 +92,34 @@ int hs_output_lua_string(FILE *fh, const char *s);
 unsigned hs_disk_free_ob(const char *path, unsigned ob_size);
 
 /**
+ * Removes the error files from the specified directory.
+ *
+ * @param dir
+ */
+void hs_prune_err(const char *dir);
+
+/**
  * Writes the termination error to disk
  *
- * @param cfg Hindsight configuration
+ * @param path Output directory
  * @param name Sandbox name
  * @param err Sandbox error message
  */
-void hs_save_termination_err(const hs_config *cfg,
+void hs_save_termination_err(const char *path,
                              const char *name,
                              const char *err);
+
+/**
+ * Writes the termination error to disk based on a format string
+ *
+ * @param path Output directory
+ * @param name Sandbox name
+ * @param fmt Format string
+ */
+void hs_save_termination_err_vfmt(const char *path,
+                                  const char *name,
+                                  const char *fmt,
+                                  va_list arg);
 
 /**
  * Deletes the specified file

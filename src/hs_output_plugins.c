@@ -27,7 +27,6 @@
 #include <unistd.h>
 
 #include "hs_input.h"
-#include "hs_logger.h"
 #include "hs_output.h"
 #include "hs_util.h"
 
@@ -173,6 +172,8 @@ create_output_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
     destroy_output_plugin(p);
   }
   memcpy(p->name, sbc->cfg_name, len);
+  p->ctx.plugin_name = p->name;
+  p->ctx.output_path = cfg->run_path;
 
   char *state_file = NULL;
   if (sbc->preserve_data) {
@@ -210,7 +211,7 @@ create_output_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
     destroy_output_plugin(p);
     return NULL;
   }
-  lsb_logger logger = { .context = NULL, .cb = hs_log };
+  lsb_logger logger = { .context = &p->ctx, .cb = hs_log };
   p->hsb = lsb_heka_create_output(p, lua_file, state_file, ob.buf, &logger,
                                   update_checkpoint_callback);
   lsb_free_output_buffer(&ob);
@@ -224,6 +225,8 @@ create_output_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
     return NULL;
   }
 
+  p->ctx.plugin_name = NULL;
+  p->ctx.output_path = NULL;
   return p;
 }
 
@@ -621,7 +624,7 @@ static void* input_thread(void *arg)
   } else {
     const char *err = lsb_heka_get_error(p->hsb);
     hs_log(NULL, p->name, 6, "detaching received: %d msg: %s", ret, err);
-    hs_save_termination_err(plugins->cfg, p->name, err);
+    hs_save_termination_err(plugins->cfg->run_path, p->name, err);
     if (p->rm_cp_terminate) {
       remove_checkpoint_q(plugins, p->name, p->read_queue);
     }
@@ -883,6 +886,8 @@ void hs_load_output_startup(hs_output_plugins *plugins)
 {
   hs_config *cfg = plugins->cfg;
   const char *dir = cfg->run_path_output;
+  hs_prune_err(dir);
+
   DIR *dp = opendir(dir);
   if (dp == NULL) {
     hs_log(NULL, g_module, 0, "%s: %s", dir, strerror(errno));

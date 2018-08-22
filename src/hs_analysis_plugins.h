@@ -21,6 +21,7 @@
 
 #include "hs_config.h"
 #include "hs_input.h"
+#include "hs_logger.h"
 #include "hs_output.h"
 
 typedef struct hs_analysis_plugin hs_analysis_plugin;
@@ -42,6 +43,7 @@ struct hs_analysis_plugin {
   unsigned            pm_im_limit;
   unsigned            te_im_limit;
   time_t              ticker_expires;
+  hs_log_context      ctx;
 };
 
 struct hs_analysis_plugins {

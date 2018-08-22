@@ -8,6 +8,7 @@
 
 #include "hs_util.h"
 
+#include <dirent.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/vfs.h>
@@ -96,28 +97,76 @@ unsigned hs_disk_free_ob(const char *path, unsigned ob_size)
 }
 
 
-void hs_save_termination_err(const hs_config *cfg,
-                             const char *name,
-                             const char *err)
+
+static FILE* common_termination_err(const char *path, const char *name)
 {
+  if (!path || !name) return NULL;
   const char *pos = strchr(name, '.');
-  if (!pos) return;
+  if (!pos) return NULL;
 
   char fn[HS_MAX_PATH];
-  int ret = snprintf(fn, sizeof(fn), "%s/%.*s/%s%s", cfg->run_path,
+  int ret = snprintf(fn, sizeof(fn), "%s/%.*s/%s%s", path,
                      (int)(pos - name), name,
                      pos + 1, hs_err_ext);
-  if (ret < 0 || ret > (int)sizeof(fn) - 1) return;
+  if (ret < 0 || ret > (int)sizeof(fn) - 1) return NULL;
 
-  FILE *fh = fopen(fn, "we");
+  FILE *fh = fopen(fn, "w+e");
   if (fh) {
     time_t t = time(NULL);
     struct tm tms;
     if (gmtime_r(&t, &tms)) {
-      fprintf(fh, "%04d-%02d-%02dT%02d:%02d:%02d\t%s\n",
+      fprintf(fh, "%04d-%02d-%02dT%02d:%02d:%02d\t",
               tms.tm_year + 1900, tms.tm_mon + 1, tms.tm_mday, tms.tm_hour,
-              tms.tm_min, tms.tm_sec, err);
+              tms.tm_min, tms.tm_sec);
     }
+  }
+  return fh;
+}
+
+
+void hs_prune_err(const char *dir)
+{
+  DIR *dp = opendir(dir);
+  if (!dp) {
+    return;
+  }
+
+  struct dirent *entry;
+  while ((entry = readdir(dp))) {
+    if (hs_has_ext(entry->d_name, hs_err_ext)) {
+      char fqfn[HS_MAX_PATH];
+      if (!hs_get_fqfn(dir, entry->d_name, fqfn, sizeof(fqfn))) {
+        unlink(fqfn);
+      }
+    }
+  }
+  closedir(dp);
+}
+
+
+void hs_save_termination_err(const char *path,
+                             const char *name,
+                             const char *err)
+{
+  if (!err) return;
+
+  FILE *fh = common_termination_err(path, name);
+  if (fh) {
+    fprintf(fh, "%s\n", err);
+    fclose(fh);
+  }
+}
+
+
+void hs_save_termination_err_vfmt(const char *path,
+                                 const char *name,
+                                 const char *fmt,
+                                 va_list arg)
+{
+  FILE *fh = common_termination_err(path, name);
+  if (fh) {
+    vfprintf(fh, fmt, arg);
+    fputc('\n', fh);
     fclose(fh);
   }
 }

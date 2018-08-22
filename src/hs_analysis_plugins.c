@@ -24,7 +24,6 @@
 #include <unistd.h>
 
 #include "hs_input.h"
-#include "hs_logger.h"
 #include "hs_output.h"
 #include "hs_util.h"
 
@@ -159,6 +158,8 @@ create_analysis_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
     destroy_analysis_plugin(p);
   }
   memcpy(p->name, sbc->cfg_name, len);
+  p->ctx.plugin_name = p->name;
+  p->ctx.output_path = cfg->run_path;
 
   char *state_file = NULL;
   if (sbc->preserve_data) {
@@ -196,7 +197,7 @@ create_analysis_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
     destroy_analysis_plugin(p);
     return NULL;
   }
-  lsb_logger logger = { .context = NULL, .cb = hs_log };
+  lsb_logger logger = { .context = &p->ctx, .cb = hs_log };
   p->hsb = lsb_heka_create_analysis(p, lua_file, state_file, ob.buf, &logger,
                                     inject_message);
   lsb_free_output_buffer(&ob);
@@ -210,6 +211,8 @@ create_analysis_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
     return NULL;
   }
 
+  p->ctx.plugin_name = NULL;
+  p->ctx.output_path = NULL;
   return p;
 }
 
@@ -358,7 +361,7 @@ static void terminate_sandbox(hs_analysis_thread *at, int i)
 #endif
   const char *err = lsb_heka_get_error(at->list[i]->hsb);
   hs_log(NULL, at->list[i]->name, 3, "terminated: %s", err);
-  hs_save_termination_err(at->plugins->cfg, at->list[i]->name, err);
+  hs_save_termination_err(at->plugins->cfg->run_path, at->list[i]->name, err);
   if (at->list[i]->shutdown_terminate) {
     hs_log(NULL, at->list[i]->name, 6, "shutting down on terminate");
     kill(getpid(), SIGTERM);
@@ -753,6 +756,8 @@ void hs_load_analysis_startup(hs_analysis_plugins *plugins)
 
   hs_config *cfg = plugins->cfg;
   const char *dir = cfg->run_path_analysis;
+  hs_prune_err(dir);
+
   DIR *dp = opendir(dir);
   if (dp == NULL) {
     hs_log(NULL, g_module, 0, "%s: %s", dir, strerror(errno));

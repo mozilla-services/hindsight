@@ -9,6 +9,11 @@
 #ifndef hs_logger_h_
 #define hs_logger_h_
 
+typedef struct hs_log_context {
+  const char *output_path;
+  const char *plugin_name;
+} hs_log_context;
+
 // todo add an option to output Heka protobuf logs
 
 /**

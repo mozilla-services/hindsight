@@ -7,6 +7,7 @@
 /** @brief Hindsight logging implementation @file */
 
 #include "hs_logger.h"
+#include "hs_util.h"
 
 #include <pthread.h>
 #include <stdarg.h>
@@ -48,7 +49,6 @@ static void release_mutex(void *arg)
 void
 hs_log(void *context, const char *plugin, int severity, const char *fmt, ...)
 {
-  (void)context;
   if (severity > g_loglevel) return;
 
   struct timespec ts;
@@ -100,4 +100,13 @@ hs_log(void *context, const char *plugin, int severity, const char *fmt, ...)
   fwrite("\n", 1, 1, stderr);
   pthread_cleanup_pop(1);
   va_end(args);
+
+  if (context && severity < 4) {
+    hs_log_context *ctx = (hs_log_context *)context;
+    if (ctx->output_path) { // currently only set during plugin creation
+      va_start(args, fmt);
+      hs_save_termination_err_vfmt(ctx->output_path, ctx->plugin_name, fmt, args);
+      va_end(args);
+    }
+  }
 }
