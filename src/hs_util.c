@@ -10,6 +10,7 @@
 
 #include <dirent.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/vfs.h>
 #include <time.h>
@@ -97,18 +98,47 @@ unsigned hs_disk_free_ob(const char *path, unsigned ob_size)
 }
 
 
-
-static FILE* common_termination_err(const char *path, const char *name)
+static char* get_termination_fn(const char *path, const char *name)
 {
   if (!path || !name) return NULL;
   const char *pos = strchr(name, '.');
   if (!pos) return NULL;
+  char *fn = malloc(HS_MAX_PATH);
+  if (!fn) return NULL;
 
-  char fn[HS_MAX_PATH];
-  int ret = snprintf(fn, sizeof(fn), "%s/%.*s/%s%s", path,
-                     (int)(pos - name), name,
-                     pos + 1, hs_err_ext);
-  if (ret < 0 || ret > (int)sizeof(fn) - 1) return NULL;
+  int ret = snprintf(fn, HS_MAX_PATH, "%s/%.*s/%s%s", path, (int)(pos - name),
+                     name, pos + 1, hs_err_ext);
+  if (ret < 0 || ret > HS_MAX_PATH - 1) {
+    free(fn);
+    fn = NULL;
+  }
+  return fn;
+}
+
+
+bool hs_is_bad_state(const char *path, const char *name, const char *state)
+{
+  bool retry = false;
+  char *fn = get_termination_fn(path, name);
+  if (fn) {
+    char *em = lsb_read_file(fn);
+    const char *pos = strstr(em, "restore_global_data");
+    if (pos) {
+      unlink(fn);
+      unlink(state);
+      retry = true;
+    }
+    free(em);
+    free(fn);
+  }
+  return retry;
+}
+
+
+static FILE* common_termination_err(const char *path, const char *name)
+{
+  char *fn = get_termination_fn(path, name);
+  if (!fn) return NULL;
 
   FILE *fh = fopen(fn, "w+e");
   if (fh) {
@@ -120,6 +150,7 @@ static FILE* common_termination_err(const char *path, const char *name)
               tms.tm_min, tms.tm_sec);
     }
   }
+  free(fn);
   return fh;
 }
 
@@ -127,17 +158,12 @@ static FILE* common_termination_err(const char *path, const char *name)
 void hs_prune_err(const char *dir)
 {
   DIR *dp = opendir(dir);
-  if (!dp) {
-    return;
-  }
+  if (!dp) return;
 
   struct dirent *entry;
   while ((entry = readdir(dp))) {
     if (hs_has_ext(entry->d_name, hs_err_ext)) {
-      char fqfn[HS_MAX_PATH];
-      if (!hs_get_fqfn(dir, entry->d_name, fqfn, sizeof(fqfn))) {
-        unlink(fqfn);
-      }
+      hs_remove_file(dir, entry->d_name);
     }
   }
   closedir(dp);
@@ -159,9 +185,9 @@ void hs_save_termination_err(const char *path,
 
 
 void hs_save_termination_err_vfmt(const char *path,
-                                 const char *name,
-                                 const char *fmt,
-                                 va_list arg)
+                                  const char *name,
+                                  const char *fmt,
+                                  va_list arg)
 {
   FILE *fh = common_termination_err(path, name);
   if (fh) {

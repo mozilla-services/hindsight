@@ -200,6 +200,10 @@ create_analysis_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
   lsb_logger logger = { .context = &p->ctx, .cb = hs_log };
   p->hsb = lsb_heka_create_analysis(p, lua_file, state_file, ob.buf, &logger,
                                     inject_message);
+  if (!p->hsb && hs_is_bad_state(cfg->run_path, p->name, state_file)) {
+    p->hsb = lsb_heka_create_analysis(p, lua_file, state_file, ob.buf, &logger,
+                                      inject_message);
+  }
   lsb_free_output_buffer(&ob);
   free(sbc->cfg_lua);
   sbc->cfg_lua = NULL;

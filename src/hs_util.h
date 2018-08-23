@@ -99,6 +99,18 @@ unsigned hs_disk_free_ob(const char *path, unsigned ob_size);
 void hs_prune_err(const char *dir);
 
 /**
+ * Checks to see if a plugin failed to load due to a bad state.
+ *
+ * @param path Output directory
+ * @param name Sandbox name
+ * @param state State file to remove
+ *
+ * @return True when creation should be called again
+ */
+bool
+hs_is_bad_state(const char *path, const char *name, const char *state);
+
+/**
  * Writes the termination error to disk
  *
  * @param path Output directory
