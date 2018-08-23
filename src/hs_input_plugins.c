@@ -50,11 +50,13 @@ static void free_ip_checkpoint(hs_ip_checkpoint *cp)
 {
   if (!cp) return;
 
-  cp->type = HS_CP_NONE;
   if (cp->type == HS_CP_STRING) {
     free(cp->value.s);
     cp->value.s = NULL;
+    cp->len = 0;
+    cp->cap = 0;
   }
+  cp->type = HS_CP_NONE;
   pthread_mutex_destroy(&cp->lock);
 }
 
