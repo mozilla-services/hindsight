@@ -357,6 +357,13 @@ static void* input_thread(void *arg)
         pthread_mutex_lock(&p->cp.lock);
         p->stats = lsb_heka_get_stats(p->hsb);
         pthread_mutex_unlock(&p->cp.lock);
+        if (ret == LSB_HEKA_PM_FAIL) {
+          const char *err = lsb_heka_get_error(p->hsb);
+          if (strlen(err) > 0) {
+            hs_log(NULL, p->name, 4, "process_message returned: %d %s", ret,
+                   err);
+          }
+        }
         ts = get_current_timespec(p->name);
         ts.tv_sec += p->ticker_interval;
         if (!sem_timedwait(&p->shutdown, &ts)) {
