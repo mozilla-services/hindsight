@@ -27,6 +27,7 @@
 #include "hs_input_plugins.h"
 #include "hs_logger.h"
 #include "hs_output_plugins.h"
+#include "hs_sslutil.h"
 
 
 static const char g_module[] = "hindsight";
@@ -94,6 +95,16 @@ int main(int argc, char *argv[])
     }
   }
   hs_init_log(loglevel);
+
+#ifdef WITH_OPENSSL
+  if (hs_sslcallback_init()) {
+    // openssl < 1.1 requires locking callbacks in a multi-threaded environment,
+    // install those here so sandboxes that make use of openssl can utilize the
+    // already established set of locking callbacks
+    fprintf(stderr, "openssl locking callback initialization failed\n");
+    return EXIT_FAILURE;
+  }
+#endif
 
   hs_config cfg;
   if (hs_load_config(argv[1], &cfg)) {

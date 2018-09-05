@@ -13,17 +13,17 @@ hs_input_plugins.c
 hs_logger.c
 hs_output.c
 hs_output_plugins.c
+hs_sslutil.c
 hs_util.c
 )
-
-set(HINDSIGHT_LIBS
-${LUASANDBOX_LIBRARIES}
-${UNIX_LIBRARIES})
 
 add_executable(hindsight ${HINDSIGHT_SRC})
 set(HINDSIGHT_LIBS
 ${LUASANDBOX_LIBRARIES}
 ${UNIX_LIBRARIES})
+if (NOT WITHOUT_OPENSSL)
+  set(HINDSIGHT_LIBS ${HINDSIGHT_LIBS} ${OPENSSL_LIBRARIES})
+endif()
 
 target_link_libraries(hindsight ${HINDSIGHT_LIBS})
 

@@ -28,6 +28,7 @@ running instance here: [hsadmin](https://hsadmin.trink.com/))
 * Clang 3.1 or GCC 4.7+
 * CMake (3.6+) - http://cmake.org/cmake/resources/software.html
 * lua_sandbox (1.2.3+) - https://github.com/mozilla-services/lua_sandbox
+* OpenSSL (1.0.x+, optional)
 
 ### CMake Build Instructions
 
@@ -43,6 +44,11 @@ running instance here: [hsadmin](https://hsadmin.trink.com/))
     cpack -G TGZ # (DEB|RPM|ZIP)
 
     # Cross platform support is planned but not supported yet
+
+By default hindsight is linked against OpenSSL and configured to set locking callbacks in the
+library to ensure proper threaded operation. If this functionality is not desired the cmake
+build option `-DWITHOUT_OPENSSL=true` can be used to disable this, for example if you are not
+using any sandboxes/modules that make use of OpenSSL and do not want the dependency.
 
 ## Releases
 

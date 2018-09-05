@@ -3,7 +3,7 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 cmake_minimum_required(VERSION 3.6 FATAL_ERROR)
-project(hindsight VERSION 0.15.1 LANGUAGES C)
+project(hindsight VERSION 0.15.2 LANGUAGES C)
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Hindsight")
 set(CPACK_PACKAGE_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
 set(CPACK_PACKAGE_VERSION_MINOR ${PROJECT_VERSION_MINOR})
@@ -24,6 +24,10 @@ set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 include(mozsvc)
 
 find_package(luasandbox 1.3 REQUIRED CONFIG)
+if (NOT WITHOUT_OPENSSL)
+  find_package(OpenSSL REQUIRED)
+  add_definitions(-DWITH_OPENSSL)
+endif()
 include(GNUInstallDirs)
 
 if(CMAKE_HOST_UNIX)
