@@ -106,6 +106,7 @@ static int inject_message(void *parent,
                           double cp_numeric,
                           const char *cp_string)
 {
+  static time_t last_bp_check = 0;
   static bool backpressure = false;
   static char header[14];
 
@@ -161,7 +162,8 @@ static int inject_message(void *parent,
         }
       }
     }
-    if (backpressure) {
+    if (backpressure && last_bp_check < time(NULL)) {
+      last_bp_check = time(NULL);
       bool release_dfbp = true;
       if (p->plugins->cfg->backpressure_df) {
         unsigned df = hs_disk_free_ob(p->plugins->output.path,
