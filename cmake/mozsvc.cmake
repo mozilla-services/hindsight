@@ -19,7 +19,7 @@ if(MSVC)
 else()
     # Predefined Macros: clang|gcc -dM -E -x c /dev/null
     # Compiler options: http://gcc.gnu.org/onlinedocs/gcc/Invoking-GCC.html#Invoking-GCC
-    set(CMAKE_C_FLAGS   "-std=c99 -pedantic -Werror -Wno-error=deprecated -Wall -Wextra -fPIC")
+    set(CMAKE_C_FLAGS   "-std=c11 -pedantic -Werror -Wno-error=deprecated -Wall -Wextra -fPIC")
     set(CMAKE_C_FLAGS_DEBUG     "-g")
 
     set(CMAKE_C_FLAGS_RELEASE   "-O2")

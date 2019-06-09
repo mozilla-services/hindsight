@@ -3,7 +3,7 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 cmake_minimum_required(VERSION 3.6 FATAL_ERROR)
-project(hindsight VERSION 0.15.3 LANGUAGES C)
+project(hindsight VERSION 0.15.4 LANGUAGES C)
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Hindsight")
 set(CPACK_PACKAGE_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
 set(CPACK_PACKAGE_VERSION_MINOR ${PROJECT_VERSION_MINOR})
@@ -30,6 +30,7 @@ if (NOT WITHOUT_OPENSSL)
 endif()
 include(GNUInstallDirs)
 
+set(POSIX_DEFS -D_POSIX_C_SOURCE=199506L -D_XOPEN_SOURCE=600)
 if(CMAKE_HOST_UNIX)
   find_library(PTHREAD_LIBRARY pthread)
   find_library(LIBDL_LIBRARY dl)
@@ -41,7 +42,22 @@ if(CMAKE_HOST_UNIX)
   ${LIBDL_LIBRARY}
   ${LIBM_LIBRARY}
   ${LIBRT_LIBRARY})
-  add_definitions(-D_POSIX_C_SOURCE=199506L -D_XOPEN_SOURCE=600)
+  add_definitions(${POSIX_DEFS})
+endif()
+
+
+include(CheckFunctionExists)
+set(CMAKE_REQUIRED_DEFINITIONS ${POSIX_DEFS})
+CHECK_FUNCTION_EXISTS(pthread_timedjoin_np HAVE_PTHREAD_TIMEDJOIN_NP)
+unset(CMAKE_REQUIRED_DEFINITIONS)
+if(HAVE_PTHREAD_TIMEDJOIN_NP)
+  add_definitions(-DHAVE_PTHREAD_TIMEDJOIN_NP)
+endif()
+
+include(CheckIncludeFile)
+check_include_file(sys/inotify.h HAVE_INOTIFY)
+if(HAVE_INOTIFY)
+  add_definitions(-DHAVE_INOTIFY)
 endif()
 
 install(PROGRAMS util/hindsight_timer_report.lua DESTINATION ${CMAKE_INSTALL_BINDIR})

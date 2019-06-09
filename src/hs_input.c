@@ -89,16 +89,20 @@ size_t hs_read_file(hs_input *hsi)
     need = ib->scanpos + ib->size - ib->readpos;
   }
 
+  size_t cnt = ib->size - ib->readpos;
   if (lsb_expand_input_buffer(ib, need)) {
     hs_log(NULL, g_module, 0, "%s buffer reallocation failed", hsi->name);
     exit(EXIT_FAILURE);
   }
   size_t nread = fread(ib->buf + ib->readpos,
                        1,
-                       ib->size - ib->readpos,
+                       cnt,
                        hsi->fh);
   hsi->cp.offset += nread;
   ib->readpos += nread;
+  if (cnt != nread) {
+    clearerr(hsi->fh);
+  }
   return nread;
 }
 

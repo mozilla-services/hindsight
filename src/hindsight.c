@@ -16,7 +16,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/inotify.h>
+#ifdef HAVE_INOTIFY
+  #include <sys/inotify.h>
+#elif __FreeBSD__
+typedef unsigned short u_short;
+typedef unsigned u_int;
+typedef unsigned long uintptr_t;
+typedef long  intptr_t;
+  #include <dirent.h>
+  #include <fcntl.h>
+  #include <sys/types.h>
+  #include <sys/event.h>
+  #include <sys/time.h>
+#endif
 #include <time.h>
 #include <unistd.h>
 
@@ -111,7 +123,11 @@ int main(int argc, char *argv[])
     return EXIT_FAILURE;
   }
 
-  int watch[3] = {0};
+#ifdef HAVE_INOTIFY
+  const struct inotify_event *event;
+  char inotify_buf[sizeof(struct inotify_event) + FILENAME_MAX + 1]
+    __attribute__((aligned(__alignof__(struct inotify_event))));
+  int watch[3] = { 0 };
   int load = 0;
   if (cfg.load_path[0] != 0) {
     bool err = false;
@@ -150,6 +166,54 @@ int main(int argc, char *argv[])
       return EXIT_FAILURE;
     }
   }
+#elif __FreeBSD__
+#define NUM_SLOTS 3
+  int fds[NUM_SLOTS] = { 0 };
+  struct kevent event_data[NUM_SLOTS] = { { 0 } };
+  struct kevent watch[NUM_SLOTS] = { { 0 } };
+  int load = 0;
+  if (cfg.load_path[0] != 0) {
+    bool err = false;
+    load = kqueue();
+    if (load < 0) {
+      hs_free_config(&cfg);
+      perror("inotify_init failed");
+      return EXIT_FAILURE;
+    }
+    fds[0] = open(cfg.load_path_input, O_RDONLY);
+    if (fds[0] < 0) {
+      hs_log(NULL, g_module, 0, "%s: directory does not exist",
+             cfg.load_path_input);
+      err = true;
+    }
+
+    fds[1] = open(cfg.load_path_analysis, O_RDONLY);
+    if (fds[1] < 0) {
+      hs_log(NULL, g_module, 0, "%s: directory does not exist",
+             cfg.load_path_analysis);
+      err = true;
+    }
+
+    fds[2] = open(cfg.load_path_output, O_RDONLY);
+    if (fds[2] < 0) {
+      hs_log(NULL, g_module, 0, "%s: directory does not exist",
+             cfg.load_path_output);
+      err = true;
+    }
+
+    if (err) {
+      hs_free_config(&cfg);
+      return EXIT_FAILURE;
+    }
+
+    EV_SET(&watch[0], fds[0], EVFILT_VNODE, EV_ADD | EV_CLEAR, NOTE_WRITE, 0,
+           cfg.load_path_input);
+    EV_SET(&watch[1], fds[1], EVFILT_VNODE, EV_ADD | EV_CLEAR, NOTE_WRITE, 0,
+           cfg.load_path_analysis);
+    EV_SET(&watch[2], fds[2], EVFILT_VNODE, EV_ADD | EV_CLEAR, NOTE_WRITE, 0,
+           cfg.load_path_output);
+  }
+#endif
 
   hs_checkpoint_reader cpr;
   hs_init_checkpoint_reader(&cpr, cfg.output_path);
@@ -185,10 +249,6 @@ int main(int argc, char *argv[])
   hs_init_checkpoint_writer(&cpw, &ips, &aps, &ops, cfg.output_path);
 
   struct timespec ts;
-  const struct inotify_event *event;
-  char inotify_buf[sizeof(struct inotify_event) + FILENAME_MAX + 1]
-      __attribute__((aligned(__alignof__(struct inotify_event))));
-
   while (true) {
     if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
       hs_log(NULL, g_module, 3, "clock_gettime failed");
@@ -202,8 +262,9 @@ int main(int argc, char *argv[])
     }
     hs_write_checkpoints(&cpw, &cpr);
 
+#ifdef HAVE_INOTIFY
     if (load) {
-      for (;;){
+      for (;;) {
         ssize_t len = read(load, inotify_buf, sizeof(inotify_buf));
         if (len == -1 && errno != EAGAIN) {
           hs_log(NULL, g_module, 1, "inotify read failure");
@@ -226,6 +287,51 @@ int main(int argc, char *argv[])
         }
       }
     }
+#elif __FreeBSD__
+    if (load) {
+      for (;;) {
+        ts.tv_sec = 0;
+        ts.tv_nsec = 0;
+        int len = kevent(load, watch, NUM_SLOTS, event_data, NUM_SLOTS, &ts);
+        if (len == -1) {
+          hs_log(NULL, g_module, 1, "kevent read failure: %s", strerror(errno));
+          sem_post(&g_shutdown);
+        }
+        if (len <= 0) break;
+
+        for (int i = 0; i < len; ++i) {
+          if (event_data[i].flags == EV_ERROR) {
+            hs_log(NULL, g_module, 1, "kevent read failure: %s", strerror(event_data[i].data));
+            break;
+          }
+          DIR *dp = opendir(event_data[i].udata);
+          if (!dp) {continue; }
+
+          struct dirent *entry;
+          if (event_data[i].udata == cfg.load_path_analysis) {
+            while ((entry = readdir(dp))) {
+              if (entry->d_name[0] != '.') {
+                hs_load_analysis_dynamic(&aps, entry->d_name);
+              }
+            }
+          } else if (event_data[i].udata == cfg.load_path_input) {
+            while ((entry = readdir(dp))) {
+              if (entry->d_name[0] != '.') {
+                hs_load_input_dynamic(&ips, entry->d_name);
+              }
+            }
+          } else if (event_data[i].udata == cfg.load_path_output) {
+            while ((entry = readdir(dp))) {
+              if (entry->d_name[0] != '.') {
+                hs_load_output_dynamic(&ops, entry->d_name);
+              }
+            }
+          }
+          closedir(dp);
+        }
+      }
+    }
+#endif
 
 #ifdef HINDSIGHT_CLI
     if (ips.list_cnt == 0) {
@@ -236,12 +342,22 @@ int main(int argc, char *argv[])
 #endif
   }
 
+#ifdef HAVE_INOTIFY
   if (load) {
     for (int i = 0; i < 3; ++i) {
       inotify_rm_watch(load, watch[i]);
     }
     close(load);
   }
+
+#elif __FreeBSD__
+  if (load) {
+    for (int i = 0; i < NUM_SLOTS; ++i) {
+      close(fds[i]);
+    }
+    close(load);
+  }
+#endif
   int rv = EXIT_SUCCESS;
 
 #ifdef HINDSIGHT_CLI

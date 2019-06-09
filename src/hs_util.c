@@ -12,9 +12,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/vfs.h>
 #include <time.h>
 #include <unistd.h>
+
+// statfs requirements
+#ifdef __FreeBSD__
+// <sys/types.h> will not expose these types for a POSIX application
+typedef unsigned short u_short;
+typedef unsigned char u_char;
+typedef unsigned u_int;
+  #include <sys/mount.h>
+#else
+  #include <sys/vfs.h>
+#endif
 
 
 bool hs_file_exists(const char *fn)
