@@ -32,7 +32,7 @@ add_executable(hindsight_cli ${HINDSIGHT_SRC})
 target_compile_definitions(hindsight_cli PUBLIC "-DHINDSIGHT_CLI")
 target_link_libraries(hindsight_cli ${HINDSIGHT_LIBS})
 
-install(TARGETS hindsight DESTINATION ${CMAKE_INSTALL_BINDIR})
-install(TARGETS hindsight_cli DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS hindsight DESTINATION ${CMAKE_INSTALL_FULL_BINDIR})
+install(TARGETS hindsight_cli DESTINATION ${CMAKE_INSTALL_FULL_BINDIR})
 
 add_subdirectory(test)

@@ -32,8 +32,9 @@ else()
     set(CMAKE_BUILD_WITH_INSTALL_RPATH      FALSE)
     set(CMAKE_INSTALL_RPATH_USE_LINK_PATH   FALSE)
 
-    set(CMAKE_INSTALL_SYSCONFDIR "/etc/hindsight")
-    set(CMAKE_INSTALL_LOCALSTATEDIR "/var/cache/hindsight")
+    set(CMAKE_INSTALL_PREFIX "/")
+    set(CMAKE_INSTALL_SYSCONFDIR "etc/hindsight")
+    set(CMAKE_INSTALL_LOCALSTATEDIR "var/cache/hindsight")
 endif()
 
 include(CPack)
