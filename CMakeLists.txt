@@ -17,6 +17,7 @@ set(CPACK_DEBIAN_PACKAGE_DEPENDS "luasandbox (>= 1.3)")
 set(CPACK_DEBIAN_PACKAGE_RECOMMENDS "luasandbox-hindsight (>= 0.0.1)")
 # only suppoorted in rpm 4.12+ string(REGEX REPLACE "[()]" "" CPACK_RPM_PACKAGE_SUGGESTS ${CPACK_DEBIAN_PACKAGE_RECOMMENDS})
 set(CPACK_DEBIAN_FILE_NAME      "DEB-DEFAULT")
+set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA "${CMAKE_CURRENT_SOURCE_DIR}/contrib/hindsight.postinst")
 set(CPACK_RPM_FILE_NAME         "RPM-DEFAULT")
 
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
@@ -42,6 +43,21 @@ if(CMAKE_HOST_UNIX)
   ${LIBM_LIBRARY}
   ${LIBRT_LIBRARY})
   add_definitions(-D_POSIX_C_SOURCE=199506L -D_XOPEN_SOURCE=600)
+
+  set(HS_SUBDIRS "/load/input"
+                    "/load/output"
+                    "/load/analysis"
+                    "/run/input"
+                    "/run/output"
+                    "/run/analysis")
+  foreach(ITEM ${HS_SUBDIRS})
+      install(DIRECTORY DESTINATION "${CMAKE_INSTALL_SYSCONFDIR}/${ITEM}")
+  endforeach()
+
+  install(FILES "contrib/hindsight.cfg" DESTINATION ${CMAKE_INSTALL_SYSCONFDIR})
+  install(DIRECTORY DESTINATION ${CMAKE_INSTALL_LOCALSTATEDIR} DIRECTORY_PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ GROUP_EXECUTE GROUP_READ)
+  install(FILES contrib/hindsight.service DESTINATION "/lib/systemd/system/")
+  install(FILES contrib/hindsight.init DESTINATION "/etc/init.d/" RENAME "hindsight" PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ GROUP_EXECUTE GROUP_READ WORLD_EXECUTE WORLD_READ)
 endif()
 
 install(PROGRAMS util/hindsight_timer_report.lua DESTINATION ${CMAKE_INSTALL_BINDIR})

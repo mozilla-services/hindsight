@@ -1,0 +1,13 @@
+# Default systemd file for debian systems
+[Unit]
+Description=Log forwarding service
+After=syslog.target network-online.target
+
+[Service]
+Type=simple
+UMask=0007
+ExecStart=/usr/bin/hindsight /etc/hindsight/hindsight.cfg
+Restart=on-abort
+
+[Install]
+WantedBy=multi-user.target
