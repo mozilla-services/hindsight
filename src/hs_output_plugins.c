@@ -83,6 +83,10 @@ static int update_checkpoint_callback(void *parent, void *sequence_id)
   hs_output_plugin *p = parent;
 
   if (sequence_id && p->async_cp) {
+    if ((uintptr_t)sequence_id > p->ack_sequence_id
+        || p->sequence_id < p->ack_sequence_id) { // handle wrapping
+      p->ack_sequence_id = (uintptr_t)sequence_id;
+    }
     int i = (uintptr_t)sequence_id % p->async_len;
     pthread_mutex_lock(&p->cp_lock);
     if ((p->async_cp[i].input.id == p->cp.input.id
@@ -130,7 +134,8 @@ create_output_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
   }
 
   p->list_index = -1;
-  p->sequence_id = 1;
+  p->sequence_id = 0;
+  p->ack_sequence_id = 0;
   p->ticker_interval = sbc->ticker_interval;
   p->rm_cp_terminate = sbc->rm_cp_terminate;
   p->read_queue = sbc->read_queue;
@@ -262,13 +267,13 @@ static int output_message(hs_output_plugin *p, lsb_heka_message *msg,
     }
     if (matched) {
       if (p->async_len) {
-        int i = p->sequence_id % p->async_len;
+        int i = (p->sequence_id + 1) % p->async_len;
         p->async_cp[i].input.id = p->cur.input.id;
         p->async_cp[i].input.offset = p->cur.input.offset;
         p->async_cp[i].analysis.id = p->cur.analysis.id;
         p->async_cp[i].analysis.offset = p->cur.analysis.offset;
       }
-      ret = lsb_heka_pm_output(p->hsb, msg, (void *)p->sequence_id,
+      ret = lsb_heka_pm_output(p->hsb, msg, (void *)(p->sequence_id + 1),
                                p->pm_sample);
       p->pm_sample = false;
       if (ret <= 0) {
@@ -282,7 +287,6 @@ static int output_message(hs_output_plugin *p, lsb_heka_message *msg,
                                        "without a configured buffer");
             ret = 1;
           }
-          p->batching = true;
         } else if (ret == LSB_HEKA_PM_FAIL) {
           const char *err = lsb_heka_get_error(p->hsb);
           if (strlen(err) > 0) {
@@ -301,8 +305,9 @@ static int output_message(hs_output_plugin *p, lsb_heka_message *msg,
       if (sample) p->pm_sample = true;
     }
 
-    // advance the checkpoint if not batching/asyc/retrying
-    if (ret <= 0 && !p->batching && ret != LSB_HEKA_PM_RETRY) {
+    // advance the checkpoint if not fatal/batching/pending asyc/retrying
+    bool pending = (p->async_len && p->sequence_id != p->ack_sequence_id);
+    if (ret <= 0 && !p->batching && !pending && ret != LSB_HEKA_PM_RETRY) {
       update_checkpoint(p);
     }
   }
@@ -573,8 +578,8 @@ static void* input_thread(void *arg)
       if (ret == LSB_HEKA_PM_RETRY) {
         while (!stop) {
           const char *err = lsb_heka_get_error(p->hsb);
-          hs_log(NULL, p->name, 7, "retry message %llu err: %s", p->sequence_id,
-                 err);
+          hs_log(NULL, p->name, 7, "retry message %llu err: %s",
+                 p->sequence_id + 1, err);
           sleep(1);
 #ifndef HINDSIGHT_CLI
           current_t = time(NULL);
