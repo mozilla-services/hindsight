@@ -164,7 +164,8 @@ static void input_stats(hs_checkpoint_writer *cpw, hs_checkpoint_reader *cpr,
 static int get_max_mps(long long tt, int amps, int max_mps)
 {
   if (tt && amps) {
-    int emps = 1000000000LL / (tt / amps) + 1;
+    int tmps = tt / amps;
+    int emps = tmps ? 1000000000LL / tmps + 1 : 1;
     if (emps > max_mps) {
       max_mps = emps;
     }
