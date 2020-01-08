@@ -133,7 +133,7 @@ static int inject_message(void *parent,
   if (rv != LSB_HEKA_IM_SUCCESS) return rv;
 
   bool bp;
-  pthread_mutex_lock(&p->plugins->output.lock);
+  pthread_mutex_lock(&p->plugins->output->lock);
   int len = lsb_pb_output_varint(header + 3, pb_len);
   int tlen = 4 + len + pb_len;
 
@@ -141,20 +141,20 @@ static int inject_message(void *parent,
   header[1] = (char)(len + 1);
   header[2] = 0x08;
   header[3 + len] = 0x1f;
-  if (fwrite(header, 4 + len, 1, p->plugins->output.fh) == 1
-      && fwrite(pb, pb_len, 1, p->plugins->output.fh) == 1) {
-    p->plugins->output.cp.offset += tlen;
-    if (p->plugins->output.cp.offset >= p->plugins->cfg->output_size) {
-      ++p->plugins->output.cp.id;
-      hs_open_output_file(&p->plugins->output);
+  if (fwrite(header, 4 + len, 1, p->plugins->output->fh) == 1
+      && fwrite(pb, pb_len, 1, p->plugins->output->fh) == 1) {
+    p->plugins->output->cp.offset += tlen;
+    if (p->plugins->output->cp.offset >= p->plugins->cfg->output_size) {
+      ++p->plugins->output->cp.id;
+      hs_open_output_file(p->plugins->output);
       if (p->plugins->cfg->backpressure
-          && p->plugins->output.cp.id - p->plugins->output.min_cp_id
+          && p->plugins->output->cp.id - p->plugins->output->min_cp_id
           > p->plugins->cfg->backpressure) {
         backpressure = true;
         hs_log(NULL, g_module, 4, "applying backpressure (checkpoint)");
       }
       if (!backpressure && p->plugins->cfg->backpressure_df) {
-        unsigned df = hs_disk_free_ob(p->plugins->output.path,
+        unsigned df = hs_disk_free_ob(p->plugins->output->path,
                                       p->plugins->cfg->output_size);
         if (df <= p->plugins->cfg->backpressure_df) {
           backpressure = true;
@@ -166,13 +166,13 @@ static int inject_message(void *parent,
       last_bp_check = time(NULL);
       bool release_dfbp = true;
       if (p->plugins->cfg->backpressure_df) {
-        unsigned df = hs_disk_free_ob(p->plugins->output.path,
+        unsigned df = hs_disk_free_ob(p->plugins->output->path,
                                       p->plugins->cfg->output_size);
         release_dfbp = (df > p->plugins->cfg->backpressure_df);
       }
       // even if we triggered on disk space continue to backpressure
       // until the queue is caught up too
-      if (p->plugins->output.cp.id == p->plugins->output.min_cp_id
+      if (p->plugins->output->cp.id == p->plugins->output->min_cp_id
           && release_dfbp) {
         backpressure = false;
         hs_log(NULL, g_module, 4, "releasing backpressure");
@@ -180,11 +180,11 @@ static int inject_message(void *parent,
     }
   } else {
     hs_log(NULL, g_module, 0, "inject_message fwrite failed: %s",
-           strerror(ferror(p->plugins->output.fh)));
+           strerror(ferror(p->plugins->output->fh)));
     exit(EXIT_FAILURE);
   }
   bp = backpressure;
-  pthread_mutex_unlock(&p->plugins->output.lock);
+  pthread_mutex_unlock(&p->plugins->output->lock);
 
   if (bp) {
     usleep(100000); // throttle to 10 messages per second
@@ -539,13 +539,14 @@ static void add_to_input_plugins(hs_input_plugins *plugins, hs_input_plugin *p)
 
 void hs_init_input_plugins(hs_input_plugins *plugins,
                            hs_config *cfg,
-                           hs_checkpoint_reader *cpr)
+                           hs_checkpoint_reader *cpr,
+                           hs_output *output)
 {
-  hs_init_output(&plugins->output, cfg->output_path, hs_input_dir);
   plugins->cfg = cfg;
   plugins->cpr = cpr;
-  plugins->list_cnt = 0;
+  plugins->output = output;
   plugins->list = NULL;
+  plugins->list_cnt = 0;
   plugins->list_cap = 0;
 #ifdef HINDSIGHT_CLI
   plugins->terminated = false;
@@ -578,7 +579,7 @@ void hs_free_input_plugins(hs_input_plugins *plugins)
   plugins->list = NULL;
 
   pthread_mutex_destroy(&plugins->list_lock);
-  hs_free_output(&plugins->output);
+  plugins->output = NULL;
   plugins->cfg = NULL;
   plugins->list_cnt = 0;
   plugins->list_cap = 0;

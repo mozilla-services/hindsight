@@ -168,8 +168,11 @@ int main(int argc, char *argv[])
     return EXIT_FAILURE;
   }
 
+  hs_output input_queue;
+  hs_init_output(&input_queue, cfg.output_path, hs_input_dir);
+
   hs_input_plugins ips;
-  hs_init_input_plugins(&ips, &cfg, &cpr);
+  hs_init_input_plugins(&ips, &cfg, &cpr, &input_queue);
   hs_load_input_startup(&ips);
 
   hs_analysis_plugins aps;
@@ -178,7 +181,7 @@ int main(int argc, char *argv[])
   hs_start_analysis_threads(&aps);
 
   hs_output_plugins ops;
-  hs_init_output_plugins(&ops, &cfg, &cpr);
+  hs_init_output_plugins(&ops, &cfg, &cpr, &input_queue);
   hs_load_output_startup(&ops);
 
   hs_checkpoint_writer cpw;
@@ -251,7 +254,6 @@ int main(int argc, char *argv[])
   if (ips.terminated) {
     rv = 2;
   }
-  hs_free_input_plugins(&ips);
 
   hs_stop_analysis_plugins(&aps);
   hs_wait_analysis_plugins(&aps);
@@ -259,7 +261,6 @@ int main(int argc, char *argv[])
     rv |= 4;
   }
   hs_write_checkpoints(&cpw, &cpr);
-  hs_free_analysis_plugins(&aps);
 
   hs_stop_output_plugins(&ops);
   hs_wait_output_plugins(&ops);
@@ -267,7 +268,6 @@ int main(int argc, char *argv[])
   if (ops.terminated) {
     rv |= 8;
   }
-  hs_free_output_plugins(&ops);
   pthread_kill(sig_thread, SIGHUP);
 #else
   // non CLI mode should shut everything down immediately
@@ -280,12 +280,12 @@ int main(int argc, char *argv[])
   hs_wait_output_plugins(&ops);
 
   hs_write_checkpoints(&cpw, &cpr);
+#endif
 
   hs_free_input_plugins(&ips);
   hs_free_analysis_plugins(&aps);
   hs_free_output_plugins(&ops);
-#endif
-
+  hs_free_output(&input_queue);
   hs_free_checkpoint_writer(&cpw);
   hs_free_checkpoint_reader(&cpr);
   hs_free_config(&cfg);

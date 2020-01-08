@@ -67,19 +67,21 @@ struct hs_output_plugins {
   hs_output_plugin      **list;
   hs_config             *cfg;
   hs_checkpoint_reader  *cpr;
+  hs_output             *output;
 
+  pthread_mutex_t list_lock;
   int list_cnt;
   int list_cap;
 
-  pthread_mutex_t list_lock;
 #ifdef HINDSIGHT_CLI
-  bool            terminated;
+  bool terminated;
 #endif
 };
 
 void hs_init_output_plugins(hs_output_plugins *plugins,
                             hs_config *cfg,
-                            hs_checkpoint_reader *cpr);
+                            hs_checkpoint_reader *cpr,
+                            hs_output *output);
 
 void hs_free_output_plugins(hs_output_plugins *plugins);
 
