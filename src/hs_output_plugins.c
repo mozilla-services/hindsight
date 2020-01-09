@@ -32,6 +32,74 @@
 
 static const char g_module[] = "output_plugins";
 
+
+static int inject_message(void *parent, const char *pb, size_t pb_len)
+{
+  static time_t last_bp_check = 0;
+  static bool backpressure = false;
+  static char header[14];
+
+  hs_output_plugin *p = parent;
+  bool bp;
+  pthread_mutex_lock(&p->plugins->output->lock);
+  int len = lsb_pb_output_varint(header + 3, pb_len);
+  int tlen = 4 + len + pb_len;
+  header[0] = 0x1e;
+  header[1] = (char)(len + 1);
+  header[2] = 0x08;
+  header[3 + len] = 0x1f;
+  if (fwrite(header, 4 + len, 1, p->plugins->output->fh) == 1
+      && fwrite(pb, pb_len, 1, p->plugins->output->fh) == 1) {
+    p->plugins->output->cp.offset += tlen;
+    if (p->plugins->output->cp.offset >= p->plugins->cfg->output_size) {
+      ++p->plugins->output->cp.id;
+      hs_open_output_file(p->plugins->output);
+      if (p->plugins->cfg->backpressure
+          && p->plugins->output->cp.id - p->plugins->output->min_cp_id
+          > p->plugins->cfg->backpressure) {
+        backpressure = true;
+        hs_log(NULL, g_module, 4, "applying backpressure (checkpoint)");
+      }
+      if (!backpressure && p->plugins->cfg->backpressure_df) {
+        unsigned df = hs_disk_free_ob(p->plugins->output->path,
+                                      p->plugins->cfg->output_size);
+        if (df <= p->plugins->cfg->backpressure_df) {
+          backpressure = true;
+          hs_log(NULL, g_module, 4, "applying backpressure (disk)");
+        }
+      }
+    }
+    if (backpressure && last_bp_check < time(NULL)) {
+      last_bp_check = time(NULL);
+      bool release_dfbp = true;
+      if (p->plugins->cfg->backpressure_df) {
+        unsigned df = hs_disk_free_ob(p->plugins->output->path,
+                                      p->plugins->cfg->output_size);
+        release_dfbp = (df > p->plugins->cfg->backpressure_df);
+      }
+      // even if we triggered on disk space continue to backpressure
+      // until the queue is caught up too
+      if (p->plugins->output->cp.id == p->plugins->output->min_cp_id
+          && release_dfbp) {
+        backpressure = false;
+        hs_log(NULL, g_module, 4, "releasing backpressure");
+      }
+    }
+  } else {
+    hs_log(NULL, g_module, 0, "inject_message fwrite failed: %s",
+           strerror(ferror(p->plugins->output->fh)));
+    exit(EXIT_FAILURE);
+  }
+  bp = backpressure;
+  pthread_mutex_unlock(&p->plugins->output->lock);
+
+  if (bp) {
+    usleep(100000); // throttle to 10 messages per second
+  }
+  return LSB_HEKA_IM_SUCCESS;
+}
+
+
 static void destroy_output_plugin(hs_output_plugin *p)
 {
   if (!p) return;
@@ -217,12 +285,12 @@ create_output_plugin(const hs_config *cfg, hs_sandbox_config *sbc)
     return NULL;
   }
   lsb_logger logger = { .context = &p->ctx, .cb = hs_log };
-  p->hsb = lsb_heka_create_output(p, lua_file, state_file, ob.buf, &logger,
-                                  update_checkpoint_callback);
+  p->hsb = lsb_heka_create_output_im(p, lua_file, state_file, ob.buf, &logger,
+                                  update_checkpoint_callback, inject_message);
 
   if (!p->hsb && hs_is_bad_state(cfg->run_path, p->name, state_file)) {
-    p->hsb = lsb_heka_create_output(p, lua_file, state_file, ob.buf, &logger,
-                                    update_checkpoint_callback);
+    p->hsb = lsb_heka_create_output_im(p, lua_file, state_file, ob.buf, &logger,
+                                    update_checkpoint_callback, inject_message);
   }
   lsb_free_output_buffer(&ob);
   free(sbc->cfg_lua);
@@ -773,10 +841,12 @@ static void add_to_output_plugins(hs_output_plugins *plugins,
 
 void hs_init_output_plugins(hs_output_plugins *plugins,
                             hs_config *cfg,
-                            hs_checkpoint_reader *cpr)
+                            hs_checkpoint_reader *cpr,
+                            hs_output *output)
 {
   plugins->cfg = cfg;
   plugins->cpr = cpr;
+  plugins->output = output;
   plugins->list = NULL;
   plugins->list_cnt = 0;
   plugins->list_cap = 0;
@@ -824,6 +894,7 @@ void hs_free_output_plugins(hs_output_plugins *plugins)
   free(plugins->list);
 
   pthread_mutex_destroy(&plugins->list_lock);
+  plugins->output = NULL;
   plugins->list = NULL;
   plugins->cfg = NULL;
   plugins->list_cnt = 0;

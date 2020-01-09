@@ -150,13 +150,13 @@ static void input_stats(hs_checkpoint_writer *cpw, hs_checkpoint_reader *cpr,
   }
   pthread_mutex_unlock(&cpw->input_plugins->list_lock);
 
-  pthread_mutex_lock(&cpw->input_plugins->output.lock);
-  if (fflush(cpw->input_plugins->output.fh)) {
+  pthread_mutex_lock(&cpw->input_plugins->output->lock);
+  if (fflush(cpw->input_plugins->output->fh)) {
     hs_log(NULL, g_module, 0, "input queue fflush failed");
     exit(EXIT_FAILURE);
   }
-  cpi->cp = cpw->input_plugins->output.cp;
-  pthread_mutex_unlock(&cpw->input_plugins->output.lock);
+  cpi->cp = cpw->input_plugins->output->cp;
+  pthread_mutex_unlock(&cpw->input_plugins->output->lock);
   hs_update_input_checkpoint(cpr, hs_input_dir, NULL, &cpi->cp);
 }
 
@@ -402,17 +402,9 @@ void hs_write_checkpoints(hs_checkpoint_writer *cpw, hs_checkpoint_reader *cpr)
     cpi.tsv_error = !(cpi.utsv && cpi.ptsv);
   }
   cpi.sample = (cpi.sample_cnt % sample_sec == 0);
-  if (cpw->input_plugins) {
-    input_stats(cpw, cpr, &cpi);
-  }
-
-  if (cpw->analysis_plugins) {
-    analysis_stats(cpw, cpr, &cpi);
-  }
-
-  if (cpw->output_plugins) {
-    output_stats(cpw, cpr, &cpi);
-  }
+  input_stats(cpw, cpr, &cpi);
+  analysis_stats(cpw, cpr, &cpi);
+  output_stats(cpw, cpr, &cpi);
 
   if (cpi.ptsv) {
     if (!fclose(cpi.ptsv)) rename(cpw->ptsv_path_tmp, cpw->ptsv_path);
@@ -421,13 +413,13 @@ void hs_write_checkpoints(hs_checkpoint_writer *cpw, hs_checkpoint_reader *cpr)
     if (!fclose(cpi.utsv)) rename(cpw->utsv_path_tmp, cpw->utsv_path);
   }
 
-  if (cpw->input_plugins) {
-    cpw->input_plugins->output.min_cp_id = cpi.min_input_id;
-  }
+  pthread_mutex_lock(&cpw->input_plugins->output->lock);
+  cpw->input_plugins->output->min_cp_id = cpi.min_input_id;
+  pthread_mutex_unlock(&cpw->input_plugins->output->lock);
 
-  if (cpw->analysis_plugins) {
-    cpw->analysis_plugins->output.min_cp_id = cpi.min_analysis_id;
-  }
+  pthread_mutex_lock(&cpw->analysis_plugins->output.lock);
+  cpw->analysis_plugins->output.min_cp_id = cpi.min_analysis_id;
+  pthread_mutex_unlock(&cpw->analysis_plugins->output.lock);
 
   if (++cpi.sample_cnt == 60) cpi.sample_cnt = 0;
 

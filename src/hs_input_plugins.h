@@ -42,20 +42,21 @@ struct hs_input_plugins {
   hs_input_plugin       **list;
   hs_config             *cfg;
   hs_checkpoint_reader  *cpr;
+  hs_output             *output;
 
   pthread_mutex_t list_lock;
   int list_cnt;
   int list_cap;
 
-  hs_output output;
 #ifdef HINDSIGHT_CLI
-  bool      terminated;
+  bool terminated;
 #endif
 };
 
 void hs_init_input_plugins(hs_input_plugins *plugins,
                            hs_config *cfg,
-                           hs_checkpoint_reader *cpr);
+                           hs_checkpoint_reader *cpr,
+                           hs_output *output);
 
 void hs_free_input_plugins(hs_input_plugins *plugins);
 
