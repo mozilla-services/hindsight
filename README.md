@@ -18,7 +18,7 @@ running instance here: [hsadmin](https://hsadmin.trink.com/))
 
 * [Full Documentation](http://mozilla-services.github.io/hindsight)
 * Support
-    * IRC: [#hindsight on irc.mozilla.org](irc://irc.mozilla.org/hindsight)
+    * Chat: [Matrix](https://chat.mozilla.org/#/room/#hindsight:mozilla.org)
     * Mailing list: https://mail.mozilla.org/listinfo/hindsight
 
 ## Build
