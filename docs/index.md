@@ -16,12 +16,12 @@ So how much lighter and faster? see: [Performance](performance.md)
 * [Architecture](architecture.md)
 * [Configuration](configuration.md)
 * [Command Line Version](hindsight_cli.md)
-* [Heka Sandbox Documentation](http://mozilla-services.github.io/lua_sandbox/heka/index.html)
-* [Sandbox Extensions Documentation](http://mozilla-services.github.io/lua_sandbox_extensions/index.html)
+* [Heka Sandbox Documentation](https://mozilla-services.github.io/lua_sandbox/heka/index.html)
+* [Sandbox Extensions Documentation](https://mozilla-services.github.io/lua_sandbox_extensions/index.html)
 
 ### Differences from Heka
 
-1. [Sandbox API Differences](http://mozilla-services.github.io/lua_sandbox/heka/index.html#sandbox-api-changes-from-the-go-heka-sandbox)
+1. [Sandbox API Differences](https://mozilla-services.github.io/lua_sandbox/heka/index.html#sandbox-api-changes-from-the-go-heka-sandbox)
 1. The message matcher now uses Lua string match patterns instead of RE2
 expressions.
 1. Looping messages in Heka, injecting messages back to an earlier point in the

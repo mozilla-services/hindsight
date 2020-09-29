@@ -1,10 +1,10 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 if(MSVC)
-    # Predefined Macros: http://msdn.microsoft.com/en-us/library/b0084kay.aspx
-    # Compiler options: http://msdn.microsoft.com/en-us/library/fwkeyyhe.aspx
+    # Predefined Macros: https://msdn.microsoft.com/en-us/library/b0084kay.aspx
+    # Compiler options: https://msdn.microsoft.com/en-us/library/fwkeyyhe.aspx
 
     # set a high warning level and treat them as errors
     set(CMAKE_C_FLAGS           "/W3 /WX")
@@ -18,7 +18,7 @@ if(MSVC)
     set(CPACK_GENERATOR         "NSIS")
 else()
     # Predefined Macros: clang|gcc -dM -E -x c /dev/null
-    # Compiler options: http://gcc.gnu.org/onlinedocs/gcc/Invoking-GCC.html#Invoking-GCC
+    # Compiler options: https://gcc.gnu.org/onlinedocs/gcc/Invoking-GCC.html#Invoking-GCC
     set(CMAKE_C_FLAGS   "-std=c99 -pedantic -Werror -Wno-error=deprecated -Wall -Wextra -fPIC")
     set(CMAKE_C_FLAGS_DEBUG     "-g")
 
