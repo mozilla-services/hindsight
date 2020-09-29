@@ -16,7 +16,7 @@ is stable and changes infrequently.  There is also a [Hindsight Administration U
 available for monitoring, debugging and plugin management (you can check out a
 running instance here: [hsadmin](https://hsadmin.trink.com/))
 
-* [Full Documentation](http://mozilla-services.github.io/hindsight)
+* [Full Documentation](https://mozilla-services.github.io/hindsight)
 * Support
     * Chat: [Matrix](https://chat.mozilla.org/#/room/#hindsight:mozilla.org)
     * Mailing list: https://mail.mozilla.org/listinfo/hindsight
@@ -26,7 +26,7 @@ running instance here: [hsadmin](https://hsadmin.trink.com/))
 ### Prerequisites
 
 * Clang 3.1 or GCC 4.7+
-* CMake (3.6+) - http://cmake.org/cmake/resources/software.html
+* CMake (3.6+) - https://cmake.org/cmake/resources/software.html
 * lua_sandbox (1.2.3+) - https://github.com/mozilla-services/lua_sandbox
 * OpenSSL (1.0.x+, optional)
 

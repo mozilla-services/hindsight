@@ -19,7 +19,7 @@ configurations discussed here are independent from the input plugin being used.
 
 ## Definition of Terms
 
-* [Input Plugin](http://mozilla-services.github.io/lua_sandbox/heka/input.html) -
+* [Input Plugin](https://mozilla-services.github.io/lua_sandbox/heka/input.html) -
   A piece of Lua code that loads data into Hindsight
 * Decoders/Sub-decoders - Zero or more stages during the input process where the
   raw data is transformed into a more useful form
@@ -44,7 +44,7 @@ This is an example of a basic syslog decoder that extracts the header
 information (timestamp, hostname, pid, programname) and the message string. The
 only thing required to configure the basic syslog decoder is the template
 configuration specified in the
-[rsyslog.conf](http://rsyslog-5-8-6-doc.neocities.org/rsyslog_conf_templates.html)
+[rsyslog.conf](https://rsyslog-5-8-6-doc.neocities.org/rsyslog_conf_templates.html)
 file. The template below is the RSYSLOG_TraditionalFileFormat without the new
 line at the end since that is consumed by the file input. The Uuid (type 4
 random) and Logger (input plugin name) are added to the output by Hindsight.

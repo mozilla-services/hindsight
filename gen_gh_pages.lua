@@ -1,6 +1,6 @@
 -- This Source Code Form is subject to the terms of the Mozilla Public
 -- License, v. 2.0. If a copy of the MPL was not distributed with this
--- file, You can obtain one at http://mozilla.org/MPL/2.0/.
+-- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 require "os"
 require "io"
@@ -16,8 +16,8 @@ local function output_menu(output_dir, version)
 * [Configuration](configuration.md)
 * [Command Line Version](hindsight_cli.md)
 * [Execution Profiling](hindsight_timer_report.md)
-* [Heka Sandbox Documentation](http://mozilla-services.github.io/lua_sandbox/heka/index.html)
-* [Sandbox Extensions Documentation](http://mozilla-services.github.io/lua_sandbox_extensions/index.html)
+* [Heka Sandbox Documentation](https://mozilla-services.github.io/lua_sandbox/heka/index.html)
+* [Sandbox Extensions Documentation](https://mozilla-services.github.io/lua_sandbox_extensions/index.html)
 
 ### Tutorials
 
