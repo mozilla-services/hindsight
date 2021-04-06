@@ -27,5 +27,4 @@ usage: hindsight_cli <cfg> <log_level>
 
 ## Integration Test Example
 
-[Mozilla Telemetry Integration Tests](https://github.com/mozilla-services/lua_sandbox_extensions/tree/master/moz_telemetry/tests/hindsight)
-
+[Mozilla Telemetry Integration Tests](https://github.com/mozilla-services/lua_sandbox_extensions/tree/main/moz_telemetry/tests/hindsight)
