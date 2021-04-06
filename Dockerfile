@@ -31,7 +31,7 @@ ENV PERL5LIB='PERL5LIB=/opt/rh/devtoolset-7/root//usr/lib64/perl5/vendor_perl:/o
     PYTHONPATH=/opt/rh/devtoolset-7/root/usr/lib64/python2.7/site-packages:/opt/rh/devtoolset-7/root/usr/lib/python2.7/site-packages \
     PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
 
-# Compile and install lua_sandbox using master branch
+# Compile and install lua_sandbox using main branch
 RUN git clone https://github.com/mozilla-services/lua_sandbox && \
     mkdir -p lua_sandbox/release && cd lua_sandbox/release && \
     cmake -DCMAKE_BUILD_TYPE=release .. && \

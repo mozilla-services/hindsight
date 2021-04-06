@@ -52,7 +52,7 @@ using any sandboxes/modules that make use of OpenSSL and do not want the depende
 
 ## Releases
 
-* The master branch is the current release and is considered stable at all
+* The main branch is the current release and is considered stable at all
   times.
 * New versions can be released as frequently as every two weeks (our sprint
   cycle). The only exception would be for a high priority patch.
@@ -60,13 +60,13 @@ using any sandboxes/modules that make use of OpenSSL and do not want the depende
   project dashboard.
 * New releases occur the day after the sprint finishes.
   * The version in the dev branch is updated
-  * The changes are merged into master
+  * The changes are merged into main
   * A new tag is created
 
 ## Docker Images
 
 [Docker images](https://hub.docker.com/r/mozilla/hindsight/tags) are constructed from the
-master and dev branches and can be pulled, or built using the Dockerfile.
+main and dev branches and can be pulled, or built using the Dockerfile.
 
 Note that the Docker image built here is only a bare bones image containing just lua_sandbox
 and hindsight. For a more full featured image that also contains all of the extensions, see
@@ -76,7 +76,7 @@ repo.
 ## Contributions
 
 * All pull requests must be made against the dev branch, direct commits to
-  master are not permitted.
+  main are not permitted.
 * All non trivial contributions should start with an issue being filed (if it is
   a new feature please propose your design/approach before doing any work as not
   all feature requests are accepted).
