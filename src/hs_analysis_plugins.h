@@ -42,6 +42,7 @@ struct hs_analysis_plugin {
   unsigned            im_limit;
   unsigned            pm_im_limit;
   unsigned            te_im_limit;
+  bool                cpu_affinity;
   time_t              ticker_expires;
   hs_log_context      ctx;
 };
@@ -77,6 +78,7 @@ struct hs_analysis_thread {
   uint8_t   utilization;
   bool      stop;
   bool      sample;
+  bool      cpu_affinity;
 #ifdef HINDSIGHT_CLI
   bool      terminated;
 #endif

@@ -85,6 +85,7 @@ input_defaults = {
 
 analysis_defaults = {
   -- see: Default Sandbox Configuration Variables
+  -- cpu_affinity           = false
 }
 
 output_defaults = {
@@ -127,6 +128,8 @@ output_defaults = {
 * **timer_event_inject_limit** - the maximum number of messages the
   `timer_event` function can inject in a single invocation (count,
   default 10).
+
+* **cpu_affinity** - if analysis threads should be pinned to a logical CPU core (bool, default false)
 
 #### Default Output Sandbox Configuration Variables
 
